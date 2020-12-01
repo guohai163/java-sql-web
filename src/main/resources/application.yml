@@ -1,0 +1,21 @@
+server:
+  port: 8002
+  tomcat:
+    uri-encoding: UTF-8
+spring:
+  datasource:
+    type: com.alibaba.druid.pool.DruidDataSource
+    druid:
+      url: jdbc:mysql://localhost:3306/javasqladmin_db?useUnicode=true&characterEncoding=UTF-8&allowMultiQueries=true
+      username: root
+      password: Passw0rd
+  freemarker:
+    template-loader-path: classpath:/web/
+    cache: false
+    charset: UTF-8
+    content-type: text/html
+    suffix: .ftl
+    check-template-location: true
+    expose-request-attributes: true
+    expose-session-attributes: true
+    request-context-attribute: request

@@ -1,0 +1,14 @@
+#%RAML 1.0
+title: javaSqlAdmin
+version: v1
+baseUri: http://127.0.0.1:8002
+
+/database:
+  /infoall:
+    get:
+      body:
+        application/json:
+      responses:
+        200:
+  /dblist:
+    get:
