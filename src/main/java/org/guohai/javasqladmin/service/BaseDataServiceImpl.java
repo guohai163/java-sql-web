@@ -3,6 +3,7 @@ package org.guohai.javasqladmin.service;
 import org.guohai.javasqladmin.beans.ConnectConfigBean;
 import org.guohai.javasqladmin.beans.DatabaseNameBean;
 import org.guohai.javasqladmin.beans.Result;
+import org.guohai.javasqladmin.beans.TablesNameBean;
 import org.guohai.javasqladmin.dao.BaseConfigDao;
 import org.guohai.javasqladmin.service.operation.DBOperation;
 import org.guohai.javasqladmin.service.operation.DBOperationFactory;
@@ -32,13 +33,40 @@ public class BaseDataServiceImpl implements BaseDataService{
     @Override
     public Result<List<DatabaseNameBean>> getDbName(Integer dbCode) {
         ConnectConfigBean connConfigBean = baseConfigDao.getConnectConfig(dbCode);
-        DBOperation operation = DBOperationFactory.createDBOperation(connConfigBean);
+        DBOperation operation = null;
+        try {
+            operation = DBOperationFactory.createDBOperation(connConfigBean);
+        } catch (SQLException throwables) {
+            throwables.printStackTrace();
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        }
 
         try {
             return new Result<>(true, operation.getDBList());
         } catch (SQLException throwables) {
             throwables.printStackTrace();
         } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        }
+        return new Result<>(false,null);
+    }
+
+    /**
+     * 获得指定库的所有表名
+     *
+     * @param dbCode
+     * @param dbName
+     * @return
+     */
+    @Override
+    public Result<List<TablesNameBean>> getTableList(Integer dbCode, String dbName) {
+        ConnectConfigBean connConfigBean = baseConfigDao.getConnectConfig(dbCode);
+        DBOperation operation = null;
+        try {
+            operation = DBOperationFactory.createDBOperation(connConfigBean);
+            return new Result<>(true, operation.getTableList(dbName));
+        } catch (Exception e) {
             e.printStackTrace();
         }
         return new Result<>(false,null);

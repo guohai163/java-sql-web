@@ -38,11 +38,13 @@
             <artifactId>mysql-connector-java</artifactId>
             <scope>runtime</scope>
         </dependency>
+        <!-- https://mvnrepository.com/artifact/com.microsoft.sqlserver/mssql-jdbc -->
         <dependency>
             <groupId>com.microsoft.sqlserver</groupId>
-            <artifactId>jdbc</artifactId>
-            <version>4.0.2206.100</version>
+            <artifactId>mssql-jdbc</artifactId>
+            <version>8.4.1.jre11</version>
         </dependency>
+
         <dependency>
             <groupId>com.alibaba</groupId>
             <artifactId>druid-spring-boot-starter</artifactId>
