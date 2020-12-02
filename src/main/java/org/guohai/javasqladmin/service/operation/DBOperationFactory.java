@@ -10,11 +10,21 @@ import java.sql.SQLException;
  */
 public class DBOperationFactory {
 
-    public static DBOperation createDBOperation(ConnectConfigBean conn) throws SQLException, ClassNotFoundException {
+    /**
+     * MYSQL常量
+     */
+    private static final String MYSQL = "mysql";
+
+    /**
+     * MSSQL常量
+     */
+    private static final String MSSQL = "mssql";
+
+    public static DBOperation createDbOperation(ConnectConfigBean conn) throws SQLException, ClassNotFoundException {
         DBOperation operation = null;
-        if("mysql".equals(conn.getDbServerType())) {
+        if(MYSQL.equals(conn.getDbServerType())) {
             operation = new DBOperationMysql(conn);
-        } else if("mssql".equals(conn.getDbServerType())) {
+        } else if(MSSQL.equals(conn.getDbServerType())) {
             operation = new DBOperationMssql(conn);
         }
         return operation;

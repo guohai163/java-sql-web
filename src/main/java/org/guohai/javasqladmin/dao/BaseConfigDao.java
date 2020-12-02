@@ -7,6 +7,10 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 
+/**
+ * 基础信息DAO
+ * @author guohai
+ */
 @Repository
 public interface BaseConfigDao {
 

@@ -34,7 +34,7 @@ public class BaseDataController {
      */
     @ResponseBody
     @RequestMapping(value = "/dblist/{serverCode}")
-    public Result<List<DatabaseNameBean>> getAllDBName(@PathVariable("serverCode") String serverCode){
+    public Result<List<DatabaseNameBean>> getAllDbName(@PathVariable("serverCode") String serverCode){
         return baseDataService.getDbName(Integer.parseInt(serverCode));
     }
 

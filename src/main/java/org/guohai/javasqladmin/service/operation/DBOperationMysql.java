@@ -13,7 +13,7 @@ public class DBOperationMysql implements DBOperation {
     }
 
     @Override
-    public List<DatabaseNameBean> getDBList() {
+    public List<DatabaseNameBean> getDbList() {
         return null;
     }
 

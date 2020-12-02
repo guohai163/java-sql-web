@@ -7,7 +7,6 @@ import org.guohai.javasqladmin.service.operation.DBOperationFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,7 +39,7 @@ public class BaseDataServiceImpl implements BaseDataService{
         DBOperation operation = createDbOperation(serverCode);
         if(null != operation){
             try{
-                return new Result<>(true, operation.getDBList());
+                return new Result<>(true, operation.getDbList());
             } catch (Exception e) {
                 e.printStackTrace();
                 return new Result<>(false,null);
@@ -154,7 +153,7 @@ public class BaseDataServiceImpl implements BaseDataService{
                 if(null == operationMap.get(serverCode)){
                     ConnectConfigBean connConfigBean = baseConfigDao.getConnectConfig(serverCode);
                     try{
-                        dbOperation = DBOperationFactory.createDBOperation(connConfigBean);
+                        dbOperation = DBOperationFactory.createDbOperation(connConfigBean);
                         operationMap.put(serverCode,dbOperation);
                     } catch (Exception e){
                         e.printStackTrace();

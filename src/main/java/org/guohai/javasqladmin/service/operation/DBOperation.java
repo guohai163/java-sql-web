@@ -19,12 +19,13 @@ public interface DBOperation {
      * @throws SQLException
      * @throws ClassNotFoundException
      */
-    List<DatabaseNameBean> getDBList() throws SQLException, ClassNotFoundException;
+    List<DatabaseNameBean> getDbList() throws SQLException, ClassNotFoundException;
 
     /**
      * 获得实例指定库的所有表名
-     * @param dbName
-     * @return
+     * @param dbName 库名
+     * @return 返回集合
+     * @throws SQLException 抛出异常
      */
     List<TablesNameBean> getTableList(String dbName) throws SQLException;
 
@@ -33,6 +34,7 @@ public interface DBOperation {
      * @param dbName
      * @param tableName
      * @return
+     * @throws SQLException 抛出异常
      */
     List<ColumnsNameBean> getColumnsList(String dbName, String tableName) throws SQLException;
 
@@ -41,6 +43,7 @@ public interface DBOperation {
      * @param dbName
      * @param tableName
      * @return
+     * @throws SQLException 抛出异常
      */
     List<TableIndexesBean> getIndexesList(String dbName, String tableName) throws SQLException;
 
@@ -49,6 +52,7 @@ public interface DBOperation {
      * @param dbName
      * @param sql
      * @return
+     * @throws SQLException 抛出异常
      */
     Object queryDatabaseBySql(String dbName, String sql) throws SQLException;
 }

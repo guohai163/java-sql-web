@@ -57,12 +57,12 @@ public class DBOperationMssql implements DBOperation {
      * @throws ClassNotFoundException
      */
     @Override
-    public List<DatabaseNameBean> getDBList() throws SQLException {
-        List<DatabaseNameBean> listDNB = new ArrayList<>();
+    public List<DatabaseNameBean> getDbList() throws SQLException {
+        List<DatabaseNameBean> listDnb = new ArrayList<>();
         Statement st = sqlConn.createStatement();
         ResultSet rs = st.executeQuery("SELECT database_id,name FROM sys.databases ;");
         while (rs.next()){
-            listDNB.add(new DatabaseNameBean(rs.getObject("name").toString()));
+            listDnb.add(new DatabaseNameBean(rs.getObject("name").toString()));
         }
         // 关闭rs和statement
         if (rs != null) {
@@ -71,7 +71,7 @@ public class DBOperationMssql implements DBOperation {
         if (st != null) {
             st.close();
         }
-        return listDNB;
+        return listDnb;
     }
 
     /**
@@ -82,13 +82,13 @@ public class DBOperationMssql implements DBOperation {
      */
     @Override
     public List<TablesNameBean> getTableList(String dbName) throws SQLException {
-        List<TablesNameBean> listTNB = new ArrayList<>();
+        List<TablesNameBean> listTnb = new ArrayList<>();
         Statement st = sqlConn.createStatement();
         ResultSet rs = st.executeQuery(String.format("use %s;" +
                 "SELECT a.name, b.rows FROM sysobjects a JOIN sysindexes b ON a.id = b.id " +
                 "WHERE xtype = 'u' and indid in (0,1);", dbName));
         while (rs.next()){
-            listTNB.add(new TablesNameBean(rs.getObject("name").toString(),
+            listTnb.add(new TablesNameBean(rs.getObject("name").toString(),
                                 rs.getInt("rows")));
         }
         // 关闭rs和statement
@@ -98,7 +98,7 @@ public class DBOperationMssql implements DBOperation {
         if (st != null) {
             st.close();
         }
-        return listTNB;
+        return listTnb;
     }
 
     /**
@@ -109,7 +109,7 @@ public class DBOperationMssql implements DBOperation {
      */
     @Override
     public List<ColumnsNameBean> getColumnsList(String dbName, String tableName) throws SQLException {
-        List<ColumnsNameBean> listCNB = new ArrayList<>();
+        List<ColumnsNameBean> listCnb = new ArrayList<>();
         Statement st = sqlConn.createStatement();
         ResultSet rs = st.executeQuery(String.format("use %s;" +
                 "SELECT b.name column_name,c.name column_type,c.length column_length \n" +
@@ -117,7 +117,7 @@ public class DBOperationMssql implements DBOperation {
                 "join systypes c on b.xtype=c.xusertype\n" +
                 "where a.name='%s'", dbName, tableName));
         while (rs.next()){
-            listCNB.add(new ColumnsNameBean(rs.getObject("column_name").toString(),
+            listCnb.add(new ColumnsNameBean(rs.getObject("column_name").toString(),
                                             rs.getObject("column_type").toString(),
                                             rs.getObject("column_length").toString()));
         }
@@ -128,7 +128,7 @@ public class DBOperationMssql implements DBOperation {
         if (st != null) {
             st.close();
         }
-        return listCNB;
+        return listCnb;
     }
 
     /**
@@ -140,12 +140,12 @@ public class DBOperationMssql implements DBOperation {
      */
     @Override
     public List<TableIndexesBean> getIndexesList(String dbName, String tableName) throws SQLException {
-        List<TableIndexesBean> listTIB = new ArrayList<>();
+        List<TableIndexesBean> listTib = new ArrayList<>();
         Statement st = sqlConn.createStatement();
         ResultSet rs = st.executeQuery(String.format("use %s;" +
                 "exec sp_helpindex '%s'", dbName, tableName));
         while (rs.next()){
-            listTIB.add(new TableIndexesBean(rs.getObject("index_name").toString(),
+            listTib.add(new TableIndexesBean(rs.getObject("index_name").toString(),
                     rs.getObject("index_description").toString(),
                     rs.getObject("index_keys").toString()));
         }
@@ -156,7 +156,7 @@ public class DBOperationMssql implements DBOperation {
         if (st != null) {
             st.close();
         }
-        return listTIB;
+        return listTib;
     }
 
     /**
