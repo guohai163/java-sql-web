@@ -43,4 +43,12 @@ public interface DBOperation {
      * @return
      */
     List<TableIndexesBean> getIndexesList(String dbName, String tableName) throws SQLException;
+
+    /**
+     * 执行查询的SQL
+     * @param dbName
+     * @param sql
+     * @return
+     */
+    Object queryDatabaseBySql(String dbName, String sql) throws SQLException;
 }

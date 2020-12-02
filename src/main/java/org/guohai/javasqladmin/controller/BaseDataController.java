@@ -6,10 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -32,35 +29,43 @@ public class BaseDataController {
 
     /**
      * 通过DBCode获得所有库
-     * @param dbCode
+     * @param serverCode
      * @return
      */
     @ResponseBody
-    @RequestMapping(value = "/dblist/{dbCode}")
-    public Result<List<DatabaseNameBean>> getAllDBName(@PathVariable("dbCode") String dbCode){
-        return baseDataService.getDbName(Integer.parseInt(dbCode));
+    @RequestMapping(value = "/dblist/{serverCode}")
+    public Result<List<DatabaseNameBean>> getAllDBName(@PathVariable("serverCode") String serverCode){
+        return baseDataService.getDbName(Integer.parseInt(serverCode));
     }
 
     /**
      * 通过库编号+库名获得表列表
-     * @param dbCode
+     * @param serverCode
      * @param dbName
      * @return
      */
     @ResponseBody
-    @RequestMapping(value = "/tablelist/{dbCode}/{dbName}")
-    public Result<List<TablesNameBean>> getTableName(@PathVariable("dbCode") String dbCode, @PathVariable("dbName") String dbName){
-        return baseDataService.getTableList(Integer.parseInt(dbCode),dbName);
+    @RequestMapping(value = "/tablelist/{serverCode}/{dbName}")
+    public Result<List<TablesNameBean>> getTableName(@PathVariable("serverCode") String serverCode, @PathVariable("dbName") String dbName){
+        return baseDataService.getTableList(Integer.parseInt(serverCode),dbName);
     }
 
     /**
      *
      */
     @ResponseBody
-    @RequestMapping(value = "/columnlist/{dbCode}/{dbName}/{tableName}")
-    public Result<List<ColumnsNameBean>> getColumnName(@PathVariable("dbCode") String dbCode,
+    @RequestMapping(value = "/columnlist/{serverCode}/{dbName}/{tableName}")
+    public Result<List<ColumnsNameBean>> getColumnName(@PathVariable("serverCode") String serverCode,
                                                        @PathVariable("dbName") String dbName,
                                                        @PathVariable("tableName") String tableName){
-        return baseDataService.getColumnList(Integer.parseInt(dbCode), dbName, tableName);
+        return baseDataService.getColumnList(Integer.parseInt(serverCode), dbName, tableName);
+    }
+
+    @ResponseBody
+    @RequestMapping(value = "/query/{serverCode}/{dbName}", method = RequestMethod.POST)
+    public Result<Object> quereyData(@PathVariable("serverCode") String serverCode,
+                                     @PathVariable("dbName") String dbName,
+                                     @RequestBody String sql){
+        return baseDataService.quereyDataBySql(Integer.parseInt(serverCode), dbName, sql);
     }
 }

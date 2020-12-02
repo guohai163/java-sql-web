@@ -49,4 +49,16 @@ public class DBOperationMysql implements DBOperation {
     public List<TableIndexesBean> getIndexesList(String dbName, String tableName) throws SQLException {
         return null;
     }
+
+    /**
+     * 执行查询的SQL
+     *
+     * @param dbName
+     * @param sql
+     * @return
+     */
+    @Override
+    public Object queryDatabaseBySql(String dbName, String sql) throws SQLException {
+        return null;
+    }
 }

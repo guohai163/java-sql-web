@@ -3,8 +3,7 @@ package org.guohai.javasqladmin.service.operation;
 import org.guohai.javasqladmin.beans.*;
 
 import java.sql.*;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 /**
  * 基于微软MSSQL的操作类
@@ -152,5 +151,42 @@ public class DBOperationMssql implements DBOperation {
             st.close();
         }
         return listTIB;
+    }
+
+    /**
+     * 执行查询的SQL
+     *
+     * @param dbName
+     * @param sql
+     * @return
+     */
+    @Override
+    public Object queryDatabaseBySql(String dbName, String sql) throws SQLException {
+        List<Map<String, Object>> listData = new ArrayList<>();
+        // TODO: 缺少SQL检查
+        Statement st = sqlConn.createStatement();
+        ResultSet rs = st.executeQuery(String.format("use %s;" +
+                "%s;", dbName, sql));
+        // 获得结果集结构信息,元数据
+        java.sql.ResultSetMetaData md = rs.getMetaData();
+        // 获得列数
+        int columnCount = md.getColumnCount();
+        while (rs.next()){
+            Map<String, Object> rowData = new LinkedHashMap<String, Object>();
+            for(int i=1;i<=columnCount;i++){
+                rowData.put(md.getColumnName(i),md.getColumnType(i) == 93
+                        ? rs.getDate(i) + " " + rs.getTime(i)
+                        : rs.getObject(i));
+            }
+            listData.add(rowData);
+        }
+        // 关闭rs和statement
+        if (rs != null) {
+            rs.close();
+        }
+        if (st != null) {
+            st.close();
+        }
+        return listData;
     }
 }

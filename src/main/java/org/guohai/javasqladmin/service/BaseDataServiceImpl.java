@@ -8,13 +8,20 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.sql.SQLException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class BaseDataServiceImpl implements BaseDataService{
 
     @Autowired
     BaseConfigDao baseConfigDao;
+
+    /**
+     * 服务器实例集合
+     */
+    private static Map<Integer,DBOperation> operationMap = new HashMap<>();
 
     @Override
     public Result<List<ConnectConfigBean>> getAllDataConnect() {
@@ -24,67 +31,138 @@ public class BaseDataServiceImpl implements BaseDataService{
     /**
      * 活的指定DB服务器的库名列表
      *
-     * @param dbCode
+     * @param serverCode
      * @return
      */
     @Override
-    public Result<List<DatabaseNameBean>> getDbName(Integer dbCode) {
-        ConnectConfigBean connConfigBean = baseConfigDao.getConnectConfig(dbCode);
-        DBOperation operation = null;
-        try {
-            operation = DBOperationFactory.createDBOperation(connConfigBean);
-        } catch (SQLException throwables) {
-            throwables.printStackTrace();
-        } catch (ClassNotFoundException e) {
-            e.printStackTrace();
+    public Result<List<DatabaseNameBean>> getDbName(Integer serverCode) {
+
+        DBOperation operation = createDbOperation(serverCode);
+        if(null != operation){
+            try{
+                return new Result<>(true, operation.getDBList());
+            } catch (Exception e) {
+                e.printStackTrace();
+                return new Result<>(false,null);
+            }
+        }else{
+            return new Result<>(false,null);
         }
 
-        try {
-            return new Result<>(true, operation.getDBList());
-        } catch (SQLException throwables) {
-            throwables.printStackTrace();
-        } catch (ClassNotFoundException e) {
-            e.printStackTrace();
-        }
-        return new Result<>(false,null);
     }
 
     /**
      * 获得指定库的所有表名
      *
-     * @param dbCode
+     * @param serverCode
      * @param dbName
      * @return
      */
     @Override
-    public Result<List<TablesNameBean>> getTableList(Integer dbCode, String dbName) {
-        ConnectConfigBean connConfigBean = baseConfigDao.getConnectConfig(dbCode);
-        DBOperation operation = null;
-        try {
-            operation = DBOperationFactory.createDBOperation(connConfigBean);
-            return new Result<>(true, operation.getTableList(dbName));
-        } catch (Exception e) {
-            e.printStackTrace();
+    public Result<List<TablesNameBean>> getTableList(Integer serverCode, String dbName) {
+        DBOperation operation = createDbOperation(serverCode);
+        if(null != operation){
+            try{
+                return new Result<>(true, operation.getTableList(dbName));
+            } catch (Exception e) {
+                e.printStackTrace();
+                return new Result<>(false,null);
+            }
+        }else{
+            return new Result<>(false,null);
         }
-        return new Result<>(false,null);
     }
 
     /**
-     * @param dbCode
+     * 获取所有列名
+     * @param serverCode
      * @param dbName
      * @param tableName
      * @return
      */
     @Override
-    public Result<List<ColumnsNameBean>> getColumnList(Integer dbCode, String dbName, String tableName) {
-        ConnectConfigBean connConfigBean = baseConfigDao.getConnectConfig(dbCode);
-        DBOperation operation = null;
-        try {
-            operation = DBOperationFactory.createDBOperation(connConfigBean);
-            return new Result<>(true, operation.getColumnsList(dbName, tableName));
-        } catch (Exception e) {
-            e.printStackTrace();
+    public Result<List<ColumnsNameBean>> getColumnList(Integer serverCode, String dbName, String tableName) {
+        
+        DBOperation operation = createDbOperation(serverCode);
+        if(null != operation){
+            try{
+                return new Result<>(true, operation.getColumnsList(dbName, tableName));
+            } catch (Exception e) {
+                e.printStackTrace();
+                return new Result<>(false,null);
+            }
+        }else{
+            return new Result<>(false,null);
         }
-        return new Result<>(false,null);
+    }
+
+    /**
+     * 获得指定表的所有索引
+     *
+     * @param serverCode
+     * @param dbName
+     * @param tableName
+     * @return
+     */
+    @Override
+    public Result<List<TableIndexesBean>> getTableIndexes(Integer serverCode, String dbName, String tableName) {
+        DBOperation operation = createDbOperation(serverCode);
+        if(null != operation){
+            try{
+                return new Result<>(true, operation.getIndexesList(dbName, tableName));
+            } catch (Exception e) {
+                e.printStackTrace();
+                return new Result<>(false,null);
+            }
+        }else{
+            return new Result<>(false,null);
+        }
+    }
+
+    /**
+     * 执行查询语句
+     *
+     * @param serverCode
+     * @param dbName
+     * @param sql
+     * @return
+     */
+    @Override
+    public Result<Object> quereyDataBySql(Integer serverCode, String dbName, String sql) {
+        DBOperation operation = createDbOperation(serverCode);
+        if(null != operation){
+            try{
+                return new Result<>(true, operation.queryDatabaseBySql(dbName, sql));
+            } catch (Exception e) {
+                e.printStackTrace();
+                return new Result<>(false,null);
+            }
+        }else{
+            return new Result<>(false,null);
+        }
+    }
+
+    /**
+     * 使用单例模式创建一个数据操作实例对象
+     * @param serverCode
+     * @return
+     */
+    private DBOperation createDbOperation(Integer serverCode){
+        DBOperation dbOperation = operationMap.get(serverCode);
+        if(null == dbOperation){
+            synchronized (BaseDataServiceImpl.class) {
+                if(null == operationMap.get(serverCode)){
+                    ConnectConfigBean connConfigBean = baseConfigDao.getConnectConfig(serverCode);
+                    try{
+                        dbOperation = DBOperationFactory.createDBOperation(connConfigBean);
+                        operationMap.put(serverCode,dbOperation);
+                    } catch (Exception e){
+                        e.printStackTrace();
+                    }
+
+                }
+            }
+        }
+        return dbOperation;
     }
 }
