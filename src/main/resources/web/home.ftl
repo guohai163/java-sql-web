@@ -14,7 +14,7 @@
                 <a class="hide navigation_url" href="navigation.php?ajax_request=1"></a>
 
                 <div id="pmalogo">
-                    <a href="index.php">
+                    <a href="http://jsa.guohai.org">
                         <img id="imgpmalogo" src="/images/logo_left.png" alt="phpMyAdmin">
                     </a>
                 </div>

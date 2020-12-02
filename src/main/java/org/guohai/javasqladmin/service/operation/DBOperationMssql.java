@@ -31,6 +31,8 @@ public class DBOperationMssql implements DBOperation {
      * 静态变量
      */
     private static final String DB_DRIVER = "com.microsoft.sqlserver.jdbc.SQLServerDriver";
+
+    private static final Integer LIMIT_NUMBER = 100;
     //endregion
 
     /**
@@ -188,5 +190,17 @@ public class DBOperationMssql implements DBOperation {
             st.close();
         }
         return listData;
+    }
+
+    /**
+     * 检查SQL语句中是否有top属性
+     * @return
+     */
+    private String limitSql(String sql){
+        if (!sql.contains("top")) {
+            return sql.replace("select", "select top " + LIMIT_NUMBER);
+        }
+        //TODO:包含top的也要做数量检查
+        return sql;
     }
 }
