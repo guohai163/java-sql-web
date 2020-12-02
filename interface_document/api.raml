@@ -10,5 +10,18 @@ baseUri: http://127.0.0.1:8002
         application/json:
       responses:
         200:
-  /dblist:
+  /dblist/{dbcode}:
     get:
+    uriParameters:
+      dbcode:
+        type: string
+        example: 1
+  /tablelist/{dbcode}/{dbname}:
+    get:
+      uriParameters:
+        dbcode:
+          type: string
+          example: 1
+        dbname:
+          type: string
+          example: 1

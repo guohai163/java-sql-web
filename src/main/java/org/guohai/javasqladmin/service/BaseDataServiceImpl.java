@@ -1,9 +1,6 @@
 package org.guohai.javasqladmin.service;
 
-import org.guohai.javasqladmin.beans.ConnectConfigBean;
-import org.guohai.javasqladmin.beans.DatabaseNameBean;
-import org.guohai.javasqladmin.beans.Result;
-import org.guohai.javasqladmin.beans.TablesNameBean;
+import org.guohai.javasqladmin.beans.*;
 import org.guohai.javasqladmin.dao.BaseConfigDao;
 import org.guohai.javasqladmin.service.operation.DBOperation;
 import org.guohai.javasqladmin.service.operation.DBOperationFactory;
@@ -66,6 +63,25 @@ public class BaseDataServiceImpl implements BaseDataService{
         try {
             operation = DBOperationFactory.createDBOperation(connConfigBean);
             return new Result<>(true, operation.getTableList(dbName));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return new Result<>(false,null);
+    }
+
+    /**
+     * @param dbCode
+     * @param dbName
+     * @param tableName
+     * @return
+     */
+    @Override
+    public Result<List<ColumnsNameBean>> getColumnList(Integer dbCode, String dbName, String tableName) {
+        ConnectConfigBean connConfigBean = baseConfigDao.getConnectConfig(dbCode);
+        DBOperation operation = null;
+        try {
+            operation = DBOperationFactory.createDBOperation(connConfigBean);
+            return new Result<>(true, operation.getColumnsList(dbName, tableName));
         } catch (Exception e) {
             e.printStackTrace();
         }

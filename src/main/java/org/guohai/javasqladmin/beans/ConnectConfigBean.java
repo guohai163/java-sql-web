@@ -6,7 +6,6 @@ import lombok.Data;
 import java.util.Date;
 
 @Data
-@AllArgsConstructor
 public class ConnectConfigBean {
 
     private Integer code;

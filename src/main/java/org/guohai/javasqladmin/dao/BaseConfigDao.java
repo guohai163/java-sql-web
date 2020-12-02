@@ -14,9 +14,14 @@ public interface BaseConfigDao {
      * 返回完整的配置项
      * @return
      */
-    @Select("SELECT * FROM db_connect_config_tb;")
+    @Select("SELECT code,db_server_name,db_server_type FROM db_connect_config_tb;")
     List<ConnectConfigBean> getAllConnectConfig();
 
+    /**
+     * 获得指定code的连接属性
+     * @param code
+     * @return
+     */
     @Select("SELECT * FROM db_connect_config_tb WHERE code=#{code}")
     ConnectConfigBean getConnectConfig(@Param("code") Integer code);
 }

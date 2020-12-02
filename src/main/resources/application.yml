@@ -19,3 +19,6 @@ spring:
     expose-request-attributes: true
     expose-session-attributes: true
     request-context-attribute: request
+mybatis:
+  configuration:
+    map-underscore-to-camel-case: true

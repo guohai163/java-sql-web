@@ -1,8 +1,6 @@
 package org.guohai.javasqladmin.service.operation;
 
-import org.guohai.javasqladmin.beans.ConnectConfigBean;
-import org.guohai.javasqladmin.beans.DatabaseNameBean;
-import org.guohai.javasqladmin.beans.TablesNameBean;
+import org.guohai.javasqladmin.beans.*;
 
 import java.sql.*;
 import java.util.ArrayList;
@@ -15,6 +13,7 @@ import java.util.List;
  */
 public class DBOperationMssql implements DBOperation {
 
+    //region 私有变量区
     /**
      * 数据库配置
      */
@@ -33,6 +32,7 @@ public class DBOperationMssql implements DBOperation {
      * 静态变量
      */
     private static final String DB_DRIVER = "com.microsoft.sqlserver.jdbc.SQLServerDriver";
+    //endregion
 
     /**
      * 构造方法
@@ -95,5 +95,62 @@ public class DBOperationMssql implements DBOperation {
             st.close();
         }
         return listTNB;
+    }
+
+    /**
+     * @param dbName
+     * @param tableName
+     * @return
+     */
+    @Override
+    public List<ColumnsNameBean> getColumnsList(String dbName, String tableName) throws SQLException {
+        List<ColumnsNameBean> listCNB = new ArrayList<>();
+        Statement st = sqlConn.createStatement();
+        ResultSet rs = st.executeQuery(String.format("use %s;" +
+                "SELECT b.name column_name,c.name column_type,c.length column_length \n" +
+                "FROM sysobjects a join syscolumns b on a.id=b.id and a.xtype='U'\n" +
+                "join systypes c on b.xtype=c.xusertype\n" +
+                "where a.name='%s'", dbName, tableName));
+        while (rs.next()){
+            listCNB.add(new ColumnsNameBean(rs.getObject("column_name").toString(),
+                                            rs.getObject("column_type").toString(),
+                                            rs.getObject("column_length").toString()));
+        }
+        // 关闭rs和statement
+        if (rs != null) {
+            rs.close();
+        }
+        if (st != null) {
+            st.close();
+        }
+        return listCNB;
+    }
+
+    /**
+     * 获取所有的索引数据
+     *
+     * @param dbName
+     * @param tableName
+     * @return
+     */
+    @Override
+    public List<TableIndexesBean> getIndexesList(String dbName, String tableName) throws SQLException {
+        List<TableIndexesBean> listTIB = new ArrayList<>();
+        Statement st = sqlConn.createStatement();
+        ResultSet rs = st.executeQuery(String.format("use %s;" +
+                "exec sp_helpindex '%s'", dbName, tableName));
+        while (rs.next()){
+            listTIB.add(new TableIndexesBean(rs.getObject("index_name").toString(),
+                    rs.getObject("index_description").toString(),
+                    rs.getObject("index_keys").toString()));
+        }
+        // 关闭rs和statement
+        if (rs != null) {
+            rs.close();
+        }
+        if (st != null) {
+            st.close();
+        }
+        return listTIB;
     }
 }

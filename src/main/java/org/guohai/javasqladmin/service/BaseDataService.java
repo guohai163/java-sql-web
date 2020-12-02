@@ -1,9 +1,6 @@
 package org.guohai.javasqladmin.service;
 
-import org.guohai.javasqladmin.beans.ConnectConfigBean;
-import org.guohai.javasqladmin.beans.DatabaseNameBean;
-import org.guohai.javasqladmin.beans.Result;
-import org.guohai.javasqladmin.beans.TablesNameBean;
+import org.guohai.javasqladmin.beans.*;
 
 import java.util.List;
 
@@ -29,4 +26,13 @@ public interface BaseDataService {
      * @return
      */
     Result<List<TablesNameBean>> getTableList(Integer dbCode, String dbName);
+
+    /**
+     *
+     * @param dbCode
+     * @param dbName
+     * @param tableName
+     * @return
+     */
+    Result<List<ColumnsNameBean>> getColumnList(Integer dbCode, String dbName, String tableName);
 }

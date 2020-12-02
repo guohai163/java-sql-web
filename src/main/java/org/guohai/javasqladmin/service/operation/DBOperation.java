@@ -1,6 +1,8 @@
 package org.guohai.javasqladmin.service.operation;
 
+import org.guohai.javasqladmin.beans.ColumnsNameBean;
 import org.guohai.javasqladmin.beans.DatabaseNameBean;
+import org.guohai.javasqladmin.beans.TableIndexesBean;
 import org.guohai.javasqladmin.beans.TablesNameBean;
 
 import java.sql.SQLException;
@@ -25,4 +27,20 @@ public interface DBOperation {
      * @return
      */
     List<TablesNameBean> getTableList(String dbName) throws SQLException;
+
+    /**
+     * 获取所有列名
+     * @param dbName
+     * @param tableName
+     * @return
+     */
+    List<ColumnsNameBean> getColumnsList(String dbName, String tableName) throws SQLException;
+
+    /**
+     * 获取所有的索引数据
+     * @param dbName
+     * @param tableName
+     * @return
+     */
+    List<TableIndexesBean> getIndexesList(String dbName, String tableName) throws SQLException;
 }

@@ -1,9 +1,6 @@
 package org.guohai.javasqladmin.controller;
 
-import org.guohai.javasqladmin.beans.ConnectConfigBean;
-import org.guohai.javasqladmin.beans.DatabaseNameBean;
-import org.guohai.javasqladmin.beans.Result;
-import org.guohai.javasqladmin.beans.TablesNameBean;
+import org.guohai.javasqladmin.beans.*;
 import org.guohai.javasqladmin.service.BaseDataService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,5 +51,16 @@ public class BaseDataController {
     @RequestMapping(value = "/tablelist/{dbCode}/{dbName}")
     public Result<List<TablesNameBean>> getTableName(@PathVariable("dbCode") String dbCode, @PathVariable("dbName") String dbName){
         return baseDataService.getTableList(Integer.parseInt(dbCode),dbName);
+    }
+
+    /**
+     *
+     */
+    @ResponseBody
+    @RequestMapping(value = "/columnlist/{dbCode}/{dbName}/{tableName}")
+    public Result<List<ColumnsNameBean>> getColumnName(@PathVariable("dbCode") String dbCode,
+                                                       @PathVariable("dbName") String dbName,
+                                                       @PathVariable("tableName") String tableName){
+        return baseDataService.getColumnList(Integer.parseInt(dbCode), dbName, tableName);
     }
 }
