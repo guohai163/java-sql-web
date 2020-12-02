@@ -84,9 +84,12 @@ public class DBOperationMssql implements DBOperation {
     public List<TablesNameBean> getTableList(String dbName) throws SQLException {
         List<TablesNameBean> listTNB = new ArrayList<>();
         Statement st = sqlConn.createStatement();
-        ResultSet rs = st.executeQuery(String.format("SELECT name FROM %s..sysobjects WHERE xtype = 'u';", dbName));
+        ResultSet rs = st.executeQuery(String.format("use %s;" +
+                "SELECT a.name, b.rows FROM sysobjects a JOIN sysindexes b ON a.id = b.id " +
+                "WHERE xtype = 'u' and indid in (0,1);", dbName));
         while (rs.next()){
-            listTNB.add(new TablesNameBean(rs.getObject("name").toString()));
+            listTNB.add(new TablesNameBean(rs.getObject("name").toString(),
+                                rs.getInt("rows")));
         }
         // 关闭rs和statement
         if (rs != null) {
@@ -99,6 +102,7 @@ public class DBOperationMssql implements DBOperation {
     }
 
     /**
+     * 获取所有的列
      * @param dbName
      * @param tableName
      * @return

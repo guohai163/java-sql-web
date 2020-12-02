@@ -22,7 +22,7 @@ public class BaseDataController {
     BaseDataService baseDataService;
 
     @ResponseBody
-    @RequestMapping(value = "/infoall")
+    @RequestMapping(value = "/serverlist")
     public Result<List<ConnectConfigBean>> getAllConnect(){
         return baseDataService.getAllDataConnect();
     }
@@ -51,16 +51,42 @@ public class BaseDataController {
     }
 
     /**
-     *
+     * 查询 库的所有列名
+     * @param serverCode
+     * @param dbName
+     * @param tableName
+     * @return
      */
     @ResponseBody
-    @RequestMapping(value = "/columnlist/{serverCode}/{dbName}/{tableName}")
-    public Result<List<ColumnsNameBean>> getColumnName(@PathVariable("serverCode") String serverCode,
+    @RequestMapping(value = "/columnslist/{serverCode}/{dbName}/{tableName}")
+    public Result<List<ColumnsNameBean>> getColumnsName(@PathVariable("serverCode") String serverCode,
                                                        @PathVariable("dbName") String dbName,
                                                        @PathVariable("tableName") String tableName){
         return baseDataService.getColumnList(Integer.parseInt(serverCode), dbName, tableName);
     }
 
+    /**
+     * 查询表的所有列名
+     * @param serverCode
+     * @param dbName
+     * @param tableName
+     * @return
+     */
+    @ResponseBody
+    @RequestMapping(value = "/indexeslist/{serverCode}/{dbName}/{tableName}")
+    public Result<List<TableIndexesBean>> getIndexesName(@PathVariable("serverCode") String serverCode,
+                                                         @PathVariable("dbName") String dbName,
+                                                         @PathVariable("tableName") String tableName){
+        return baseDataService.getTableIndexes(Integer.parseInt(serverCode), dbName, tableName);
+    }
+
+    /**
+     * 执行业务查询
+     * @param serverCode
+     * @param dbName
+     * @param sql
+     * @return
+     */
     @ResponseBody
     @RequestMapping(value = "/query/{serverCode}/{dbName}", method = RequestMethod.POST)
     public Result<Object> quereyData(@PathVariable("serverCode") String serverCode,

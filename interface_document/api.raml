@@ -4,24 +4,73 @@ version: v1
 baseUri: http://127.0.0.1:8002
 
 /database:
-  /infoall:
+  /serverlist:
     get:
       body:
         application/json:
       responses:
         200:
-  /dblist/{dbcode}:
+  /dblist/{serverCode}:
     get:
     uriParameters:
-      dbcode:
+      serverCode:
         type: string
-        example: 1
-  /tablelist/{dbcode}/{dbname}:
+        example: "1"
+  /tablelist/{serverCode}/{dbname}:
     get:
-      uriParameters:
-        dbcode:
-          type: string
-          example: 1
-        dbname:
-          type: string
-          example: 1
+      body:
+        application/json:
+    uriParameters:
+      serverCode:
+        type: string
+        example: "1"
+      dbname:
+        type: string
+        example: master
+  /columnslist/{serverCode}/{dbName}/{tableName}:
+    uriParameters:
+      serverCode:
+        type: string
+        example: "1"
+      dbName:
+        type: string
+        example: master
+      tableName:
+        type: string
+        example: MSreplication_options
+    get:
+      body:
+        application/json:
+      responses:
+        200:
+  /indexeslist/{serverCode}/{dbName}/{tableName}:
+    uriParameters:
+      serverCode:
+        type: string
+        example: "1"
+      dbName:
+        type: string
+        example: master
+      tableName:
+        type: string
+        example: MSreplication_options
+    get:
+      body:
+        application/json:
+      responses:
+        200:
+  /query/{serverCode}/{dbName}:
+    post:
+      body:
+        text/plain:
+          example: |
+            select * from user_score_log
+      responses:
+        200:
+    uriParameters:
+      serverCode:
+        type: string
+        example: "1"
+      dbName:
+        type: string
+        example: master
