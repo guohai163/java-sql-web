@@ -6,7 +6,7 @@ import {
   Switch,
   Route
 } from "react-router-dom";
-import App from './App';
+import JavaSqlAdmin from './JavaSqlAdmin';
 import reportWebVitals from './reportWebVitals';
 
 
