@@ -1,9 +1,7 @@
 package org.guohai.javasqladmin.service.operation;
 
-import org.guohai.javasqladmin.beans.ColumnsNameBean;
-import org.guohai.javasqladmin.beans.DatabaseNameBean;
-import org.guohai.javasqladmin.beans.TableIndexesBean;
-import org.guohai.javasqladmin.beans.TablesNameBean;
+import org.apache.ibatis.jdbc.SQL;
+import org.guohai.javasqladmin.beans.*;
 
 import java.sql.SQLException;
 import java.util.List;
@@ -47,6 +45,22 @@ public interface DBOperation {
      */
     List<TableIndexesBean> getIndexesList(String dbName, String tableName) throws SQLException;
 
+    /**
+     * 获取指定库的所有存储过程列表
+     * @param dbName
+     * @return
+     * @throws SQLException
+     */
+    List<StoredProceduresBean> getStoredProceduresList(String dbName) throws SQLException;
+
+    /**
+     * 获取指定存储过程内容
+     * @param dbName
+     * @param spName
+     * @return
+     * @throws SQLException
+     */
+    StoredProceduresBean getStoredProcedure(String dbName, String spName) throws SQLException;
     /**
      * 执行查询的SQL
      * @param dbName

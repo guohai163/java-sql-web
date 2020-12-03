@@ -160,6 +160,59 @@ public class DBOperationMssql implements DBOperation {
     }
 
     /**
+     * 获取指定库的所有存储过程列表
+     *
+     * @param dbName
+     * @return
+     * @throws SQLException
+     */
+    @Override
+    public List<StoredProceduresBean> getStoredProceduresList(String dbName) throws SQLException {
+        List<StoredProceduresBean> listSp = new ArrayList<>();
+        Statement st = sqlConn.createStatement();
+        ResultSet rs = st.executeQuery(String.format("use %s;" +
+                "SELECT name FROM sysobjects WHERE type='P'", dbName));
+        while (rs.next()){
+            listSp.add(new StoredProceduresBean(rs.getString("name")));
+        }
+        // 关闭rs和statement
+        if (rs != null) {
+            rs.close();
+        }
+        if (st != null) {
+            st.close();
+        }
+        return listSp;
+    }
+
+    /**
+     * 获取指定存储过程内容
+     *
+     * @param dbName
+     * @param spName
+     * @return
+     * @throws SQLException
+     */
+    @Override
+    public StoredProceduresBean getStoredProcedure(String dbName, String spName) throws SQLException {
+        StoredProceduresBean spBean = null;
+        Statement st = sqlConn.createStatement();
+        ResultSet rs = st.executeQuery(String.format("use %s;" +
+                "select definition from sys.sql_modules WHERE object_id = object_id('%s')", dbName, spName));
+        while (rs.next()){
+            spBean = new StoredProceduresBean(spName, rs.getString("definition"));
+        }
+        // 关闭rs和statement
+        if (rs != null) {
+            rs.close();
+        }
+        if (st != null) {
+            st.close();
+        }
+        return spBean;
+    }
+
+    /**
      * 执行查询的SQL
      *
      * @param dbName
@@ -201,7 +254,7 @@ public class DBOperationMssql implements DBOperation {
      * @return
      */
     private String limitSql(String sql){
-        if (!sql.contains("top")) {
+        if (!sql.toLowerCase().contains("top") && !sql.toLowerCase().contains("distinct")) {
             return sql.replace("select", "select top " + LIMIT_NUMBER);
         }
         //TODO:包含top的也要做数量检查

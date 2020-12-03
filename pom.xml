@@ -10,7 +10,7 @@
     </parent>
     <groupId>org.guohai</groupId>
     <artifactId>javasqladmin</artifactId>
-    <version>0.0.1</version>
+    <version>0.1.1</version>
     <name>javasqladmin</name>
     <description>java version db query tools</description>
 

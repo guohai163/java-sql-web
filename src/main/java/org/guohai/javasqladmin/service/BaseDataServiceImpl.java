@@ -119,6 +119,51 @@ public class BaseDataServiceImpl implements BaseDataService{
     }
 
     /**
+     * 获取指定库的存储过程列表,只含名字
+     *
+     * @param serverCode
+     * @param dbName
+     * @return
+     */
+    @Override
+    public Result<List<StoredProceduresBean>> getSpList(Integer serverCode, String dbName) {
+        DBOperation operation = createDbOperation(serverCode);
+        if(null != operation){
+            try{
+                return new Result<>(true, operation.getStoredProceduresList(dbName));
+            } catch (Exception e) {
+                e.printStackTrace();
+                return new Result<>(false,null);
+            }
+        }else{
+            return new Result<>(false,null);
+        }
+    }
+
+    /**
+     * 通过存储过程名获取存储过程内容
+     *
+     * @param serverCode
+     * @param dbName
+     * @param spName
+     * @return
+     */
+    @Override
+    public Result<StoredProceduresBean> getSpByName(Integer serverCode, String dbName, String spName) {
+        DBOperation operation = createDbOperation(serverCode);
+        if(null != operation){
+            try{
+                return new Result<>(true, operation.getStoredProcedure(dbName, spName));
+            } catch (Exception e) {
+                e.printStackTrace();
+                return new Result<>(false,null);
+            }
+        }else{
+            return new Result<>(false,null);
+        }
+    }
+
+    /**
      * 执行查询语句
      *
      * @param serverCode

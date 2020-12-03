@@ -74,3 +74,28 @@ baseUri: http://127.0.0.1:8002
       dbName:
         type: string
         example: master
+  /storedprocedures/{serverCode}/{dbName}:
+    get:
+      responses:
+        200:
+    uriParameters:
+      serverCode:
+        type: string
+        example: "1"
+      dbName:
+        type: string
+        example: master
+  /storedprocedures/{serverCode}/{dbName}/{spName}:
+    get:
+      responses:
+        200:
+    uriParameters:
+      serverCode:
+        type: string
+        example: "1"
+      dbName:
+        type: string
+        example: master
+      spName:
+        type: string
+        example: master

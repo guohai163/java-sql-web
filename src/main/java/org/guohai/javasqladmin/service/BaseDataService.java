@@ -50,6 +50,22 @@ public interface BaseDataService {
     Result<List<TableIndexesBean>> getTableIndexes(Integer serverCode, String dbName, String tableName);
 
     /**
+     * 获取指定库的存储过程列表,只含名字
+     * @param serverCode
+     * @param dbName
+     * @return
+     */
+    Result<List<StoredProceduresBean>> getSpList(Integer serverCode, String dbName);
+
+    /**
+     * 通过存储过程名获取存储过程内容
+     * @param serverCode
+     * @param dbName
+     * @param spName
+     * @return
+     */
+    Result<StoredProceduresBean> getSpByName(Integer serverCode, String dbName, String spName);
+    /**
      * 执行查询语句
      * @param serverCode
      * @param dbName

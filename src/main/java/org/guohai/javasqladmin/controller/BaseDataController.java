@@ -81,6 +81,33 @@ public class BaseDataController {
     }
 
     /**
+     * 获取存储过程列表
+     * @param serverCode
+     * @param dbName
+     * @return
+     */
+    @ResponseBody
+    @RequestMapping(value = "/storedprocedures/{serverCode}/{dbName}")
+    public Result<List<StoredProceduresBean>> getSpList(@PathVariable("serverCode") String serverCode,
+                                                        @PathVariable("dbName") String dbName){
+        return baseDataService.getSpList(Integer.parseInt(serverCode), dbName);
+    }
+
+    /**
+     * 获取指定存储过程
+     * @param serverCode
+     * @param dbName
+     * @param spName
+     * @return
+     */
+    @ResponseBody
+    @RequestMapping(value = "/storedprocedures/{serverCode}/{dbName}/{spName}")
+    public Result<StoredProceduresBean> getSpByName(@PathVariable("serverCode") String serverCode,
+                                                    @PathVariable("dbName") String dbName,
+                                                    @PathVariable("spName") String spName){
+        return baseDataService.getSpByName(Integer.parseInt(serverCode), dbName, spName);
+    }
+    /**
      * 执行业务查询
      * @param serverCode
      * @param dbName

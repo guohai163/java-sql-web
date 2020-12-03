@@ -51,6 +51,31 @@ public class DBOperationMysql implements DBOperation {
     }
 
     /**
+     * 获取指定库的所有存储过程列表
+     *
+     * @param dbName
+     * @return
+     * @throws SQLException
+     */
+    @Override
+    public List<StoredProceduresBean> getStoredProceduresList(String dbName) throws SQLException {
+        return null;
+    }
+
+    /**
+     * 获取指定存储过程内容
+     *
+     * @param dbName
+     * @param spName
+     * @return
+     * @throws SQLException
+     */
+    @Override
+    public StoredProceduresBean getStoredProcedure(String dbName, String spName) throws SQLException {
+        return null;
+    }
+
+    /**
      * 执行查询的SQL
      *
      * @param dbName
