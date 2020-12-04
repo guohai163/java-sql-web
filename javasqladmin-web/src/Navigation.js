@@ -4,6 +4,7 @@ import './Navigation.css';
 import logo from './images/logo_left.png'
 import dot from './images/dot.gif'
 import config from './config'
+import Pubsub from 'pubsub-js'
 
 class Navigation extends React.Component {
     constructor(props){
@@ -35,7 +36,6 @@ class Navigation extends React.Component {
         })
     }
     dbChange(dbName,event) {
-        console.log(dbName)
         this.setState({
             selectDatabase: dbName
         })
@@ -53,7 +53,6 @@ class Navigation extends React.Component {
         //获取存储过程
     }
     serverChange(event) {
-        console.log(event)
         //当不为“请选择服务器”时进行相应 操作
         if('0' !== event.target.value) {
             console.log('需要进行操作');
@@ -73,10 +72,13 @@ class Navigation extends React.Component {
         }
     }
     tableChange(tableName,event){
-        console.log(tableName);
         this.setState({
             selectTable: tableName
         })
+        const selectData = {selectServer: this.state.selectServer,
+                            selectDatabase: this.state.selectDatabase,
+                            selectTable: tableName};
+        Pubsub.publish('dataSelect', selectData);
     }
     render(){
         return (
@@ -88,9 +90,9 @@ class Navigation extends React.Component {
                             <img src={logo} alt="logo" />
                         </div>
                         <div id="navipanellinks">
-                            <a href="#" title="设置">
+                            <button href="#" title="设置">
                                 <img src={dot} alt="setting" className="icon ic_s_cog"></img>
-                            </a>
+                            </button>
                             <a href="#" title="退出">
                                 <img src={dot} alt="exit" className="icon ic_s_loggoff"></img>
                             </a>
@@ -122,14 +124,14 @@ class Navigation extends React.Component {
                                             </a>
                                         </div>
                                         <a className="hover_show_full" onClick={this.dbChange.bind(this,db.dbName)}>{db.dbName}</a>
-                                        <div class="clearfloat"></div>
+                                        <div className="clearfloat"></div>
                                         <div className={this.state.selectDatabase == db.dbName?'list_container':'hide'}>                                            
                                             <ul>
                                                 {this.state.tableList.map(table =>
                                                     <li className="view">
-                                                    <div class="block"><i></i><span class="hide pos2_name">views</span><span class="hide pos2_value">0</span></div>
+                                                    <div className="block"><i></i><span className="hide pos2_name">views</span><span className="hide pos2_value">0</span></div>
                                                     <div className="block"><a href="#"><img src={dot} title="视图" alt="视图" className="icon ic_b_props" /></a></div>
-                                                    <a class="hover_show_full" href="#" title="" onClick={this.tableChange.bind(this,table.tableName)}>{table.tableName} ({table.tableRows})</a>
+                                                    <a className="hover_show_full" href="#" title="" onClick={this.tableChange.bind(this,table.tableName)}>{table.tableName} ({table.tableRows})</a>
                                                     </li>
                                                 )}
                                                

@@ -1,3 +1,90 @@
 .page_content {
     display: block;
 }
+#serverinfo {
+    background: #888;
+    text-shadow: 0 1px 0 #000;
+    max-width: 100%;
+    max-height: 23px;
+    overflow: hidden;
+    box-sizing: content-box;
+}
+#serverinfo .item {
+    white-space: nowrap;
+    color: #fff;
+    font-size: 13px;
+}
+fieldset {
+    margin-top: 1em;
+    -webkit-border-radius: 4px 4px 0 0;
+    border: #aaa solid 1px;
+    padding: .5em;
+    background: #eee;
+    box-shadow: 1px 1px 2px #fff inset;
+    min-width: 0;
+    margin: 0;
+    display: block;
+    margin-inline-start: 2px;
+    margin-inline-end: 2px;
+}
+div#sqlquerycontainer {
+    float: left;
+    width: 69%;
+}
+textarea#sqlquery {
+    width: 100%;
+    -moz-border-radius: 4px;
+    -webkit-border-radius: 4px;
+    border-radius: 4px;
+    border: 1px solid #aaa;
+    padding: 5px;
+    font-family: inherit;
+}
+
+textarea {
+    resize: both;
+}
+textarea {
+    overflow: visible;
+    margin: 6px;
+}
+div#tablefieldscontainer {
+    float: right;
+    width: 29%;
+    margin-top: -20px;
+}
+label {
+    display: inline-block;
+    margin-bottom: .5rem;
+    cursor: default;
+}
+div#tablefieldscontainer select {
+    width: 100%;
+    background: #fff;
+}
+select {
+    -moz-border-radius: 2px;
+    -webkit-border-radius: 2px;
+    border-radius: 2px;
+    border: 1px solid #bbb;
+    color: #333;
+    padding: 3px;
+    background: #fff;
+    margin: 6px;
+}
+fieldset.tblFooters {
+    margin-top: 0;
+    margin-bottom: .5em;
+    border-top: 0;
+    text-align: right;
+    float: none;
+    clear: both;
+    -webkit-border-radius: 0 0 4px 4px;
+    -moz-border-radius: 0 0 4px 4px;
+    border-radius: 0 0 4px 4px;
+}
+div.tools, .tblFooters {
+    font-weight: normal;
+    color: #000;
+    background: #d3dce3;
+}
