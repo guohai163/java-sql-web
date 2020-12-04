@@ -1,0 +1,46 @@
+#navigation {
+    width: 240px;
+    position: fixed;
+    left: 0;
+    background: url(./images/left_nav_bg.png) repeat-y right 0 #f3f3f3;
+    height: 100vh;
+}
+#navigation_resizer {
+    height: 100%;
+    width: 3px;
+    left: 240px;
+    background-color: #aaa;
+}
+
+#navigation_content {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+#navigation_header {
+    overflow: hidden;
+}
+
+#navipanellinks {
+    text-align: center;
+    padding: 5px 10px 0;
+    border: 0;
+}
+.icon {
+    width: 16px;
+    height: 16px;
+    padding: 0 !important;
+    margin: 0;
+}
+.ic_s_cog {
+    background-image: url(./images/s_cog.png);
+}
+.ic_s_loggoff {
+    background-image: url(./images/s_loggoff.png);
+}
+#navigation_tree {
+    margin-left: 5px;
+}

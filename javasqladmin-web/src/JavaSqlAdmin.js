@@ -1,10 +1,14 @@
 import React from 'react';
-
+import Navigation from './Navigation';
+import PageContent from './PageContent';
 class JavaSqlAdmin extends React.Component {
     render(){
         return (
-            <div className='navigation'>a</div>
-            <div className='main'>b</div>
+            <div>
+                <Navigation />
+                <PageContent />
+            </div>
+            
         )
     }
 }
