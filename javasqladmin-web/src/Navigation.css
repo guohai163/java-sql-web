@@ -44,3 +44,61 @@
 #navigation_tree {
     margin-left: 5px;
 }
+#navigation_tree div.block {
+    float: left;
+}
+#navigation_tree ul {
+    clear: both;
+    padding: 0;
+    margin: 0;
+    list-style-type: none;
+}
+#navigation_tree li {
+    white-space: nowrap;
+    clear: both;
+    min-height: 16px;
+}
+#navigation_tree_content {
+    width: 100%;
+    position: absolute;
+}
+.navigation_server {
+
+    margin-bottom: 10px;
+}
+.hide {
+    display: none;
+}
+.ic_b_plus {
+    background-image: url(./images/b_plus.png);
+}
+.ic_s_db {
+    background-image: url(./images/s_db.png);
+}
+.ic_b_props {
+    background-image: url(./images/b_props.png);
+}
+li {
+    display: list-item;
+    text-align: -webkit-match-parent;
+}
+ul{
+    list-style-type: none;
+}
+#navigation_tree a{
+    color: #000;
+}
+.clearfloat {
+    clear: both;
+}
+#navigation_tree .list_container {
+    border-left: 1px solid #666;
+    margin-left: .75em;
+    padding-left: .75em;
+}
+#navigation_tree ul ul {
+    position: relative;
+}
+.hover_show_full {
+    font-size: 12px;
+}

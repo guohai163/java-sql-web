@@ -15,6 +15,7 @@ import java.util.List;
  */
 @RestController
 @RequestMapping(value = "/database")
+@CrossOrigin
 public class BaseDataController {
     private static final Logger LOG  = LoggerFactory.getLogger(BaseDataController.class);
 
