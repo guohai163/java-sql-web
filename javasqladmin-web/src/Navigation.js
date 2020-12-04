@@ -12,7 +12,10 @@ class Navigation extends React.Component {
             serverList: [],
             selectServer: '0',
             dbList: [],
-            selectDatabase: ''
+            selectDatabase: '',
+            tableList: [],
+            spList: [],
+            selectTable: ''
         }
         this.serverChange = this.serverChange.bind(this);
     }
@@ -37,7 +40,16 @@ class Navigation extends React.Component {
             selectDatabase: dbName
         })
         // 获取表
-
+        const client = new FetchHttpClient(config.serverDomain);
+        client.addMiddleware(json());
+        client.get('/database/tablelist/'+this.state.selectServer+'/'+dbName).then(response => {
+            console.log(response.jsonData)
+            if(response.jsonData.status) {
+                this.setState({
+                    tableList: response.jsonData.data
+                })
+            }
+        })
         //获取存储过程
     }
     serverChange(event) {
@@ -59,6 +71,12 @@ class Navigation extends React.Component {
             })
 
         }
+    }
+    tableChange(tableName,event){
+        console.log(tableName);
+        this.setState({
+            selectTable: tableName
+        })
     }
     render(){
         return (
@@ -107,11 +125,14 @@ class Navigation extends React.Component {
                                         <div class="clearfloat"></div>
                                         <div className={this.state.selectDatabase == db.dbName?'list_container':'hide'}>                                            
                                             <ul>
-                                                <li className="view">
-                                                <div class="block"><i></i><span class="hide pos2_name">views</span><span class="hide pos2_value">0</span></div>
-                                                <div className="block"><a href="#"><img src={dot} title="视图" alt="视图" className="icon ic_b_props" /></a></div>
-                                                <a class="hover_show_full" href="#" title="">ALL_PLUGINS</a>
-                                                </li>
+                                                {this.state.tableList.map(table =>
+                                                    <li className="view">
+                                                    <div class="block"><i></i><span class="hide pos2_name">views</span><span class="hide pos2_value">0</span></div>
+                                                    <div className="block"><a href="#"><img src={dot} title="视图" alt="视图" className="icon ic_b_props" /></a></div>
+                                                    <a class="hover_show_full" href="#" title="" onClick={this.tableChange.bind(this,table.tableName)}>{table.tableName} ({table.tableRows})</a>
+                                                    </li>
+                                                )}
+                                               
                                             </ul>
                                         </div>
                                     </li>
