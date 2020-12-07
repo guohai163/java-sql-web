@@ -223,6 +223,7 @@ public class DBOperationMssql implements DBOperation {
     public Object queryDatabaseBySql(String dbName, String sql) throws SQLException {
         List<Map<String, Object>> listData = new ArrayList<>();
         // TODO: 缺少SQL检查
+        sql = limitSql(sql);
         Statement st = sqlConn.createStatement();
         ResultSet rs = st.executeQuery(String.format("use %s;" +
                 "%s;", dbName, sql));
@@ -255,7 +256,7 @@ public class DBOperationMssql implements DBOperation {
      */
     private String limitSql(String sql){
         if (!sql.toLowerCase().contains("top") && !sql.toLowerCase().contains("distinct")) {
-            return sql.replace("select", "select top " + LIMIT_NUMBER);
+            return sql.toLowerCase().replace("select", "select top " + LIMIT_NUMBER);
         }
         //TODO:包含top的也要做数量检查
         return sql;

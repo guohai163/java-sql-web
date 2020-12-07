@@ -88,3 +88,9 @@ div.tools, .tblFooters {
     color: #000;
     background: #d3dce3;
 }
+table { 
+    border-collapse:collapse;
+}  
+td { 
+    border:#000000 solid 1px; padding:5px; 
+}  

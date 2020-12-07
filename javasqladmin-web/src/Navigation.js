@@ -8,6 +8,7 @@ import Pubsub from 'pubsub-js'
 
 class Navigation extends React.Component {
     constructor(props){
+        console.log(window.innerHeight)
         super(props)
         this.state = {
             serverList: [],
@@ -16,18 +17,33 @@ class Navigation extends React.Component {
             selectDatabase: '',
             tableList: [],
             spList: [],
-            selectTable: ''
+            selectTable: '',
+            deskHeight: 0,
+            showTableColumn: '',
+            columntData: [],
+            spList: []
         }
         this.serverChange = this.serverChange.bind(this);
+        this.handleSize = this.handleSize.bind(this)
     }
     componentDidMount() {
         this.getServerList()
+        this.handleSize()
+        window.addEventListener('resize', this.handleSize);
+    }
+    componentWillUnmount() {
+        window.removeEventListener('resize', this.handleSize);
+    }
+    handleSize = () => {
+        console.log(window.innerHeight)
+        this.setState({
+            deskHeight:window.innerHeight - 120 
+        })
     }
     getServerList() {
         const client = new FetchHttpClient(config.serverDomain);
         client.addMiddleware(json());
         client.get('/database/serverlist').then(response => {
-            console.log(response.jsonData);
             if(response.jsonData.status) {
                 this.setState({
                     serverList: response.jsonData.data
@@ -36,6 +52,12 @@ class Navigation extends React.Component {
         })
     }
     dbChange(dbName,event) {
+        if(dbName == this.state.selectDatabase) {
+            this.setState({
+                selectDatabase: ''
+            })
+            return
+        }
         this.setState({
             selectDatabase: dbName
         })
@@ -43,7 +65,6 @@ class Navigation extends React.Component {
         const client = new FetchHttpClient(config.serverDomain);
         client.addMiddleware(json());
         client.get('/database/tablelist/'+this.state.selectServer+'/'+dbName).then(response => {
-            console.log(response.jsonData)
             if(response.jsonData.status) {
                 this.setState({
                     tableList: response.jsonData.data
@@ -51,6 +72,7 @@ class Navigation extends React.Component {
             }
         })
         //获取存储过程
+        this.getSpList(dbName);
     }
     serverChange(event) {
         //当不为“请选择服务器”时进行相应 操作
@@ -71,16 +93,55 @@ class Navigation extends React.Component {
 
         }
     }
+    getSpList(dbName) {
+        const client = new FetchHttpClient(config.serverDomain);
+        client.addMiddleware(json());
+        client.get('/database/storedprocedures/'+this.state.selectServer+'/'+dbName).then(response => {
+            console.log(response.jsonData)
+            if(response.jsonData.status) {
+                this.setState({
+                    spList: response.jsonData.data
+                })
+            }
+        })
+    }
+    spChange(spName,event) {
+        console.log(spName)
+        const selectData = {selectServer: this.state.selectServer,
+            selectDatabase: this.state.selectDatabase,
+            spName: spName,
+            type: 'sp'
+        };
+        Pubsub.publish('dataSelect', selectData);
+    }
     tableChange(tableName,event){
         this.setState({
             selectTable: tableName
         })
         const selectData = {selectServer: this.state.selectServer,
                             selectDatabase: this.state.selectDatabase,
-                            selectTable: tableName};
+                            selectTable: tableName,
+                            type: 'table'
+                        };
         Pubsub.publish('dataSelect', selectData);
     }
+    showTableColumn(tableName, event){
+        this.setState({
+            showTableColumn: tableName
+        })
+        const client = new FetchHttpClient(config.serverDomain);
+        client.addMiddleware(json());
+        client.get('/database/columnslist/'+this.state.selectServer+'/'+this.state.selectDatabase+'/'+tableName).
+            then(response => {
+                    if(response.jsonData.status){
+                        this.setState({
+                            columntData: response.jsonData.data
+                        })
+                    }
+            })
+    }
     render(){
+        const {deskHeight, columntData, spList} = this.state;
         return (
             <div id='navigation'>
                 <div id='navigation_resizer'></div>
@@ -106,20 +167,20 @@ class Navigation extends React.Component {
                                 {this.state.serverList.map(server => <option value={server.code}>{server.dbServerName}</option>)}
                             </select>
                         </div>
-                        <div id="navigation_tree_content">
+                        <div id="navigation_tree_content" style={{height: deskHeight}}>
                             <ul>
                                 {this.state.dbList.map(db => 
                                     <li className="database">
                                         <div className="block">
                                             <i></i><b></b>
-                                            <a className="expander loaded" href="#"><span className="hide aPath">cm9vdA==.aW5mb3JtYXRpb25fc2NoZW1h</span>
+                                            <a className="expander loaded" href="#" onClick={this.dbChange.bind(this,db.dbName)}><span className="hide aPath">cm9vdA==.aW5mb3JtYXRpb25fc2NoZW1h</span>
                                             <span className="hide vPath">cm9vdA==.aW5mb3JtYXRpb25fc2NoZW1h</span>
                                             <span className="hide pos">0</span>
                                             <img src={dot} title="扩展/收起" alt="扩展/收起" className="icon ic_b_plus"></img>
                                             </a>
                                         </div>
                                         <div className="block">
-                                            <a href="#">
+                                            <a href="#" onClick={this.dbChange.bind(this,db.dbName)}>
                                                 <img src={dot} alt="数据库操作" className="icon ic_s_db"></img>
                                             </a>
                                         </div>
@@ -129,12 +190,35 @@ class Navigation extends React.Component {
                                             <ul>
                                                 {this.state.tableList.map(table =>
                                                     <li className="view">
-                                                    <div className="block"><i></i><span className="hide pos2_name">views</span><span className="hide pos2_value">0</span></div>
+                                                    <div className="block"><i></i>
+                                                    <a className="expander" href="#">
+                                                    <span className="hide pos2_name">views</span><span className="hide pos2_value">0</span>
+                                                    <img src={dot} title="扩展/收起" alt="扩展/收起" class="icon ic_b_plus" onClick={this.showTableColumn.bind(this,table.tableName)}></img>
+                                                    </a></div>
                                                     <div className="block"><a href="#"><img src={dot} title="视图" alt="视图" className="icon ic_b_props" /></a></div>
-                                                    <a className="hover_show_full" href="#" title="" onClick={this.tableChange.bind(this,table.tableName)}>{table.tableName} ({table.tableRows})</a>
+                                                    <a className="hover_show_full" href="#" title="" onClick={this.tableChange.bind(this,table.tableName)}> {table.tableName} ({table.tableRows})</a>
+                                                    <div class="clearfloat"></div>
+                                                    <div className={this.state.showTableColumn == table.tableName?'list_container':'hide'}>
+                                                        <ul>
+                                                            {columntData.map(column =>
+                                                                <li>{column.columnName}({column.columnType})</li>
+                                                            )}
+                                                        </ul>
+                                                    </div>
                                                     </li>
                                                 )}
-                                               
+                                               {spList.map( sp =>
+                                                    <li className="view">
+                                                    <div className="block"><i></i>
+                                                    <a className="expander" href="#">
+                                                    <span className="hide pos2_name">views</span><span className="hide pos2_value">0</span>
+                                                    <img src={dot} title="扩展/收起" alt="扩展/收起" class="icon"></img>
+                                                    </a></div>
+                                                    <div className="block"><a href="#"><img src={dot} title="视图" alt="视图" className="icon ic_b_routines" /></a></div>
+                                                    <a className="hover_show_full" href="#" title="" onClick={this.spChange.bind(this,sp.procedureName)}> {sp.procedureName}</a>
+                                                    <div class="clearfloat"></div>
+                                                    </li>
+                                               )}
                                             </ul>
                                         </div>
                                     </li>

@@ -4,20 +4,7 @@ import dot from './images/dot.gif'
 import './PageContent.css'
 import FetchHttpClient, { json } from 'fetch-http-client';
 import config from "./config";
-
-class TableHeader extends React.Component {
-    constructor(props) {
-        super(props)
-        console.log(props.tableHeaderData)
-    }
-    render() {
-        return(
-            <tr>
-            <th className="draggable">code</th>
-            </tr>
-        )
-    }
-}
+import { CSVLink, CSVDownload } from "react-csv";
 
 class PageContent extends React.Component {
     constructor(props){
@@ -28,32 +15,55 @@ class PageContent extends React.Component {
             selectTable: '',
             tableColumns: [],
             sql: '',
-            queryResult: []
+            queryResult: [],
+            spName: ''
         }
     }
 
     componentDidMount() {
         Pubsub.subscribe('dataSelect', (msg, data) => {
-            this.setState({
-                selectServer: data.selectServer,
-                selectDatabase: data.selectDatabase,
-                selectTable: data.selectTable,
-                sql: 'SELECT * FROM ' + data.selectTable
-            })
-            const client = new FetchHttpClient(config.serverDomain);
-            client.addMiddleware(json());
-            client.get('/database/columnslist/'+data.selectServer+'/'+data.selectDatabase+'/'+data.selectTable).
-                then(response => {
-                    console.log(response.jsonData)
-                    if(response.jsonData.status) {
-                        this.setState({
-                            tableColumns: response.jsonData.data
-
-                        })
-                    }
+            if('table' === data.type){
+                this.setState({
+                    selectServer: data.selectServer,
+                    selectDatabase: data.selectDatabase,
+                    selectTable: data.selectTable,
+                    sql: 'SELECT * FROM ' + data.selectTable
                 })
+                const client = new FetchHttpClient(config.serverDomain);
+                client.addMiddleware(json());
+                client.get('/database/columnslist/'+data.selectServer+'/'+data.selectDatabase+'/'+data.selectTable).
+                    then(response => {
+                        console.log(response.jsonData)
+                        if(response.jsonData.status) {
+                            this.setState({
+                                tableColumns: response.jsonData.data
+    
+                            })
+                        }
+                    })
+            }
+            else if('sp' === data.type){
+                this.setState({
+                    selectServer: data.selectServer,
+                    selectDatabase: data.selectDatabase,
+                    spName: data.spName
+                })
+                const client = new FetchHttpClient(config.serverDomain);
+                client.addMiddleware(json());
+                client.get('/database/storedprocedures/'+data.selectServer+'/'+data.selectDatabase+'/'+data.spName).
+                    then(response => {
+                        console.log(response.jsonData)
+                        this.setState({
+                            sql: response.jsonData.data.procedureData
+                        })
+                    })
+                
+            }
+
         })
     }
+
+
 
     execeteSql() {
         const client = new FetchHttpClient(config.serverDomain);
@@ -61,8 +71,13 @@ class PageContent extends React.Component {
         client.post('/database/query/'+this.state.selectServer+'/'+this.state.selectDatabase,
         {headers:{'Content-Type': 'text/plain'},body: this.state.sql}).then(response => {
             if(response.jsonData.status){
+                console.log(response.jsonData.data)
                 this.setState({
                     queryResult: response.jsonData.data
+                })
+            }else {
+                this.setState({
+                    queryResult: []
                 })
             }
 
@@ -89,7 +104,25 @@ class PageContent extends React.Component {
         }
     }
 
+    static dataColumnShow(columnData) {
+        if(null == columnData){
+            return 'null'
+        }
+        switch(typeof columnData) {
+            case 'boolean':
+                return columnData?'true':'false';
+            default:
+                return columnData;
+        }
+    }
+
+    handleTextareaChange(e) {
+        this.setState({
+            sql: e.target.value
+        })
+    }
     printTableData() {
+        
         if(this.state.queryResult[0] != undefined){
             let data = this.state.queryResult
 
@@ -97,22 +130,23 @@ class PageContent extends React.Component {
                 data.map( row => {
                 return(<tr>{
                     Object.keys(row).map( col => {
-                        return (<td>{typeof row[col] == 'boolean'?row[col] ?'true':'false':row[col] }</td>)
+                        return (<td>{PageContent.dataColumnShow(row[col])}</td>)
                     })
                     }</tr>)
                 }
-                
-                    )
+                )
 
             );
         }
         else{
             return(
-                <tr><td></td></tr>
+                <tr><td>无数据...</td></tr>
             )
         }
     }
     render(){
+        const {sql, queryResult} = this.state;
+
         return (
             <div>
                 <div id="menubar">
@@ -126,7 +160,7 @@ class PageContent extends React.Component {
                         <fieldset id="queryboxf">
                             <div id="queryfieldscontainer">
                                 <div id="sqlquerycontainer">
-                                    <textarea value={this.state.sql} tabIndex="100" name="sql_query" id="sqlquery" cols="40" rows="20">
+                                    <textarea value={sql} onChange={this.handleTextareaChange.bind(this)} tabIndex="100" name="sql_query" id="sqlquery" cols="40" rows="20">
 
                                     </textarea>
                                 </div>
@@ -144,6 +178,8 @@ class PageContent extends React.Component {
                     <fieldset id="queryboxfooter" className="tblFooters">
                         <input className="btn btn-primary" type="submit" id="button_submit_query" name="SQL"
                                tabIndex="200" value="执行" onClick={this.execeteSql.bind(this)} />
+                               { 0 != queryResult.length? (<CSVLink data={queryResult}>导出查询结果</CSVLink>):(<span></span>) }
+                               
                             <div className="clearfloat"></div>
                     </fieldset>
                     <div className="responsivetable">

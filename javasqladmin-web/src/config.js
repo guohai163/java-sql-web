@@ -1,5 +1,5 @@
 let globalData = {
-    serverDomain: "http://localhost:8002"
+    serverDomain: "http://jsa.dev.cn"
 }
 
 export default globalData;

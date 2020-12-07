@@ -61,10 +61,15 @@
 #navigation_tree_content {
     width: 100%;
     position: absolute;
+    overflow: hidden;
+    overflow-y: auto;
 }
 .navigation_server {
 
     margin-bottom: 10px;
+}
+.list_container {
+    font-size: 12px;
 }
 .hide {
     display: none;
@@ -77,6 +82,10 @@
 }
 .ic_b_props {
     background-image: url(./images/b_props.png);
+}
+.ic_b_routines {
+    background-image: url(./images/b_routines.png);
+
 }
 li {
     display: list-item;
