@@ -74,3 +74,9 @@ ALTER TABLE `db_connect_config_tb`
 ALTER TABLE `db_query_log`
   MODIFY `code` int(11) NOT NULL AUTO_INCREMENT;
 COMMIT;
+
+
+INSERT INTO `user_tb`
+(`user_name`,`pass_word`,`token`)
+VALUES
+('admin',md5(CONCAT(md5('admin'),'jsa')),'');
