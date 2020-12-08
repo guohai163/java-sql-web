@@ -1,6 +1,7 @@
 package org.guohai.javasqladmin.service;
 
 import org.guohai.javasqladmin.beans.*;
+import org.guohai.javasqladmin.dao.AdminDao;
 import org.guohai.javasqladmin.dao.BaseConfigDao;
 import org.guohai.javasqladmin.service.operation.DBOperation;
 import org.guohai.javasqladmin.service.operation.DBOperationFactory;
@@ -16,6 +17,9 @@ public class BaseDataServiceImpl implements BaseDataService{
 
     @Autowired
     BaseConfigDao baseConfigDao;
+
+    @Autowired
+    AdminDao adminDao;
 
     /**
      * 服务器实例集合
@@ -172,10 +176,15 @@ public class BaseDataServiceImpl implements BaseDataService{
      * @return
      */
     @Override
-    public Result<Object> quereyDataBySql(Integer serverCode, String dbName, String sql) {
+    public Result<Object> quereyDataBySql(Integer serverCode, String dbName, String sql, String token) {
+        UserBean user = adminDao.getUserByToken(token);
+        if(null == user){
+            return new Result<>(false,null);
+        }
         DBOperation operation = createDbOperation(serverCode);
         if(null != operation){
             try{
+                baseConfigDao.saveQueryLog(user.getUserName(),sql);
                 return new Result<>(true, operation.queryDatabaseBySql(dbName, sql));
             } catch (Exception e) {
                 e.printStackTrace();

@@ -99,3 +99,18 @@ baseUri: http://127.0.0.1:8002
       spName:
         type: string
         example: master
+/user:
+  /check:
+    get:
+      headers:
+        User-Token:
+          type: string
+      responses:
+        200:
+  /login:
+    post:
+      queryParameters:
+        user:
+          type: string
+        pass:
+          type: string

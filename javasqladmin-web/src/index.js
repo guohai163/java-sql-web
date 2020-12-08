@@ -24,7 +24,6 @@ class Root extends React.Component {
         </Router>
       </div>
       
-      
     )
   }
 }

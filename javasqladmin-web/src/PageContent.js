@@ -6,6 +6,8 @@ import FetchHttpClient, { json } from 'fetch-http-client';
 import config from "./config";
 import { CSVLink, CSVDownload } from "react-csv";
 
+import cookie from 'react-cookies'
+
 class PageContent extends React.Component {
     constructor(props){
         super(props)
@@ -16,11 +18,13 @@ class PageContent extends React.Component {
             tableColumns: [],
             sql: '',
             queryResult: [],
-            spName: ''
+            spName: '',
+            token: cookie.load('token')
         }
     }
 
     componentDidMount() {
+        console.log('PageContent', this.props.token)
         Pubsub.subscribe('dataSelect', (msg, data) => {
             if('table' === data.type){
                 this.setState({
@@ -66,10 +70,11 @@ class PageContent extends React.Component {
 
 
     execeteSql() {
+        console.log('executeSql', this.state.token)
         const client = new FetchHttpClient(config.serverDomain);
         client.addMiddleware(json());
         client.post('/database/query/'+this.state.selectServer+'/'+this.state.selectDatabase,
-        {headers:{'Content-Type': 'text/plain'},body: this.state.sql}).then(response => {
+        {headers:{'Content-Type': 'text/plain','User-Token': this.state.token},body: this.state.sql}).then(response => {
             if(response.jsonData.status){
                 console.log(response.jsonData.data)
                 this.setState({

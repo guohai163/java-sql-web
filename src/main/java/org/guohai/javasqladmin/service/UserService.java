@@ -23,4 +23,11 @@ public interface UserService {
      * @return
      */
     Result<String> logout(String token);
+
+    /**
+     * 检查登录状态
+     * @param token
+     * @return
+     */
+    Result<UserBean> checkLoginStatus(String token);
 }
