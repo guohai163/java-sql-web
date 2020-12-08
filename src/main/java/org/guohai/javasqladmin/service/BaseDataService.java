@@ -72,5 +72,5 @@ public interface BaseDataService {
      * @param sql
      * @return
      */
-    Result<Object> quereyDataBySql(Integer serverCode, String dbName, String sql);
+    Result<Object> quereyDataBySql(Integer serverCode, String dbName, String sql, String token);
 }

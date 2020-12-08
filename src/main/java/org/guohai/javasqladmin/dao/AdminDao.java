@@ -38,4 +38,6 @@ public interface AdminDao {
      */
     @Select("SELECT user_name FROM user_tb WHERE token=#{token}")
     UserBean getUserByToken(@Param("token") String token);
+
+
 }

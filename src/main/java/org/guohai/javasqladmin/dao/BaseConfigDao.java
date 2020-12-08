@@ -1,5 +1,6 @@
 package org.guohai.javasqladmin.dao;
 
+import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.guohai.javasqladmin.beans.ConnectConfigBean;
@@ -28,4 +29,22 @@ public interface BaseConfigDao {
      */
     @Select("SELECT * FROM db_connect_config_tb WHERE code=#{code}")
     ConnectConfigBean getConnectConfig(@Param("code") Integer code);
+
+    /**
+     * 保存查询日志
+     * @param user
+     * @param sql
+     * @return
+     */
+    @Insert("INSERT INTO `db_query_log`\n" +
+            "(`query_ip`,\n" +
+            "`query_name`,\n" +
+            "`query_sqlscript`,\n" +
+            "`query_time`)\n" +
+            "VALUES\n" +
+            "('127.0.0.1',\n" +
+            "#{user},\n" +
+            "#{sql},\n" +
+            "now());")
+    Boolean saveQueryLog(@Param("user") String user,@Param("sql") String sql);
 }

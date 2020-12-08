@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
  */
 @RestController
 @RequestMapping(value = "/user")
+@CrossOrigin
 public class UserController {
 
     private static final Logger LOG  = LoggerFactory.getLogger(UserController.class);
@@ -34,8 +35,7 @@ public class UserController {
      */
     @ResponseBody
     @RequestMapping(value = "/login")
-    public Result<UserBean> login(@ModelAttribute(value = "user") String user,
-                                  @ModelAttribute(value = "pass") String pass){
-        return userService.login(user, pass);
+    public Result<UserBean> login(@RequestBody UserBean user){
+        return userService.login(user.getUserName(), user.getPassWord());
     }
 }

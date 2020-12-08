@@ -119,7 +119,8 @@ public class BaseDataController {
     @RequestMapping(value = "/query/{serverCode}/{dbName}", method = RequestMethod.POST)
     public Result<Object> quereyData(@PathVariable("serverCode") String serverCode,
                                      @PathVariable("dbName") String dbName,
+                                     @RequestHeader(value = "User-Token", required =  false) String token,
                                      @RequestBody String sql){
-        return baseDataService.quereyDataBySql(Integer.parseInt(serverCode), dbName, sql);
+        return baseDataService.quereyDataBySql(Integer.parseInt(serverCode), dbName, sql, token);
     }
 }
