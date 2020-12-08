@@ -4,6 +4,7 @@ import org.guohai.javasqladmin.beans.Result;
 import org.guohai.javasqladmin.beans.UserBean;
 import org.guohai.javasqladmin.dao.AdminDao;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 
 import java.util.UUID;
 
@@ -11,6 +12,7 @@ import java.util.UUID;
  * 用户操作类
  * @author guohai
  */
+@Service
 public class UserServiceImpl implements UserService {
     /**
      * 管理DAO
@@ -48,5 +50,21 @@ public class UserServiceImpl implements UserService {
     public Result<String> logout(String token) {
 
         return null;
+    }
+
+    /**
+     * 检查登录状态
+     *
+     * @param token
+     * @return
+     */
+    @Override
+    public Result<UserBean> checkLoginStatus(String token) {
+        UserBean user = adminDao.getUserByToken(token);
+        if(null == user){
+            // 失败
+            return new Result<>(false,null);
+        }
+        return new Result<>(true, user);
     }
 }
