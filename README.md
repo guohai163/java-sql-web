@@ -12,4 +12,17 @@
 
 ## 项目部署
 
-本项目使用
+本项目使用Reactjs+Springboot+mysql的组合。最简项目运行可以使用Docker来运行。
+
+```shell
+# 首先下载数据库初始化脚本 
+wget https://github.com/guohai163/java-sql-admin/raw/master/script/init.sql
+# 按初始化脚本编辑修改.sql文件。
+vim init.sql
+# 启动数据库容器
+docker run --name mariadb -v /opt/java-sql-admin/script:/docker-entrypoint-initdb.d -e  MYSQL_ROOT_PASSWORD=my-secret-pw -d mariadb:10
+# 启动javasqladmin容器
+ docker run --name javasqladmin -d --link mariadb -p 80:8002 gcontainer/java-sql-admin:0.3.0 
+# 使用浏览器访问 
+open http://localhost
+```

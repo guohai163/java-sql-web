@@ -6,9 +6,9 @@ spring:
   datasource:
     type: com.alibaba.druid.pool.DruidDataSource
     druid:
-      url: jdbc:mysql://localhost:3306/javasqladmin_db?useUnicode=true&characterEncoding=UTF-8&allowMultiQueries=true
+      url: jdbc:mysql://${MARIADB_PORT_3306_TCP_ADDR:localhost}:3306/javasqladmin_db?useUnicode=true&characterEncoding=UTF-8&allowMultiQueries=true
       username: root
-      password: Passw0rd
+      password: ${MARIADB_ENV_MYSQL_ROOT_PASSWORD:Passw0rd}
   freemarker:
     template-loader-path: classpath:/web/
     cache: false

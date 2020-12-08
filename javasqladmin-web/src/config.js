@@ -1,5 +1,4 @@
 let globalData = {
-    serverDomain: "http://jsa.dev.cn"
+    serverDomain: '//'+window.location.host
 }
-
 export default globalData;
