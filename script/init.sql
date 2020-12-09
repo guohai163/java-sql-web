@@ -1,6 +1,6 @@
 -- 创建数据库： `javasqladmin_db`
-CREATE DATABASE IF NOT EXISTS `javasqladmin_db` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
-USE `javasqladmin_db`;
+CREATE DATABASE IF NOT EXISTS `javasqlweb_db` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+USE `javasqlweb_db`;
 
 -- 数据库连接表
 

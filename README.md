@@ -1,4 +1,4 @@
-# JavaSqlAdmin - 一个运营环境数据查询系统
+# JavaSqlWeb - 一个运营环境数据查询系统
 
 ## 项目介绍
 
@@ -16,13 +16,13 @@
 
 ```shell
 # 首先下载数据库初始化脚本 
-wget https://github.com/guohai163/java-sql-admin/raw/master/script/init.sql
+wget https://github.com/guohai163/java-sql-web/raw/master/script/init.sql
 # 按初始化脚本编辑修改.sql文件。
 vim init.sql
 # 启动数据库容器
 docker run --name mariadb -v /opt/java-sql-admin/script:/docker-entrypoint-initdb.d -e  MYSQL_ROOT_PASSWORD=my-secret-pw -d mariadb:10
 # 启动javasqladmin容器
- docker run --name javasqladmin -d --link mariadb -p 80:8002 gcontainer/java-sql-admin:0.3.0 
+ docker run --name javasqlweb -d --link mariadb -p 80:8002 gcontainer/java-sql-web:0.3.0 
 # 使用浏览器访问 
 open http://localhost
 ```

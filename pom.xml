@@ -9,9 +9,9 @@
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>org.guohai</groupId>
-    <artifactId>javasqladmin</artifactId>
+    <artifactId>javasqlweb</artifactId>
     <version>0.3.0</version>
-    <name>javasqladmin</name>
+    <name>javasqlweb</name>
     <description>java version db query tools</description>
 
     <properties>
