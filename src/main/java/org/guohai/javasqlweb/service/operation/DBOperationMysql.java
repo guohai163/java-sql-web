@@ -2,19 +2,78 @@ package org.guohai.javasqlweb.service.operation;
 
 import org.guohai.javasqlweb.beans.*;
 
-import java.sql.SQLException;
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
+/**
+ * 基于微软MSSQL的操作类
+ * @author guohai
+ * @date 2020-12-1
+ */
 public class DBOperationMysql implements DBOperation {
 
+    //region 私有变量区
+    /**
+     * 数据库配置
+     */
     private ConnectConfigBean connectConfigBean;
-    DBOperationMysql(ConnectConfigBean conn){
+
+    /**
+     * 连接实例
+     */
+    private Connection sqlConn;
+
+    /**
+     * 最大查询限制
+     */
+    private static final Integer LIMIT_NUMBER = 100;
+    /**
+     * 数据驱动
+     */
+    private static final String DB_DRIVER = "com.mysql.cj.jdbc.Driver";
+
+    //endregion
+
+    /**
+     * 构造方法
+     * @param conn
+     * @throws ClassNotFoundException
+     * @throws SQLException
+     */
+    DBOperationMysql(ConnectConfigBean conn) throws ClassNotFoundException, SQLException {
         connectConfigBean = conn;
+        String sqlUrl = String.format("jdbc:mysql://%s:%s",conn.getDbServerHost(),conn.getDbServerPort());
+        Class.forName(DB_DRIVER);
+        sqlConn = DriverManager.getConnection(sqlUrl,
+                connectConfigBean.getDbServerUsername(),
+                connectConfigBean.getDbServerPassword());
     }
 
+    /**
+     * 获得实例服务器库列表
+     * @return
+     * @throws SQLException
+     * @throws ClassNotFoundException
+     */
     @Override
-    public List<DatabaseNameBean> getDbList() {
-        return null;
+    public List<DatabaseNameBean> getDbList() throws SQLException {
+        List<DatabaseNameBean> listDnb = new ArrayList<>();
+        Statement st = sqlConn.createStatement();
+        ResultSet rs = st.executeQuery("SHOW DATABASES;");
+        while (rs.next()){
+            listDnb.add(new DatabaseNameBean(rs.getString("Database")));
+        }
+        // 关闭rs和statement
+        if (rs != null) {
+            rs.close();
+        }
+        if (st != null) {
+            st.close();
+        }
+        return listDnb;
     }
 
     /**
@@ -25,7 +84,23 @@ public class DBOperationMysql implements DBOperation {
      */
     @Override
     public List<TablesNameBean> getTableList(String dbName) throws SQLException {
-        return null;
+        List<TablesNameBean> listTnb = new ArrayList<>();
+        Statement st = sqlConn.createStatement();
+        ResultSet rs = st.executeQuery(String.format(
+                "SELECT table_name ,table_rows\n" +
+                        "FROM `information_schema`.`tables` WHERE TABLE_SCHEMA = '%s' ORDER BY table_rows DESC;", dbName));
+        while (rs.next()){
+            listTnb.add(new TablesNameBean(rs.getObject("table_name").toString(),
+                    rs.getInt("table_rows")));
+        }
+        // 关闭rs和statement
+        if (rs != null) {
+            rs.close();
+        }
+        if (st != null) {
+            st.close();
+        }
+        return listTnb;
     }
 
     /**
@@ -35,7 +110,23 @@ public class DBOperationMysql implements DBOperation {
      */
     @Override
     public List<ColumnsNameBean> getColumnsList(String dbName, String tableName) throws SQLException {
-        return null;
+        List<ColumnsNameBean> listCnb = new ArrayList<>();
+        Statement st = sqlConn.createStatement();
+        ResultSet rs = st.executeQuery(String.format(
+                "SHOW FULL COLUMNS FROM %s.%s", dbName, tableName));
+        while (rs.next()){
+            listCnb.add(new ColumnsNameBean(rs.getObject("Field").toString(),
+                    rs.getObject("Type").toString(),
+                    rs.getObject("Type").toString()));
+        }
+        // 关闭rs和statement
+        if (rs != null) {
+            rs.close();
+        }
+        if (st != null) {
+            st.close();
+        }
+        return listCnb;
     }
 
     /**
@@ -59,7 +150,22 @@ public class DBOperationMysql implements DBOperation {
      */
     @Override
     public List<StoredProceduresBean> getStoredProceduresList(String dbName) throws SQLException {
-        return null;
+        //SELECT SPECIFIC_NAME FROM information_schema.Routines WHERE ROUTINE_SCHEMA='javasqlweb_db'
+        List<StoredProceduresBean> listSp = new ArrayList<>();
+        Statement st = sqlConn.createStatement();
+        ResultSet rs = st.executeQuery(String.format(
+                "SELECT SPECIFIC_NAME FROM information_schema.Routines WHERE ROUTINE_SCHEMA='%s'", dbName));
+        while (rs.next()){
+            listSp.add(new StoredProceduresBean(rs.getString("name")));
+        }
+        // 关闭rs和statement
+        if (rs != null) {
+            rs.close();
+        }
+        if (st != null) {
+            st.close();
+        }
+        return listSp;
     }
 
     /**
@@ -84,6 +190,43 @@ public class DBOperationMysql implements DBOperation {
      */
     @Override
     public Object queryDatabaseBySql(String dbName, String sql) throws SQLException {
-        return null;
+        List<Map<String, Object>> listData = new ArrayList<>();
+        // TODO: 缺少SQL检查
+        sql = limitSql(sql);
+        Statement st = sqlConn.createStatement();
+        ResultSet rs = st.executeQuery(String.format("%s;", sql));
+//        ResultSet rs = st.executeQuery("select * from javasqladmin_db.db_query_log;");
+        // 获得结果集结构信息,元数据
+        java.sql.ResultSetMetaData md = rs.getMetaData();
+        // 获得列数
+        int columnCount = md.getColumnCount();
+        while (rs.next()){
+            Map<String, Object> rowData = new LinkedHashMap<String, Object>();
+            for(int i=1;i<=columnCount;i++){
+                rowData.put(md.getColumnName(i),md.getColumnType(i) == 93
+                        ? rs.getDate(i) + " " + rs.getTime(i)
+                        : rs.getObject(i));
+            }
+            listData.add(rowData);
+        }
+        // 关闭rs和statement
+        if (rs != null) {
+            rs.close();
+        }
+        if (st != null) {
+            st.close();
+        }
+        return listData;
+    }
+    /**
+     * 检查SQL语句中是否有top属性
+     * @return
+     */
+    private String limitSql(String sql){
+        if (!sql.toLowerCase().contains("limit") && !sql.toLowerCase().contains("distinct")) {
+            return sql.toLowerCase().replace("$", " limit " + LIMIT_NUMBER);
+        }
+        //TODO:包含top的也要做数量检查
+        return sql;
     }
 }

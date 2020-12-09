@@ -32,6 +32,9 @@ public class DBOperationMssql implements DBOperation {
      */
     private static final String DB_DRIVER = "com.microsoft.sqlserver.jdbc.SQLServerDriver";
 
+    /**
+     * 最大查询限制
+     */
     private static final Integer LIMIT_NUMBER = 100;
     //endregion
 

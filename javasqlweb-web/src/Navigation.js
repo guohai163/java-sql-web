@@ -21,7 +21,9 @@ class Navigation extends React.Component {
             deskHeight: 0,
             showTableColumn: '',
             columntData: [],
-            spList: []
+            spList: [],
+            selectServerName: '',
+            selectServerType: ''
         }
         this.serverChange = this.serverChange.bind(this);
         this.handleSize = this.handleSize.bind(this)
@@ -35,7 +37,6 @@ class Navigation extends React.Component {
         window.removeEventListener('resize', this.handleSize);
     }
     handleSize = () => {
-        console.log(window.innerHeight)
         this.setState({
             deskHeight:window.innerHeight - 120 
         })
@@ -52,6 +53,7 @@ class Navigation extends React.Component {
         })
     }
     dbChange(dbName,event) {
+
         if(dbName == this.state.selectDatabase) {
             this.setState({
                 selectDatabase: ''
@@ -75,16 +77,21 @@ class Navigation extends React.Component {
         this.getSpList(dbName);
     }
     serverChange(event) {
+        console.log(event)
+        console.log(event.target.value)
+        console.log(event.target.name)
         //当不为“请选择服务器”时进行相应 操作
         if('0' !== event.target.value) {
             console.log('需要进行操作');
             const client = new FetchHttpClient(config.serverDomain);
             client.addMiddleware(json());
             client.get('/database/dblist/'+event.target.value).then(response => {
-                console.log(response.jsonData.data);
+
                 if(response.jsonData.status){
                     this.setState({
                         selectServer: event.target.value,
+                        selectServerName: event.target.name,
+                        selectServerType: event.target.type,
                         dbList: response.jsonData.data
                     })
                 }
@@ -121,6 +128,8 @@ class Navigation extends React.Component {
         const selectData = {selectServer: this.state.selectServer,
                             selectDatabase: this.state.selectDatabase,
                             selectTable: tableName,
+                            selectServerName: this.state.selectServerName,
+                            selectServerType: this.state.selectServerType,
                             type: 'table'
                         };
         Pubsub.publish('dataSelect', selectData);
@@ -164,7 +173,7 @@ class Navigation extends React.Component {
                             <label>服务器：</label>
                             <select id="select_server" onChange={this.serverChange}>
                                 <option value="0">请选择服务器</option>
-                                {this.state.serverList.map(server => <option value={server.code}>{server.dbServerName}</option>)}
+                                {this.state.serverList.map(server => <option type={server.dbServerType} name={server.dbServerName} value={server.code}>{server.dbServerName}</option>)}
                             </select>
                         </div>
                         <div id="navigation_tree_content" style={{height: deskHeight}}>

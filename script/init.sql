@@ -23,7 +23,8 @@ ALTER TABLE `db_connect_config_tb`
 
 -- 增加测试库连接串
 INSERT INTO `db_connect_config_tb` (`db_server_name`, `db_server_host`, `db_server_port`, `db_server_username`, `db_server_password`, `db_server_type`, `create_time`) VALUES
-('test_sqlserver', 'testsql.db.guohai.org', '1433', 'sa', 'Passw0rd', 'mssql', now());
+('test_sqlserver', '192.168.6.2', '1433', 'sa', 'Passw0rd', 'mssql', now()),
+('test_mysql', '10.12.54.166', '3306', 'root', 'Passw0rd', 'mysql', now());
 
 -- 使用都日志表
 CREATE TABLE `db_query_log` (

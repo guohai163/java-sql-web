@@ -61,6 +61,9 @@ baseUri: http://127.0.0.1:8002
         200:
   /query/{serverCode}/{dbName}:
     post:
+      headers:
+        User-Token:
+          type: string
       body:
         text/plain:
           example: |
@@ -109,8 +112,10 @@ baseUri: http://127.0.0.1:8002
         200:
   /login:
     post:
-      queryParameters:
-        user:
-          type: string
-        pass:
-          type: string
+      body:
+        application/json:
+          example: |
+            {
+              "userName": "admin",
+              "passWord": "admin"
+            }

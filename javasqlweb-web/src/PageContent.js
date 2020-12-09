@@ -19,6 +19,8 @@ class PageContent extends React.Component {
             sql: '',
             queryResult: [],
             spName: '',
+            selectServerName: '',
+            selectServerType: '',
             token: cookie.load('token')
         }
     }
@@ -27,11 +29,14 @@ class PageContent extends React.Component {
         console.log('PageContent', this.props.token)
         Pubsub.subscribe('dataSelect', (msg, data) => {
             if('table' === data.type){
+                let sql = 'mssql' === data.selectServerType ? 'SELECT top 100 * FROM ' + data.selectTable : 'SELECT * FROM '+data.selectDatabase+'.'+data.selectTable + ' limit 100'
                 this.setState({
                     selectServer: data.selectServer,
                     selectDatabase: data.selectDatabase,
                     selectTable: data.selectTable,
-                    sql: 'SELECT * FROM ' + data.selectTable
+                    selectServerName: data.selectServerName,
+                    selectServerType: data.selectServerType,
+                    sql: sql
                 })
                 const client = new FetchHttpClient(config.serverDomain);
                 client.addMiddleware(json());
