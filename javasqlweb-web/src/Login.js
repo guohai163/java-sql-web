@@ -12,6 +12,7 @@ class Login extends React.Component {
             userName: '',
             passWord: ''
         }
+        // otpauth://totp/http://admin@jsw.dev.cn?secret=CTFIE22RO3DUQKN7&issuer=JavaSqlWeb
         this.handleInputChange = this.handleInputChange.bind(this)
     }
     handleInputChange(event){

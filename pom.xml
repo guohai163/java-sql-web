@@ -44,7 +44,12 @@
             <artifactId>mssql-jdbc</artifactId>
             <version>8.4.1.jre11</version>
         </dependency>
-
+        <!-- auth -->
+        <dependency>
+            <groupId>com.warrenstrange</groupId>
+            <artifactId>googleauth</artifactId>
+            <version>1.4.0</version>
+        </dependency>
         <dependency>
             <groupId>com.alibaba</groupId>
             <artifactId>druid-spring-boot-starter</artifactId>

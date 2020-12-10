@@ -46,7 +46,10 @@ CREATE TABLE `user_tb` (
   `code` int(11) NOT NULL COMMENT '自增值',
   `user_name` varchar(45) NOT NULL COMMENT '用户名',
   `pass_word` varchar(45) NOT NULL COMMENT '密码',
-  `token` varchar(45) NOT NULL COMMENT '登录临时令牌'
+  `token` varchar(45) NOT NULL COMMENT '登录临时令牌',
+  `auth_secret` VARCHAR(45) NULL COMMENT '二次验证密钥',
+  `auth_status` varchar(45) NOT NULL DEFAULT 'UNBIND' COMMENT '密保绑定状态',
+  `login_status` VARCHAR(45) NOT NULL DEFAULT 'LOGGING'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 ALTER TABLE `user_tb`
@@ -59,3 +62,8 @@ INSERT INTO `user_tb` (`user_name`,`pass_word`,`token`) VALUES
 ('admin',md5(CONCAT(md5('admin'),'jsa')),'');
 
 COMMIT;
+
+--ALTER TABLE `javasqladmin_db`.`user_tb`
+--ADD COLUMN `auth_secret` VARCHAR(45) NULL AFTER `token`,
+--ADD COLUMN `auth_status` VARCHAR(45) NOT NULL DEFAULT 'UNBIND' AFTER `auth_secret`,
+--ADD COLUMN `login_status` VARCHAR(45) NOT NULL DEFAULT 'LOGGING' AFTER `auth_status`;

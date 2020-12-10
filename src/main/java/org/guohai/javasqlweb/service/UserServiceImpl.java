@@ -1,5 +1,8 @@
 package org.guohai.javasqlweb.service;
 
+import com.warrenstrange.googleauth.GoogleAuthenticator;
+import com.warrenstrange.googleauth.GoogleAuthenticatorKey;
+import org.guohai.javasqlweb.beans.OtpAuthStatus;
 import org.guohai.javasqlweb.beans.Result;
 import org.guohai.javasqlweb.beans.UserBean;
 import org.guohai.javasqlweb.dao.AdminDao;
@@ -32,6 +35,15 @@ public class UserServiceImpl implements UserService {
         if(null == user){
             // 登录失败
             return new Result<>(false,null);
+        }
+        user.setToken(UUID.randomUUID().toString());
+        // 检查多因子绑定情况
+        if(OtpAuthStatus.UNBIND == user.getAuthStatus()) {
+            // 未绑定，生成新的秘钥
+            GoogleAuthenticator gAuth = new GoogleAuthenticator();
+            final GoogleAuthenticatorKey key = gAuth.createCredentials();
+            user.setAuthSecret(key.getKey());
+
         }
         user.setToken(UUID.randomUUID().toString());
         if(adminDao.setUserToken(name,user.getToken())){
