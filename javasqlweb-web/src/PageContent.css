@@ -8,6 +8,8 @@
     max-height: 23px;
     overflow: hidden;
     box-sizing: content-box;
+    color: #fff;
+    font-size: 13px;
 }
 #serverinfo .item {
     white-space: nowrap;
@@ -94,3 +96,6 @@ table {
 td { 
     border:#000000 solid 1px; padding:5px; 
 }  
+.ic_s_host {
+    background-image: url(./images/s_host.png);
+}

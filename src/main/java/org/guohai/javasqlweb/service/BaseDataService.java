@@ -17,6 +17,12 @@ public interface BaseDataService {
     Result<List<ConnectConfigBean>> getAllDataConnect();
 
     /**
+     * 获取指定服务器信息
+     * @return
+     */
+    Result<ConnectConfigBean> getServerInfo(Integer serverCode);
+
+    /**
      * 获得指定DB服务器的库名列表
      * @param serverCode
      * @return

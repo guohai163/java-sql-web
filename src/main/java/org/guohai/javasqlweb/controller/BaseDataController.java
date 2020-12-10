@@ -28,6 +28,16 @@ public class BaseDataController {
     }
 
     /**
+     * 获取指定服务器信息
+     * @param serverCode
+     * @return
+     */
+    @ResponseBody
+    @RequestMapping(value = "/serverinfo/{serverCode}")
+    public Result<ConnectConfigBean> getServerInfo(@PathVariable("serverCode") String serverCode){
+        return baseDataService.getServerInfo(Integer.parseInt(serverCode));
+    }
+    /**
      * 通过DBCode获得所有库
      * @param serverCode
      * @return

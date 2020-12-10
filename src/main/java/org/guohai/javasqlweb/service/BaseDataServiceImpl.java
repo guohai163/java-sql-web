@@ -32,6 +32,19 @@ public class BaseDataServiceImpl implements BaseDataService{
     }
 
     /**
+     * 获取指定服务器信息
+     * @return
+     */
+    @Override
+    public Result<ConnectConfigBean> getServerInfo(Integer serverCode) {
+        ConnectConfigBean connBean = baseConfigDao.getConnectConfig(serverCode);
+        connBean.setDbServerPassword("");
+        connBean.setDbServerUsername("");
+        connBean.setDbServerHost("");
+        return new Result<>(true, connBean);
+    }
+
+    /**
      * 活的指定DB服务器的库名列表
      *
      * @param serverCode

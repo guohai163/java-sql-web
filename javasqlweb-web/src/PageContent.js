@@ -28,28 +28,32 @@ class PageContent extends React.Component {
     componentDidMount() {
         console.log('PageContent', this.props.token)
         Pubsub.subscribe('dataSelect', (msg, data) => {
+
             if('table' === data.type){
-                let sql = 'mssql' === data.selectServerType ? 'SELECT top 100 * FROM ' + data.selectTable : 'SELECT * FROM '+data.selectDatabase+'.'+data.selectTable + ' limit 100'
-                this.setState({
-                    selectServer: data.selectServer,
-                    selectDatabase: data.selectDatabase,
-                    selectTable: data.selectTable,
-                    selectServerName: data.selectServerName,
-                    selectServerType: data.selectServerType,
-                    sql: sql
-                })
                 const client = new FetchHttpClient(config.serverDomain);
                 client.addMiddleware(json());
-                client.get('/database/columnslist/'+data.selectServer+'/'+data.selectDatabase+'/'+data.selectTable).
-                    then(response => {
-                        console.log(response.jsonData)
-                        if(response.jsonData.status) {
-                            this.setState({
-                                tableColumns: response.jsonData.data
-    
-                            })
-                        }
+                client.get('/database/serverinfo/'+data.selectServer).then( response => {
+                    let sql = 'mssql' === response.jsonData.data.dbServerType ? 'SELECT top 100 * FROM ' + data.selectTable : 'SELECT * FROM '+data.selectDatabase+'.'+data.selectTable + ' limit 100'
+                    this.setState({
+                        selectServer: data.selectServer,
+                        selectDatabase: data.selectDatabase,
+                        selectTable: data.selectTable,
+                        selectServerName: response.jsonData.data.dbServerName,
+                        selectServerType: response.jsonData.data.dbServerType,
+                        sql: sql
                     })
+                    client.get('/database/columnslist/'+data.selectServer+'/'+data.selectDatabase+'/'+data.selectTable).
+                        then(response => {
+                            console.log(response.jsonData)
+                            if(response.jsonData.status) {
+                                this.setState({
+                                    tableColumns: response.jsonData.data
+        
+                                })
+                            }
+                        })
+                })
+
             }
             else if('sp' === data.type){
                 this.setState({
@@ -161,8 +165,10 @@ class PageContent extends React.Component {
             <div>
                 <div id="menubar">
                     <div id="serverinfo">
+                        <img src={dot} title="" alt="" className="icon ic_s_host item"/>
+                        服务器: {this.state.selectServerName} ({this.state.selectServerType}) >> 
                         <img src={dot} title="" alt="" className="icon ic_s_db item"/>
-                        <a href="#" className="item">数据库: {this.state.selectDatabase}</a>
+                        数据库: {this.state.selectDatabase}
                     </div>
                 </div>
                 <div className='page_content'>
