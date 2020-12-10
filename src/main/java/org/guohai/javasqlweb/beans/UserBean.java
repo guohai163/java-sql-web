@@ -32,4 +32,14 @@ public class UserBean {
      * 绑定状态
      */
     private OtpAuthStatus authStatus;
+
+    /**
+     * 用户登录状态
+     */
+    private UserLoginStatus loginStatus;
+
+    /**
+     * 一次密码
+     */
+    private String otpPass;
 }

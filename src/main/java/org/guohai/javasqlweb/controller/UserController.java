@@ -29,12 +29,25 @@ public class UserController {
     }
 
     /**
-     *
+     * 用户登录方法，提交用户名和密码，如果返回未绑定和密钥，需要进行二次验证绑定
+     * @param user
      * @return
      */
     @ResponseBody
     @RequestMapping(value = "/login")
     public Result<UserBean> login(@RequestBody UserBean user){
         return userService.login(user.getUserName(), user.getPassWord());
+    }
+
+    @ResponseBody
+    @RequestMapping(value = "/bindotp")
+    public Result<String> bindAuth(@RequestBody UserBean User){
+        return null;
+    }
+
+    @ResponseBody
+    @RequestMapping(value = "/testotp")
+    public Result<String> testotp(@RequestBody UserBean user){
+        return null;
     }
 }
