@@ -29,3 +29,9 @@ input[type=text], input[type=password] {
     box-sizing: border-box;
     width: 14em;
 }
+.qrcode {
+    text-align: center;
+}
+.qrcode label{
+    width: 100%;
+}

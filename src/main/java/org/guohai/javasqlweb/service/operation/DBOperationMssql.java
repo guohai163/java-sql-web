@@ -89,7 +89,7 @@ public class DBOperationMssql implements DBOperation {
         Statement st = sqlConn.createStatement();
         ResultSet rs = st.executeQuery(String.format("use %s;" +
                 "SELECT a.name, b.rows FROM sysobjects a JOIN sysindexes b ON a.id = b.id " +
-                "WHERE xtype = 'u' and indid in (0,1);", dbName));
+                "WHERE xtype = 'u' and indid in (0,1) ORDER BY a.name;", dbName));
         while (rs.next()){
             listTnb.add(new TablesNameBean(rs.getObject("name").toString(),
                                 rs.getInt("rows")));

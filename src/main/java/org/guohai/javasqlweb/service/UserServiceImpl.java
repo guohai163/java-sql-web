@@ -39,7 +39,7 @@ public class UserServiceImpl implements UserService {
         }
         user.setToken(UUID.randomUUID().toString());
         // 检查多因子绑定情况
-        if(OtpAuthStatus.UNBIND == user.getAuthStatus()) {
+        if(OtpAuthStatus.UNBIND == user.getAuthStatus() || OtpAuthStatus.BINDING == user.getAuthStatus()) {
             // 未绑定，生成新的秘钥
             GoogleAuthenticator gAuth = new GoogleAuthenticator();
             final GoogleAuthenticatorKey key = gAuth.createCredentials();
@@ -78,6 +78,10 @@ public class UserServiceImpl implements UserService {
             // 失败
             return new Result<>(false,null);
         }
+        if(UserLoginStatus.LOGGED != user.getLoginStatus()){
+            // 非登录完成状态
+            return new Result<>(false, null);
+        }
         return new Result<>(true, user);
     }
 
@@ -85,27 +89,55 @@ public class UserServiceImpl implements UserService {
      * 绑定OTP
      *
      * @param token   用户令牌
-     * @param optPass 一次密码
+     * @param otpPass 一次密码
      * @return
      */
     @Override
-    public Result<String> bindOtp(String token, String optPass) {
+    public Result<String> bindOtp(String token, String otpPass) {
         UserBean user = adminDao.getUserByToken(token);
         if(null == user){
             // 失败
             return new Result<>(false,"token_error");
         }
-        if("".equals(user.getAuthSecret()) || OtpAuthStatus.UNBIND!=user.getAuthStatus() ||
-                UserLoginStatus.LOGGING==user.getLoginStatus()){
+        if("".equals(user.getAuthSecret()) || OtpAuthStatus.BINDING!=user.getAuthStatus() ||
+                UserLoginStatus.LOGGING!=user.getLoginStatus()){
             // 状态异常结束
             return new Result<>(false,"status_error");
         }
         GoogleAuthenticator gAuth = new GoogleAuthenticator();
-        Boolean authResult = gAuth.authorize(user.getAuthSecret(), Integer.parseInt(optPass));
+        Boolean authResult = gAuth.authorize(user.getAuthSecret(), Integer.parseInt(otpPass));
         if(!authResult){
             return new Result<>(false,"otp_pass_error");
         }
         adminDao.setUserBindStatus(user.getUserName());
+        return new Result<>(true,"success");
+    }
+
+    /**
+     * 验证一次密钥
+     *
+     * @param token
+     * @param otpPass
+     * @return
+     */
+    @Override
+    public Result<String> verifyOtp(String token, String otpPass) {
+        UserBean user = adminDao.getUserByToken(token);
+        if(null == user){
+            // 失败
+            return new Result<>(false,"token_error");
+        }
+        if("".equals(user.getAuthSecret()) || OtpAuthStatus.BIND!=user.getAuthStatus() ||
+                UserLoginStatus.LOGGING!=user.getLoginStatus()){
+            // 状态异常结束
+            return new Result<>(false,"status_error");
+        }
+        GoogleAuthenticator gAuth = new GoogleAuthenticator();
+        Boolean authResult = gAuth.authorize(user.getAuthSecret(), Integer.parseInt(otpPass));
+        if(!authResult){
+            return new Result<>(false,"otp_pass_error");
+        }
+        adminDao.setUserLoginSuccess(token);
         return new Result<>(true,"success");
     }
 }

@@ -34,8 +34,16 @@ public interface UserService {
     /**
      * 绑定OTP
      * @param token 用户令牌
-     * @param optPass 一次密码
+     * @param otpPass 一次密码
      * @return
      */
-    Result<String> bindOtp(String token, String optPass);
+    Result<String> bindOtp(String token, String otpPass);
+
+    /**
+     * 验证一次密钥
+     * @param token
+     * @param otpPass
+     * @return
+     */
+    Result<String> verifyOtp(String token, String otpPass);
 }

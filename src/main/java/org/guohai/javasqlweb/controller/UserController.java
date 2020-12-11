@@ -39,15 +39,25 @@ public class UserController {
         return userService.login(user.getUserName(), user.getPassWord());
     }
 
+    /**
+     * 绑定用户令牌
+     * @param user
+     * @return
+     */
     @ResponseBody
     @RequestMapping(value = "/bindotp")
-    public Result<String> bindAuth(@RequestBody UserBean User){
-        return null;
+    public Result<String> bindOtp(@RequestBody UserBean user){
+        return userService.bindOtp(user.getToken(), user.getOtpPass());
     }
 
+    /**
+     * 验证用户密钥
+     * @param user
+     * @return
+     */
     @ResponseBody
-    @RequestMapping(value = "/testotp")
-    public Result<String> testotp(@RequestBody UserBean user){
-        return null;
+    @RequestMapping(value = "/verifyotp")
+    public Result<String> verifyOtp(@RequestBody UserBean user){
+        return userService.verifyOtp(user.getToken(), user.getOtpPass());
     }
 }

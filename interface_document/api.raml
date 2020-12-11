@@ -119,3 +119,21 @@ baseUri: http://127.0.0.1:8002
               "userName": "admin",
               "passWord": "admin"
             }
+  /bindotp:
+    post:
+      body:
+        application/json:
+          example: |
+            {
+              "token": "aaaaaaa",
+              "otpPass": "123456"
+            }
+  /verifyotp:
+    post:
+      body:
+        application/json:
+          example: |
+            {
+              "token": "aaaaaaa",
+              "otpPass": "123456"
+            }

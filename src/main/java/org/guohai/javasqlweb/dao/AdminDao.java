@@ -30,7 +30,7 @@ public interface AdminDao {
      * @param token
      * @return
      */
-    @Update("UPDATE user_tb SET token=#{token} WHERE user_name=#{name}")
+    @Update("UPDATE user_tb SET token=#{token},login_status='LOGGING' WHERE user_name=#{name}")
     Boolean setUserToken(@Param("name") String name, @Param("token") String token);
 
     /**
@@ -68,4 +68,11 @@ public interface AdminDao {
     @Select("SELECT auth_secret,auth_status FROM user_tb WHERE token=#{token}")
     UserBean getUserSecret(@Param("token") String token);
 
+    /**
+     * 设置登录成功状态
+     * @param token
+     * @return
+     */
+    @Update("UPDATE user_tb SET login_status='LOGGED' WHERE token=#{token}")
+    Boolean setUserLoginSuccess(@Param("token") String token);
 }
