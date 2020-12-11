@@ -70,6 +70,9 @@ class Navigation extends React.Component {
                     tableList: response.jsonData.data
                 })
             }
+            else{
+                this.setState({tableList: []})
+            }
         })
         //获取存储过程
         this.getSpList(dbName);
@@ -105,6 +108,9 @@ class Navigation extends React.Component {
                 this.setState({
                     spList: response.jsonData.data
                 })
+            }
+            else{
+                this.setState({spList:[]})
             }
         })
     }
