@@ -30,4 +30,12 @@ public interface UserService {
      * @return
      */
     Result<UserBean> checkLoginStatus(String token);
+
+    /**
+     * 绑定OTP
+     * @param token 用户令牌
+     * @param optPass 一次密码
+     * @return
+     */
+    Result<String> bindOtp(String token, String optPass);
 }

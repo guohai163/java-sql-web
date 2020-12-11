@@ -63,7 +63,7 @@ INSERT INTO `user_tb` (`user_name`,`pass_word`,`token`) VALUES
 
 COMMIT;
 
---ALTER TABLE `javasqladmin_db`.`user_tb`
+--ALTER TABLE `javasqlweb_db`.`user_tb`
 --ADD COLUMN `auth_secret` VARCHAR(45) NULL AFTER `token`,
 --ADD COLUMN `auth_status` VARCHAR(45) NOT NULL DEFAULT 'UNBIND' AFTER `auth_secret`,
 --ADD COLUMN `login_status` VARCHAR(45) NOT NULL DEFAULT 'LOGGING' AFTER `auth_status`;
