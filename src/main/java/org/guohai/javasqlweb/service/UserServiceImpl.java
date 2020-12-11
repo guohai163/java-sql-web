@@ -6,7 +6,7 @@ import org.guohai.javasqlweb.beans.OtpAuthStatus;
 import org.guohai.javasqlweb.beans.Result;
 import org.guohai.javasqlweb.beans.UserBean;
 import org.guohai.javasqlweb.beans.UserLoginStatus;
-import org.guohai.javasqlweb.dao.AdminDao;
+import org.guohai.javasqlweb.dao.UserManageDao;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -18,11 +18,13 @@ import java.util.UUID;
  */
 @Service
 public class UserServiceImpl implements UserService {
+
     /**
      * 管理DAO
      */
     @Autowired
-    AdminDao adminDao;
+    UserManageDao userDao;
+
     /**
      * 登录方法
      *
@@ -32,7 +34,7 @@ public class UserServiceImpl implements UserService {
      */
     @Override
     public Result<UserBean> login(String name, String pass) {
-        UserBean user = adminDao.getUserByName(name,pass);
+        UserBean user = userDao.getUserByName(name,pass);
         if(null == user){
             // 登录失败
             return new Result<>(false,null);
@@ -44,10 +46,10 @@ public class UserServiceImpl implements UserService {
             GoogleAuthenticator gAuth = new GoogleAuthenticator();
             final GoogleAuthenticatorKey key = gAuth.createCredentials();
             user.setAuthSecret(key.getKey());
-            adminDao.setUserSecret(user.getAuthSecret(),user.getToken(),user.getUserName());
+            userDao.setUserSecret(user.getAuthSecret(),user.getToken(),user.getUserName());
             return new Result<>(true, user);
         }
-        if(adminDao.setUserToken(name,user.getToken())){
+        if(userDao.setUserToken(name,user.getToken())){
             return new Result<>(true, user);
         }
         return new Result<>(false,null);
@@ -73,7 +75,7 @@ public class UserServiceImpl implements UserService {
      */
     @Override
     public Result<UserBean> checkLoginStatus(String token) {
-        UserBean user = adminDao.getUserByToken(token);
+        UserBean user = userDao.getUserByToken(token);
         if(null == user){
             // 失败
             return new Result<>(false,null);
@@ -94,7 +96,7 @@ public class UserServiceImpl implements UserService {
      */
     @Override
     public Result<String> bindOtp(String token, String otpPass) {
-        UserBean user = adminDao.getUserByToken(token);
+        UserBean user = userDao.getUserByToken(token);
         if(null == user){
             // 失败
             return new Result<>(false,"token_error");
@@ -109,7 +111,7 @@ public class UserServiceImpl implements UserService {
         if(!authResult){
             return new Result<>(false,"otp_pass_error");
         }
-        adminDao.setUserBindStatus(user.getUserName());
+        userDao.setUserBindStatus(user.getUserName());
         return new Result<>(true,"success");
     }
 
@@ -122,7 +124,7 @@ public class UserServiceImpl implements UserService {
      */
     @Override
     public Result<String> verifyOtp(String token, String otpPass) {
-        UserBean user = adminDao.getUserByToken(token);
+        UserBean user = userDao.getUserByToken(token);
         if(null == user){
             // 失败
             return new Result<>(false,"token_error");
@@ -137,7 +139,19 @@ public class UserServiceImpl implements UserService {
         if(!authResult){
             return new Result<>(false,"otp_pass_error");
         }
-        adminDao.setUserLoginSuccess(token);
+        userDao.setUserLoginSuccess(token);
         return new Result<>(true,"success");
+    }
+
+    /**
+     * 注销用户
+     *
+     * @param token
+     * @return
+     */
+    @Override
+    public Result<String> logoutUser(String token) {
+        userDao.logoutUser(token);
+        return new Result<>(true, "");
     }
 }

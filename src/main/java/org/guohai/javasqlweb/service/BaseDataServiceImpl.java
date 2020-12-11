@@ -1,7 +1,7 @@
 package org.guohai.javasqlweb.service;
 
 import org.guohai.javasqlweb.beans.*;
-import org.guohai.javasqlweb.dao.AdminDao;
+import org.guohai.javasqlweb.dao.UserManageDao;
 import org.guohai.javasqlweb.dao.BaseConfigDao;
 import org.guohai.javasqlweb.service.operation.DBOperation;
 import org.guohai.javasqlweb.service.operation.DBOperationFactory;
@@ -19,7 +19,7 @@ public class BaseDataServiceImpl implements BaseDataService{
     BaseConfigDao baseConfigDao;
 
     @Autowired
-    AdminDao adminDao;
+    UserManageDao adminDao;
 
     /**
      * 服务器实例集合

@@ -46,4 +46,11 @@ public interface UserService {
      * @return
      */
     Result<String> verifyOtp(String token, String otpPass);
+
+    /**
+     * 注销用户
+     * @param token
+     * @return
+     */
+    Result<String> logoutUser(String token);
 }

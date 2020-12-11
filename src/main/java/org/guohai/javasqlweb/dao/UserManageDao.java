@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.PathVariable;
  * @author guohai
  */
 @Repository
-public interface AdminDao {
+public interface UserManageDao {
 
     /**
      * 查询指定用户名密码的用户数据是否存在
@@ -75,4 +75,12 @@ public interface AdminDao {
      */
     @Update("UPDATE user_tb SET login_status='LOGGED' WHERE token=#{token}")
     Boolean setUserLoginSuccess(@Param("token") String token);
+
+    /**
+     * 用户注销
+     * @param token
+     * @return
+     */
+    @Update("UPDATE user_tb SET token='',login_status='LOGOUT' WHERE token=#{token} ")
+    Boolean logoutUser(@Param("token") String token);
 }

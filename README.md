@@ -22,7 +22,12 @@ vim init.sql
 # 启动数据库容器
 docker run --name mariadb -v /opt/java-sql-admin/script:/docker-entrypoint-initdb.d -e  MYSQL_ROOT_PASSWORD=my-secret-pw -d mariadb:10
 # 启动javasqladmin容器
- docker run --name javasqlweb -d --link mariadb -p 80:8002 gcontainer/java-sql-web:0.3.0 
+ docker run --name javasqlweb -d --link mariadb -p 80:8002 gcontainer/java-sql-web:0.4.0 
 # 使用浏览器访问 
 open http://localhost
 ```
+
+## 目前支持的功能列表
+
+1. 账号登录，强制二次验证。目前没有后台系统创建账号还需要依赖直接写SQL语句
+2. 
