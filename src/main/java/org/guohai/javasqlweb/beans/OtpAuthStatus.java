@@ -5,7 +5,16 @@ package org.guohai.javasqlweb.beans;
  * @author guohai
  */
 public enum OtpAuthStatus {
+    /**
+     * 未绑定
+     */
     UNBIND,
+    /**
+     * 绑定状态中
+     */
     BINDING,
+    /**
+     * 绑定
+     */
     BIND
 }

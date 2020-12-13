@@ -22,7 +22,7 @@ public interface UserManageDao {
      * @return
      */
     @Select("SELECT user_name,auth_status FROM user_tb WHERE user_name=#{name} AND pass_word=md5(CONCAT(md5(#{pass}),'jsa'))")
-    UserBean getUserByName(@Param("name") String name, @Param("pass") String Pass);
+    UserBean getUserByName(@Param("name") String name, @Param("pass") String pass);
 
     /**
      * 更新用户登录令牌

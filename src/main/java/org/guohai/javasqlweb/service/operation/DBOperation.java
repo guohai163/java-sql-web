@@ -7,6 +7,7 @@ import java.util.List;
 
 /**
  * 单例工厂的抽象接口
+ * @author guohai
  */
 public interface DBOperation {
 

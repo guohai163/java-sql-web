@@ -1,6 +1,7 @@
 package org.guohai.javasqlweb.controller;
 
 import org.guohai.javasqlweb.beans.*;
+import org.guohai.javasqlweb.config.LoginRequired;
 import org.guohai.javasqlweb.service.BaseDataService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,6 +12,7 @@ import java.util.List;
 
 /**
  * 数据基础控制器
+ * @author guohai
  */
 @RestController
 @RequestMapping(value = "/database")
@@ -21,6 +23,7 @@ public class BaseDataController {
     @Autowired
     BaseDataService baseDataService;
 
+    @LoginRequired
     @ResponseBody
     @RequestMapping(value = "/serverlist")
     public Result<List<ConnectConfigBean>> getAllConnect(){

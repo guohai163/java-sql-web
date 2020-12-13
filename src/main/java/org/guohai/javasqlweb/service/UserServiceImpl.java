@@ -37,7 +37,7 @@ public class UserServiceImpl implements UserService {
         UserBean user = userDao.getUserByName(name,pass);
         if(null == user){
             // 登录失败
-            return new Result<>(false,null);
+            return new Result<>(false,"登录失败",null);
         }
         user.setToken(UUID.randomUUID().toString());
         // 检查多因子绑定情况
@@ -47,12 +47,12 @@ public class UserServiceImpl implements UserService {
             final GoogleAuthenticatorKey key = gAuth.createCredentials();
             user.setAuthSecret(key.getKey());
             userDao.setUserSecret(user.getAuthSecret(),user.getToken(),user.getUserName());
-            return new Result<>(true, user);
+            return new Result<>(true,"success", user);
         }
         if(userDao.setUserToken(name,user.getToken())){
-            return new Result<>(true, user);
+            return new Result<>(true,"success", user);
         }
-        return new Result<>(false,null);
+        return new Result<>(false,"网络异常请重试",null);
     }
 
     /**
@@ -78,13 +78,13 @@ public class UserServiceImpl implements UserService {
         UserBean user = userDao.getUserByToken(token);
         if(null == user){
             // 失败
-            return new Result<>(false,null);
+            return new Result<>(false,"未登录",null);
         }
         if(UserLoginStatus.LOGGED != user.getLoginStatus()){
             // 非登录完成状态
-            return new Result<>(false, null);
+            return new Result<>(false,"未登录", null);
         }
-        return new Result<>(true, user);
+        return new Result<>(true,"success", user);
     }
 
     /**
@@ -99,20 +99,20 @@ public class UserServiceImpl implements UserService {
         UserBean user = userDao.getUserByToken(token);
         if(null == user){
             // 失败
-            return new Result<>(false,"token_error");
+            return new Result<>(false,"用户还未登录","token_error");
         }
         if("".equals(user.getAuthSecret()) || OtpAuthStatus.BINDING!=user.getAuthStatus() ||
                 UserLoginStatus.LOGGING!=user.getLoginStatus()){
             // 状态异常结束
-            return new Result<>(false,"status_error");
+            return new Result<>(false,"状态错误，跳回登录","status_error");
         }
         GoogleAuthenticator gAuth = new GoogleAuthenticator();
         Boolean authResult = gAuth.authorize(user.getAuthSecret(), Integer.parseInt(otpPass));
         if(!authResult){
-            return new Result<>(false,"otp_pass_error");
+            return new Result<>(false,"一次密码错误，请重新输入","otp_pass_error");
         }
         userDao.setUserBindStatus(user.getUserName());
-        return new Result<>(true,"success");
+        return new Result<>(true,"成功","success");
     }
 
     /**
@@ -127,20 +127,20 @@ public class UserServiceImpl implements UserService {
         UserBean user = userDao.getUserByToken(token);
         if(null == user){
             // 失败
-            return new Result<>(false,"token_error");
+            return new Result<>(false,"还未登录","token_error");
         }
         if("".equals(user.getAuthSecret()) || OtpAuthStatus.BIND!=user.getAuthStatus() ||
                 UserLoginStatus.LOGGING!=user.getLoginStatus()){
             // 状态异常结束
-            return new Result<>(false,"status_error");
+            return new Result<>(false,"状态异常","status_error");
         }
         GoogleAuthenticator gAuth = new GoogleAuthenticator();
         Boolean authResult = gAuth.authorize(user.getAuthSecret(), Integer.parseInt(otpPass));
         if(!authResult){
-            return new Result<>(false,"otp_pass_error");
+            return new Result<>(false,"动态码错误，请重新输入","otp_pass_error");
         }
         userDao.setUserLoginSuccess(token);
-        return new Result<>(true,"success");
+        return new Result<>(true,"成功","success");
     }
 
     /**
@@ -152,6 +152,6 @@ public class UserServiceImpl implements UserService {
     @Override
     public Result<String> logoutUser(String token) {
         userDao.logoutUser(token);
-        return new Result<>(true, "");
+        return new Result<>(true,"成功", "");
     }
 }

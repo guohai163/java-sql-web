@@ -5,6 +5,7 @@ import logo from './images/logo_left.png'
 import dot from './images/dot.gif'
 import config from './config'
 import Pubsub from 'pubsub-js'
+import cookie from 'react-cookies'
 
 class Navigation extends React.Component {
     constructor(props){
@@ -21,7 +22,8 @@ class Navigation extends React.Component {
             deskHeight: 0,
             showTableColumn: '',
             columntData: [],
-            spList: []
+            spList: [],
+            token: cookie.load('token')
         }
         this.serverChange = this.serverChange.bind(this);
         this.handleSize = this.handleSize.bind(this)
@@ -42,7 +44,7 @@ class Navigation extends React.Component {
     getServerList() {
         const client = new FetchHttpClient(config.serverDomain);
         client.addMiddleware(json());
-        client.get('/database/serverlist').then(response => {
+        client.get('/database/serverlist',{headers:{'User-Token': this.state.token}}).then(response => {
             if(response.jsonData.status) {
                 this.setState({
                     serverList: response.jsonData.data
@@ -64,7 +66,7 @@ class Navigation extends React.Component {
         // 获取表
         const client = new FetchHttpClient(config.serverDomain);
         client.addMiddleware(json());
-        client.get('/database/tablelist/'+this.state.selectServer+'/'+dbName).then(response => {
+        client.get('/database/tablelist/'+this.state.selectServer+'/'+dbName,{headers:{'User-Token': this.state.token}}).then(response => {
             if(response.jsonData.status) {
                 this.setState({
                     tableList: response.jsonData.data
@@ -86,7 +88,7 @@ class Navigation extends React.Component {
             console.log('需要进行操作');
             const client = new FetchHttpClient(config.serverDomain);
             client.addMiddleware(json());
-            client.get('/database/dblist/'+event.target.value).then(response => {
+            client.get('/database/dblist/'+event.target.value,{headers:{'User-Token': this.state.token}}).then(response => {
                 console.log(response.jsonData)
                 if(response.jsonData.status){
                     this.setState({
@@ -102,7 +104,7 @@ class Navigation extends React.Component {
     getSpList(dbName) {
         const client = new FetchHttpClient(config.serverDomain);
         client.addMiddleware(json());
-        client.get('/database/storedprocedures/'+this.state.selectServer+'/'+dbName).then(response => {
+        client.get('/database/storedprocedures/'+this.state.selectServer+'/'+dbName,{headers:{'User-Token': this.state.token}}).then(response => {
             console.log(response.jsonData)
             if(response.jsonData.status) {
                 this.setState({
@@ -140,7 +142,7 @@ class Navigation extends React.Component {
         })
         const client = new FetchHttpClient(config.serverDomain);
         client.addMiddleware(json());
-        client.get('/database/columnslist/'+this.state.selectServer+'/'+this.state.selectDatabase+'/'+tableName).
+        client.get('/database/columnslist/'+this.state.selectServer+'/'+this.state.selectDatabase+'/'+tableName,{headers:{'User-Token': this.state.token}}).
             then(response => {
                     if(response.jsonData.status){
                         this.setState({

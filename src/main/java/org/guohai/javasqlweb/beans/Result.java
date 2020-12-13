@@ -17,11 +17,14 @@ public class Result<T> {
     /**
      * 状态
      */
-    private Boolean status;
-
+    Boolean status;
+    /**
+     * 说明信息
+     */
+    String message;
     /**
      * 返回的数据体
      */
-    private T data;
+    T data;
 
 }

@@ -20,6 +20,7 @@ class JavaSqlAdmin extends React.Component {
                     this.state={token:token, user: response.jsonData.data.userName}
                     
                 }else{
+                    console.log('this.props.history')
                     this.props.history.push('/login');
                 }
             })

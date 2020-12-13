@@ -4,7 +4,7 @@ import dot from './images/dot.gif'
 import './PageContent.css'
 import FetchHttpClient, { json } from 'fetch-http-client';
 import config from "./config";
-import { CSVLink, CSVDownload } from "react-csv";
+import { CSVLink } from "react-csv";
 
 import cookie from 'react-cookies'
 
@@ -32,7 +32,7 @@ class PageContent extends React.Component {
             if('table' === data.type){
                 const client = new FetchHttpClient(config.serverDomain);
                 client.addMiddleware(json());
-                client.get('/database/serverinfo/'+data.selectServer).then( response => {
+                client.get('/database/serverinfo/'+data.selectServer,{headers:{'User-Token': this.state.token}}).then( response => {
                     let sql = 'mssql' === response.jsonData.data.dbServerType ? 'SELECT top 100 * FROM ' + data.selectTable : 'SELECT * FROM '+data.selectDatabase+'.'+data.selectTable + ' limit 100'
                     this.setState({
                         selectServer: data.selectServer,
@@ -42,7 +42,8 @@ class PageContent extends React.Component {
                         selectServerType: response.jsonData.data.dbServerType,
                         sql: sql
                     })
-                    client.get('/database/columnslist/'+data.selectServer+'/'+data.selectDatabase+'/'+data.selectTable).
+                    client.get('/database/columnslist/'+data.selectServer+'/'+data.selectDatabase+'/'+data.selectTable,
+                                {headers:{'User-Token': this.state.token}}).
                         then(response => {
                             console.log(response.jsonData)
                             if(response.jsonData.status) {
@@ -63,7 +64,8 @@ class PageContent extends React.Component {
                 })
                 const client = new FetchHttpClient(config.serverDomain);
                 client.addMiddleware(json());
-                client.get('/database/storedprocedures/'+data.selectServer+'/'+data.selectDatabase+'/'+data.spName).
+                client.get('/database/storedprocedures/'+data.selectServer+'/'+data.selectDatabase+'/'+data.spName,
+                            {headers:{'User-Token': this.state.token}}).
                     then(response => {
                         console.log(response.jsonData)
                         this.setState({
@@ -99,7 +101,7 @@ class PageContent extends React.Component {
     }
 
     printTableHeader() {
-        if(this.state.queryResult[0] != undefined){
+        if(this.state.queryResult[0] !== undefined){
             let data = this.state.queryResult[0]
             return (
                 <tr>
@@ -137,7 +139,7 @@ class PageContent extends React.Component {
     }
     printTableData() {
         
-        if(this.state.queryResult[0] != undefined){
+        if(this.state.queryResult[0] !== undefined){
             let data = this.state.queryResult
 
             return (
@@ -194,7 +196,7 @@ class PageContent extends React.Component {
                     <fieldset id="queryboxfooter" className="tblFooters">
                         <input className="btn btn-primary" type="submit" id="button_submit_query" name="SQL"
                                tabIndex="200" value="执行" onClick={this.execeteSql.bind(this)} />
-                               { 0 != queryResult.length? (<CSVLink data={queryResult}>导出查询结果</CSVLink>):(<span></span>) }
+                               { 0 !== queryResult.length? (<CSVLink data={queryResult}>导出查询结果</CSVLink>):(<span></span>) }
                                
                             <div className="clearfloat"></div>
                     </fieldset>

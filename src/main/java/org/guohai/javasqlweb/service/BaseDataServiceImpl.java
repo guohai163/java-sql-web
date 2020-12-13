@@ -28,7 +28,7 @@ public class BaseDataServiceImpl implements BaseDataService{
 
     @Override
     public Result<List<ConnectConfigBean>> getAllDataConnect() {
-        return new Result<>(true, baseConfigDao.getAllConnectConfig());
+        return new Result<>(true,"", baseConfigDao.getAllConnectConfig());
     }
 
     /**
@@ -41,7 +41,7 @@ public class BaseDataServiceImpl implements BaseDataService{
         connBean.setDbServerPassword("");
         connBean.setDbServerUsername("");
         connBean.setDbServerHost("");
-        return new Result<>(true, connBean);
+        return new Result<>(true,"成功", connBean);
     }
 
     /**
@@ -56,13 +56,13 @@ public class BaseDataServiceImpl implements BaseDataService{
         DBOperation operation = createDbOperation(serverCode);
         if(null != operation){
             try{
-                return new Result<>(true, operation.getDbList());
+                return new Result<>(true,"", operation.getDbList());
             } catch (Exception e) {
                 e.printStackTrace();
-                return new Result<>(false,null);
+                return new Result<>(false,e.toString(),null);
             }
         }else{
-            return new Result<>(false,null);
+            return new Result<>(false,"没有找到对应 的数据库",null);
         }
 
     }
@@ -79,13 +79,13 @@ public class BaseDataServiceImpl implements BaseDataService{
         DBOperation operation = createDbOperation(serverCode);
         if(null != operation){
             try{
-                return new Result<>(true, operation.getTableList(dbName));
+                return new Result<>(true,"", operation.getTableList(dbName));
             } catch (Exception e) {
                 e.printStackTrace();
-                return new Result<>(false,null);
+                return new Result<>(false,"",null);
             }
         }else{
-            return new Result<>(false,null);
+            return new Result<>(false,"",null);
         }
     }
 
@@ -102,13 +102,13 @@ public class BaseDataServiceImpl implements BaseDataService{
         DBOperation operation = createDbOperation(serverCode);
         if(null != operation){
             try{
-                return new Result<>(true, operation.getColumnsList(dbName, tableName));
+                return new Result<>(true,"", operation.getColumnsList(dbName, tableName));
             } catch (Exception e) {
                 e.printStackTrace();
-                return new Result<>(false,null);
+                return new Result<>(false,"",null);
             }
         }else{
-            return new Result<>(false,null);
+            return new Result<>(false,"",null);
         }
     }
 
@@ -125,13 +125,13 @@ public class BaseDataServiceImpl implements BaseDataService{
         DBOperation operation = createDbOperation(serverCode);
         if(null != operation){
             try{
-                return new Result<>(true, operation.getIndexesList(dbName, tableName));
+                return new Result<>(true,"", operation.getIndexesList(dbName, tableName));
             } catch (Exception e) {
                 e.printStackTrace();
-                return new Result<>(false,null);
+                return new Result<>(false,"",null);
             }
         }else{
-            return new Result<>(false,null);
+            return new Result<>(false,"",null);
         }
     }
 
@@ -147,13 +147,13 @@ public class BaseDataServiceImpl implements BaseDataService{
         DBOperation operation = createDbOperation(serverCode);
         if(null != operation){
             try{
-                return new Result<>(true, operation.getStoredProceduresList(dbName));
+                return new Result<>(true,"", operation.getStoredProceduresList(dbName));
             } catch (Exception e) {
                 e.printStackTrace();
-                return new Result<>(false,null);
+                return new Result<>(false,"",null);
             }
         }else{
-            return new Result<>(false,null);
+            return new Result<>(false,"",null);
         }
     }
 
@@ -170,13 +170,13 @@ public class BaseDataServiceImpl implements BaseDataService{
         DBOperation operation = createDbOperation(serverCode);
         if(null != operation){
             try{
-                return new Result<>(true, operation.getStoredProcedure(dbName, spName));
+                return new Result<>(true,"", operation.getStoredProcedure(dbName, spName));
             } catch (Exception e) {
                 e.printStackTrace();
-                return new Result<>(false,null);
+                return new Result<>(false,"",null);
             }
         }else{
-            return new Result<>(false,null);
+            return new Result<>(false,"",null);
         }
     }
 
@@ -192,19 +192,19 @@ public class BaseDataServiceImpl implements BaseDataService{
     public Result<Object> quereyDataBySql(Integer serverCode, String dbName, String sql, String token) {
         UserBean user = adminDao.getUserByToken(token);
         if(null == user){
-            return new Result<>(false,null);
+            return new Result<>(false,"",null);
         }
         DBOperation operation = createDbOperation(serverCode);
         if(null != operation){
             try{
                 baseConfigDao.saveQueryLog(user.getUserName(),sql);
-                return new Result<>(true, operation.queryDatabaseBySql(dbName, sql));
+                return new Result<>(true,"", operation.queryDatabaseBySql(dbName, sql));
             } catch (Exception e) {
                 e.printStackTrace();
-                return new Result<>(false,null);
+                return new Result<>(false,"",null);
             }
         }else{
-            return new Result<>(false,null);
+            return new Result<>(false,"",null);
         }
     }
 

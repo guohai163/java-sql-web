@@ -18,6 +18,7 @@ public interface BaseDataService {
 
     /**
      * 获取指定服务器信息
+     * @param serverCode
      * @return
      */
     Result<ConnectConfigBean> getServerInfo(Integer serverCode);
@@ -71,11 +72,13 @@ public interface BaseDataService {
      * @return
      */
     Result<StoredProceduresBean> getSpByName(Integer serverCode, String dbName, String spName);
+
     /**
      * 执行查询语句
      * @param serverCode
      * @param dbName
      * @param sql
+     * @param token
      * @return
      */
     Result<Object> quereyDataBySql(Integer serverCode, String dbName, String sql, String token);

@@ -195,7 +195,6 @@ public class DBOperationMysql implements DBOperation {
         sql = limitSql(sql);
         Statement st = sqlConn.createStatement();
         ResultSet rs = st.executeQuery(String.format("%s;", sql));
-//        ResultSet rs = st.executeQuery("select * from javasqladmin_db.db_query_log;");
         // 获得结果集结构信息,元数据
         java.sql.ResultSetMetaData md = rs.getMetaData();
         // 获得列数

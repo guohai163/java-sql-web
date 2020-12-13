@@ -5,6 +5,7 @@ import FetchHttpClient, { json } from 'fetch-http-client';
 import config from "./config";
 import cookie from 'react-cookies'
 import QRCode from 'qrcode.react'
+import Dialog from 'rc-dialog';
 
 class Login extends React.Component {
     constructor(props){
@@ -89,6 +90,11 @@ class Login extends React.Component {
     render(){
         return (
             <div>
+                {
+                <Dialog title="aa" style={{ width: 600 }} visible>
+                    <p>first dialog</p>
+                </Dialog>
+                }
                 <div className={this.state.loginStep === 'LOGIN'?'container':'hide'}>
                     <fieldset>
                     <legend>登录</legend>
