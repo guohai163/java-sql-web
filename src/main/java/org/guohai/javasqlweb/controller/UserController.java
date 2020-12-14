@@ -22,6 +22,11 @@ public class UserController {
     @Autowired
     UserService userService;
 
+    /**
+     * 检查登录状态
+     * @param token
+     * @return
+     */
     @ResponseBody
     @RequestMapping(value = "/check")
     public Result<UserBean> checkLogin(@RequestHeader(value = "User-Token", required =  false) String token){
@@ -37,6 +42,17 @@ public class UserController {
     @RequestMapping(value = "/login")
     public Result<UserBean> login(@RequestBody UserBean user){
         return userService.login(user.getUserName(), user.getPassWord());
+    }
+
+    /**
+     * 注销
+     * @param token
+     * @return
+     */
+    @ResponseBody
+    @RequestMapping(value = "/logout")
+    public Result<String> logout(@RequestHeader(value = "User-Token", required =  false) String token){
+        return userService.logout(token);
     }
 
     /**

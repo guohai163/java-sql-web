@@ -5,8 +5,10 @@ import './PageContent.css'
 import FetchHttpClient, { json } from 'fetch-http-client';
 import config from "./config";
 import { CSVLink } from "react-csv";
-
+import { Modal } from 'antd';
 import cookie from 'react-cookies'
+
+const { confirm } = Modal;
 
 class PageContent extends React.Component {
     constructor(props){
@@ -88,6 +90,14 @@ class PageContent extends React.Component {
         {headers:{'Content-Type': 'text/plain','User-Token': this.state.token},body: this.state.sql}).then(response => {
             if(response.jsonData.status){
                 console.log(response.jsonData.data)
+                if(0 === response.jsonData.data.length){
+                    confirm({
+                        title:'提示',
+                        content: '无符合查询条件数据',
+                        onOk(){                        },
+                        onCancel(){                        }
+                    });
+                }
                 this.setState({
                     queryResult: response.jsonData.data
                 })
@@ -164,7 +174,7 @@ class PageContent extends React.Component {
         const {sql, queryResult} = this.state;
 
         return (
-            <div>
+            <div className="right_area">
                 <div id="menubar">
                     <div id="serverinfo">
                         <img src={dot} title="" alt="" className="icon ic_s_host item"/>

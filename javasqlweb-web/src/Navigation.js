@@ -6,6 +6,8 @@ import dot from './images/dot.gif'
 import config from './config'
 import Pubsub from 'pubsub-js'
 import cookie from 'react-cookies'
+import { Modal } from 'antd';
+const { confirm } = Modal;
 
 class Navigation extends React.Component {
     constructor(props){
@@ -151,6 +153,28 @@ class Navigation extends React.Component {
                     }
             })
     }
+    logout(){
+        const client = new FetchHttpClient(config.serverDomain);
+        client.addMiddleware(json());
+        client.get('/user/logout',{headers:{'User-Token': this.state.token}}).
+            then(response => {
+                if(response.jsonData.status){
+                    this.setState({token:''})
+                    cookie.remove('token', { path: '/' })
+                    confirm({
+                        title:'提示',
+                        content: response.jsonData.message,
+                        onOk(){
+                            window.location.href = '/login'
+                        },
+                        onCancel(){
+                            window.location.href = '/login'
+                        }
+                    });
+                    
+                }
+            })
+    }
     render(){
         const {deskHeight, columntData, spList} = this.state;
         return (
@@ -165,7 +189,7 @@ class Navigation extends React.Component {
                             <button href="#" title="设置">
                                 <img src={dot} alt="setting" className="icon ic_s_cog"></img>
                             </button>
-                            <a href="#" title="退出">
+                            <a href="#" title="退出" onClick={this.logout.bind(this)}>
                                 <img src={dot} alt="exit" className="icon ic_s_loggoff"></img>
                             </a>
                         </div>
@@ -175,7 +199,7 @@ class Navigation extends React.Component {
                             <label>服务器：</label>
                             <select id="select_server" onChange={this.serverChange}>
                                 <option value="0">请选择服务器</option>
-                                {this.state.serverList.map(server => <option key={server.dbServerType} name={server.dbServerName} value={server.code}>{server.dbServerName}</option>)}
+                                {this.state.serverList.map(server => <option name={server.dbServerName} value={server.code}>{server.dbServerName}</option>)}
                             </select>
                         </div>
                         <div id="navigation_tree_content" style={{height: deskHeight}}>

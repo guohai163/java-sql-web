@@ -99,3 +99,6 @@ td {
 .ic_s_host {
     background-image: url(./images/s_host.png);
 }
+.right_area {
+    margin-left: 241px;
+}

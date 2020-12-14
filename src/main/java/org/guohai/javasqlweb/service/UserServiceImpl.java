@@ -63,8 +63,8 @@ public class UserServiceImpl implements UserService {
      */
     @Override
     public Result<String> logout(String token) {
-
-        return null;
+        userDao.logoutUser(token);
+        return new Result<>(true,"注销成功", "success");
     }
 
     /**

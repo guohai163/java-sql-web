@@ -1,3 +1,5 @@
+@import '~antd/dist/antd.css';
+
 fieldset {
     background: #eee;
 }
@@ -15,6 +17,8 @@ fieldset legend {
 }
 
 div.container {
+    margin:0 auto;
+    margin-top: 100px;
     width: 30em;
     text-align: left;
     margin-bottom: 0 auto;
@@ -33,5 +37,9 @@ input[type=text], input[type=password] {
     text-align: center;
 }
 .qrcode label{
+    width: 100%;
+}
+.center {
+    text-align: center;
     width: 100%;
 }

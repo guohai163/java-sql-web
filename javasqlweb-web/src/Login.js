@@ -5,7 +5,8 @@ import FetchHttpClient, { json } from 'fetch-http-client';
 import config from "./config";
 import cookie from 'react-cookies'
 import QRCode from 'qrcode.react'
-import Dialog from 'rc-dialog';
+import { Modal } from 'antd';
+const { confirm } = Modal;
 
 class Login extends React.Component {
     constructor(props){
@@ -22,7 +23,6 @@ class Login extends React.Component {
         this.handleInputChange = this.handleInputChange.bind(this)
     }
     handleInputChange(event){
-        console.log(event)
         if('username' === event.target.name){
             this.setState({userName: event.target.value})
         }
@@ -34,6 +34,7 @@ class Login extends React.Component {
         }
     }
     login() {
+
         const client = new FetchHttpClient(config.serverDomain);
         client.addMiddleware(json());
         client.post('/user/login',{headers: { 'Content-Type': 'application/json' },
@@ -59,6 +60,14 @@ class Login extends React.Component {
                         })
                     }
                 }
+                else{
+                    confirm({
+                        title:'提示',
+                        content: response.jsonData.message,
+                        onOk(){                        },
+                        onCancel(){                        }
+                    });
+                }
             })
     }
     bindOtp() {
@@ -80,21 +89,24 @@ class Login extends React.Component {
         client.post('/user/verifyotp',{headers: { 'Content-Type': 'application/json' },
         body:JSON.stringify({token: this.state.token, otpPass: this.state.otpPass})})
         .then(response => {
-            console.log(response.jsonData)
             if(response.jsonData.status){
                 cookie.save('token', this.state.token, {path: '/'})
                 this.props.history.push('/');
+            }
+            else{
+                confirm({
+                    title:'提示',
+                    content: response.jsonData.message,
+                    onOk(){                        },
+                    onCancel(){                        }
+                });
             }
         })
     }
     render(){
         return (
-            <div>
-                {
-                <Dialog title="aa" style={{ width: 600 }} visible>
-                    <p>first dialog</p>
-                </Dialog>
-                }
+            <div className="center">
+
                 <div className={this.state.loginStep === 'LOGIN'?'container':'hide'}>
                     <fieldset>
                     <legend>登录</legend>
