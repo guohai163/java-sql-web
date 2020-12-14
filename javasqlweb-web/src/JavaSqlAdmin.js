@@ -15,7 +15,11 @@ class JavaSqlAdmin extends React.Component {
         client.addMiddleware(json());
         client.get('/user/check',{headers: { 'User-Token': token }})
             .then(response => {
-                if(!response.jsonData.status){
+                console.log(response)
+                if(response.status !== 200){
+                    this.props.history.push('/login');
+                }
+                else if(!response.jsonData.status){
                     this.props.history.push('/login');
                     
                 }

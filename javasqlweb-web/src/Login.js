@@ -111,16 +111,16 @@ class Login extends React.Component {
                     <fieldset>
                     <legend>登录</legend>
                     <div className="item">
-                    <label for="input_username">用户名：</label>
-                    <input type="text" name="username" id="input_username" size="24" class="textfield" onChange={this.handleInputChange} />
+                    <label htmlFor="input_username">用户名：</label>
+                    <input type="text" name="username" id="input_username" size="24" className="textfield" onChange={this.handleInputChange} />
                     </div>
-                    <div class="item">
-                    <label for="input_password">密码：</label>
-                    <input type="password" name="password" id="input_password" size="24" class="textfield" onChange={this.handleInputChange} />
+                    <div className="item">
+                    <label htmlFor="input_password">密码：</label>
+                    <input type="password" name="password" id="input_password" size="24" className="textfield" onChange={this.handleInputChange} />
                     </div>    
                     </fieldset>
-                    <fieldset class="tblFooters">
-                    <input class="btn btn-primary" value="Login" type="submit" id="input_go" onClick={this.login.bind(this)} />
+                    <fieldset className="tblFooters">
+                    <input className="btn btn-primary" value="Login" type="submit" id="input_go" onClick={this.login.bind(this)} />
                     </fieldset>
                 </div>
                 <div className={this.state.loginStep === 'BIND'?'container':'hide'}>
@@ -136,24 +136,24 @@ class Login extends React.Component {
                         <label>Secret: {this.state.authSecret}</label>
                         </div>
                         <div className="item">
-                        <label for="input_password">双因子动态码：</label>
-                        <input type="text" name="otpPass" size="24" class="textfield" onChange={this.handleInputChange} />
+                        <label htmlFor="input_password">双因子动态码：</label>
+                        <input type="text" name="otpPass" size="24" className="textfield" onChange={this.handleInputChange} />
                         </div>
                     </fieldset>
-                    <fieldset class="tblFooters">
-                        <input class="btn btn-primary" value="BIND" type="submit" id="input_go" onClick={this.bindOtp.bind(this)} />
+                    <fieldset className="tblFooters">
+                        <input className="btn btn-primary" value="BIND" type="submit" id="input_go" onClick={this.bindOtp.bind(this)} />
                     </fieldset>
                 </div>
                 <div className={this.state.loginStep === 'VERIFY'?'container':'hide'}>
                 <fieldset>
                         <legend>验证OTP</legend>
                         <div className="item">
-                        <label for="input_password">双因子动态码：</label>
-                        <input type="text" name="otpPass" size="24" class="textfield" onChange={this.handleInputChange} />
+                        <label htmlFor="input_password">双因子动态码：</label>
+                        <input type="text" name="otpPass" size="24" className="textfield" onChange={this.handleInputChange} />
                         </div>
                     </fieldset>
-                    <fieldset class="tblFooters">
-                        <input class="btn btn-primary" value="Verify" type="submit" id="input_go" onClick={this.verifyOtp.bind(this)} />
+                    <fieldset className="tblFooters">
+                        <input className="btn btn-primary" value="Verify" type="submit" id="input_go" onClick={this.verifyOtp.bind(this)} />
                     </fieldset>
                 </div>
             </div>

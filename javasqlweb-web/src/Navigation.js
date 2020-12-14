@@ -56,7 +56,7 @@ class Navigation extends React.Component {
     }
     dbChange(dbName,event) {
 
-        if(dbName == this.state.selectDatabase) {
+        if(dbName === this.state.selectDatabase) {
             this.setState({
                 selectDatabase: ''
             })
