@@ -40,8 +40,16 @@ class Login extends React.Component {
         client.post('/user/login',{headers: { 'Content-Type': 'application/json' },
             body:JSON.stringify({userName: this.state.userName, passWord: this.state.passWord})})
             .then(response => {
-                console.log(response.jsonData)
-                if(response.jsonData.status){
+                console.log(response)
+                if(200 !== response.status){
+                    confirm({
+                        title:'提示',
+                        content: '服务器连接失败',
+                        onOk(){                        },
+                        onCancel(){                        }
+                    });
+                }
+                else if(response.jsonData.status){
                     //
                     // cookie.save('token', response.jsonData.data.token, {path: '/'})
                     // this.props.history.push('/');
@@ -68,6 +76,15 @@ class Login extends React.Component {
                         onCancel(){                        }
                     });
                 }
+            })
+            .catch(rejected => {
+                console.log('catch',rejected)
+                confirm({
+                    title:'提示',
+                    content: '服务器连接失败',
+                    onOk(){                        },
+                    onCancel(){                        }
+                });
             })
     }
     bindOtp() {
