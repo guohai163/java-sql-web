@@ -27,7 +27,6 @@ class Navigation extends React.Component {
             deskHeight: 0,
             showTableColumn: '',
             columntData: [],
-            spList: [],
             token: cookie.load('token'),
             tableLoading: false
         }

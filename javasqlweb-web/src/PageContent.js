@@ -9,8 +9,24 @@ import { Modal, Spin, Empty } from 'antd';
 import cookie from 'react-cookies';
 import { LoadingOutlined } from '@ant-design/icons';
 
+import {Controlled as CodeMirror} from 'react-codemirror2';
+import 'codemirror/lib/codemirror.css';
+import 'codemirror/mode/sql/sql';
+import 'codemirror/addon/hint/show-hint.css';
+import 'codemirror/addon/hint/show-hint.js';
+import 'codemirror/addon/hint/sql-hint.js';
+import 'codemirror/theme/lucario.css';
+
 const { confirm } = Modal;
 const antIcon = <LoadingOutlined style={{ fontSize: 34 }} spin />;
+
+const options={
+    lineNumbers: true,                     //显示行号
+    mode: {name: "text/x-mysql"},          //定义mode
+    extraKeys: {"Ctrl": "autocomplete"},   //自动提示配置
+    theme: "lucario"                  //选中的theme
+};  
+
 
 class PageContent extends React.Component {
     constructor(props){
@@ -26,19 +42,20 @@ class PageContent extends React.Component {
             selectServerName: '',
             selectServerType: '',
             token: cookie.load('token'),
-            queryLoading: false
+            queryLoading: false,
+            sqlValue: ''
         }
     }
 
     componentDidMount() {
-        console.log('PageContent', this.props.token)
+        
         Pubsub.subscribe('dataSelect', (msg, data) => {
-
             if('table' === data.type){
                 const client = new FetchHttpClient(config.serverDomain);
                 client.addMiddleware(json());
                 client.get('/database/serverinfo/'+data.selectServer,{headers:{'User-Token': this.state.token}}).then( response => {
                     let sql = 'mssql' === response.jsonData.data.dbServerType ? 'SELECT top 100 * FROM ' + data.selectTable : 'SELECT * FROM '+data.selectDatabase+'.'+data.selectTable + ' limit 100'
+                    console.log('sql:', sql)
                     this.setState({
                         selectServer: data.selectServer,
                         selectDatabase: data.selectDatabase,
@@ -148,8 +165,9 @@ class PageContent extends React.Component {
     }
 
     handleTextareaChange(e) {
+        console.log('newCode', e)
         this.setState({
-            sql: e.target.value
+            sql: e
         })
     }
     printTableData() {
@@ -193,9 +211,12 @@ class PageContent extends React.Component {
                         <fieldset id="queryboxf">
                             <div id="queryfieldscontainer">
                                 <div id="sqlquerycontainer">
-                                    <textarea value={sql} onChange={this.handleTextareaChange.bind(this)} tabIndex="100" name="sql_query" id="sqlquery" cols="40" rows="20">
+                                   
+                                    {/* <textarea value={sql} onChange={this.handleTextareaChange.bind(this)} tabIndex="100" name="sql_query" id="sqlquery" cols="40" rows="20">
 
-                                    </textarea>
+                                    </textarea> */}
+                                    <CodeMirror ref="editor" value={sql} onBeforeChange={(editor, data, value) => { this.setState({sql: value});}}  options={options} />
+                                    * 敲入关键字首字母后可以使用Ctrl进行快速补全
                                 </div>
                                 <div id="tablefieldscontainer"><label>字段</label>
                                     <select id="tablefields" name="dummy" size="13" multiple="multiple"  >
@@ -209,6 +230,7 @@ class PageContent extends React.Component {
                         </fieldset>
                     </div>
                     <fieldset id="queryboxfooter" className="tblFooters">
+                                       
                         <input className="btn btn-primary" type="submit" id="button_submit_query" name="SQL"
                                tabIndex="200" value="执行" onClick={this.execeteSql.bind(this)} />
                                { 0 !== queryResult.length? (<CSVLink data={queryResult}>导出查询结果</CSVLink>):(<span></span>) }
