@@ -40,7 +40,6 @@ class Login extends React.Component {
         client.post('/user/login',{headers: { 'Content-Type': 'application/json' },
             body:JSON.stringify({userName: this.state.userName, passWord: this.state.passWord})})
             .then(response => {
-                console.log(response)
                 if(200 !== response.status){
                     confirm({
                         title:'提示',
@@ -78,7 +77,6 @@ class Login extends React.Component {
                 }
             })
             .catch(rejected => {
-                console.log('catch',rejected)
                 confirm({
                     title:'提示',
                     content: '服务器连接失败',
@@ -93,7 +91,6 @@ class Login extends React.Component {
         client.post('/user/bindotp',{headers: { 'Content-Type': 'application/json' },
         body:JSON.stringify({token: this.state.token, otpPass: this.state.otpPass})})
         .then(response => {
-            console.log(response.jsonData)
             if(response.jsonData.status){
                 cookie.save('token', this.state.token, {path: '/'})
                 this.props.history.push('/');
@@ -145,7 +142,9 @@ class Login extends React.Component {
                         <legend>绑定OTP</legend>
                         <div className="item qrcode">
                         <label>
-                        使用手机 Google Authenticator 应用扫描以下二维码<br></br>获取6位验证码
+                        使用手机 Google Authenticator 应用扫描以下二维码<br></br>获取6位验证码<br></br>
+                        <a href="https://github.com/google/google-authenticator-android/releases">安卓版本</a>
+                        <a href="https://apps.apple.com/cn/app/google-authenticator/id388497605">iOS版本</a>
                         </label>
                         <br></br>
                         <QRCode value={this.state.qrCode}></QRCode>

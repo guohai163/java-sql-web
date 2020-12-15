@@ -85,9 +85,10 @@ public class DBOperationMssql implements DBOperation {
      */
     @Override
     public List<TablesNameBean> getTableList(String dbName) throws SQLException {
+
         List<TablesNameBean> listTnb = new ArrayList<>();
         Statement st = sqlConn.createStatement();
-        ResultSet rs = st.executeQuery(String.format("use %s;" +
+        ResultSet rs = st.executeQuery(String.format("use [%s];" +
                 "SELECT a.name, b.rows FROM sysobjects a JOIN sysindexes b ON a.id = b.id " +
                 "WHERE xtype = 'u' and indid in (0,1) ORDER BY a.name;", dbName));
         while (rs.next()){
@@ -114,7 +115,7 @@ public class DBOperationMssql implements DBOperation {
     public List<ColumnsNameBean> getColumnsList(String dbName, String tableName) throws SQLException {
         List<ColumnsNameBean> listCnb = new ArrayList<>();
         Statement st = sqlConn.createStatement();
-        ResultSet rs = st.executeQuery(String.format("use %s;" +
+        ResultSet rs = st.executeQuery(String.format("use [%s];" +
                 "SELECT b.name column_name,c.name column_type,c.length column_length \n" +
                 "FROM sysobjects a join syscolumns b on a.id=b.id and a.xtype='U'\n" +
                 "join systypes c on b.xtype=c.xusertype\n" +
@@ -145,7 +146,7 @@ public class DBOperationMssql implements DBOperation {
     public List<TableIndexesBean> getIndexesList(String dbName, String tableName) throws SQLException {
         List<TableIndexesBean> listTib = new ArrayList<>();
         Statement st = sqlConn.createStatement();
-        ResultSet rs = st.executeQuery(String.format("use %s;" +
+        ResultSet rs = st.executeQuery(String.format("use [%s];" +
                 "exec sp_helpindex '%s'", dbName, tableName));
         while (rs.next()){
             listTib.add(new TableIndexesBean(rs.getObject("index_name").toString(),
@@ -173,7 +174,7 @@ public class DBOperationMssql implements DBOperation {
     public List<StoredProceduresBean> getStoredProceduresList(String dbName) throws SQLException {
         List<StoredProceduresBean> listSp = new ArrayList<>();
         Statement st = sqlConn.createStatement();
-        ResultSet rs = st.executeQuery(String.format("use %s;" +
+        ResultSet rs = st.executeQuery(String.format("use [%s];" +
                 "SELECT name FROM sysobjects WHERE type='P'", dbName));
         while (rs.next()){
             listSp.add(new StoredProceduresBean(rs.getString("name")));
@@ -200,7 +201,7 @@ public class DBOperationMssql implements DBOperation {
     public StoredProceduresBean getStoredProcedure(String dbName, String spName) throws SQLException {
         StoredProceduresBean spBean = null;
         Statement st = sqlConn.createStatement();
-        ResultSet rs = st.executeQuery(String.format("use %s;" +
+        ResultSet rs = st.executeQuery(String.format("use [%s];" +
                 "select definition from sys.sql_modules WHERE object_id = object_id('%s')", dbName, spName));
         while (rs.next()){
             spBean = new StoredProceduresBean(spName, rs.getString("definition"));
@@ -228,7 +229,7 @@ public class DBOperationMssql implements DBOperation {
         // TODO: 缺少SQL检查
         sql = limitSql(sql);
         Statement st = sqlConn.createStatement();
-        ResultSet rs = st.executeQuery(String.format("use %s;" +
+        ResultSet rs = st.executeQuery(String.format("use [%s];" +
                 "%s;", dbName, sql));
         // 获得结果集结构信息,元数据
         java.sql.ResultSetMetaData md = rs.getMetaData();

@@ -14,7 +14,6 @@ const antIcon = <LoadingOutlined style={{ fontSize: 24 }} spin />;
 
 class Navigation extends React.Component {
     constructor(props){
-        console.log(window.innerHeight)
         super(props)
         this.state = {
             serverList: [],
@@ -72,8 +71,15 @@ class Navigation extends React.Component {
         }
         this.setState({
             selectDatabase: dbName,
-            tableLoading: true
+            tableLoading: true,
+            tableList: []
         })
+        const selectData = {selectServer: this.state.selectServer,
+            selectDatabase: this.state.selectDatabase,
+            type: 'database'
+            };
+        Pubsub.publish('dataSelect', selectData);
+
         // 获取表
         const client = new FetchHttpClient(config.serverDomain);
         client.addMiddleware(json());
@@ -83,6 +89,7 @@ class Navigation extends React.Component {
                     tableList: response.jsonData.data,
                     tableLoading: false
                 })
+
             }
             else{
                 this.setState({tableList: [], tableLoading: false})
@@ -92,16 +99,11 @@ class Navigation extends React.Component {
         this.getSpList(dbName);
     }
     serverChange(event) {
-        console.log(event)
-        console.log(event.target.value)
-        console.log(event.target.label)
         //当不为“请选择服务器”时进行相应 操作
         if('0' !== event.target.value) {
-            console.log('需要进行操作');
             const client = new FetchHttpClient(config.serverDomain);
             client.addMiddleware(json());
             client.get('/database/dblist/'+event.target.value,{headers:{'User-Token': this.state.token}}).then(response => {
-                console.log(response.jsonData)
                 if(response.jsonData.status){
                     this.setState({
                         selectServer: event.target.value,
@@ -117,7 +119,7 @@ class Navigation extends React.Component {
         const client = new FetchHttpClient(config.serverDomain);
         client.addMiddleware(json());
         client.get('/database/storedprocedures/'+this.state.selectServer+'/'+dbName,{headers:{'User-Token': this.state.token}}).then(response => {
-            console.log(response.jsonData)
+
             if(response.jsonData.status) {
                 this.setState({
                     spList: response.jsonData.data
@@ -129,7 +131,6 @@ class Navigation extends React.Component {
         })
     }
     spChange(spName,event) {
-        console.log(spName)
         const selectData = {selectServer: this.state.selectServer,
             selectDatabase: this.state.selectDatabase,
             spName: spName,
@@ -238,11 +239,11 @@ class Navigation extends React.Component {
                                                     <div className="block"><i></i>
                                                     <a className="expander" href="#">
                                                     <span className="hide pos2_name">views</span><span className="hide pos2_value">0</span>
-                                                    <img src={dot} title="扩展/收起" alt="扩展/收起" class="icon ic_b_plus" onClick={this.showTableColumn.bind(this,table.tableName)}></img>
+                                                    <img src={dot} title="扩展/收起" alt="扩展/收起" className="icon ic_b_plus" onClick={this.showTableColumn.bind(this,table.tableName)}></img>
                                                     </a></div>
                                                     <div className="block"><a href="#"><img src={dot} title="视图" alt="视图" className="icon ic_b_props" /></a></div>
                                                     <a className="hover_show_full" href="#" title="" onClick={this.tableChange.bind(this,table.tableName)}> {table.tableName} ({table.tableRows})</a>
-                                                    <div class="clearfloat"></div>
+                                                    <div className="clearfloat"></div>
                                                     <div className={this.state.showTableColumn == table.tableName?'list_container':'hide'}>
                                                         <ul>
                                                             {columntData.map(column =>
@@ -257,11 +258,11 @@ class Navigation extends React.Component {
                                                     <div className="block"><i></i>
                                                     <a className="expander" href="#">
                                                     <span className="hide pos2_name">views</span><span className="hide pos2_value">0</span>
-                                                    <img src={dot} title="扩展/收起" alt="扩展/收起" class="icon"></img>
+                                                    <img src={dot} title="扩展/收起" alt="扩展/收起" className="icon"></img>
                                                     </a></div>
                                                     <div className="block"><a href="#"><img src={dot} title="视图" alt="视图" className="icon ic_b_routines" /></a></div>
                                                     <a className="hover_show_full" href="#" title="" onClick={this.spChange.bind(this,sp.procedureName)}> {sp.procedureName}</a>
-                                                    <div class="clearfloat"></div>
+                                                    <div className="clearfloat"></div>
                                                     </li>
                                                )}
                                             </ul>

@@ -55,7 +55,7 @@ class PageContent extends React.Component {
                 client.addMiddleware(json());
                 client.get('/database/serverinfo/'+data.selectServer,{headers:{'User-Token': this.state.token}}).then( response => {
                     let sql = 'mssql' === response.jsonData.data.dbServerType ? 'SELECT top 100 * FROM ' + data.selectTable : 'SELECT * FROM '+data.selectDatabase+'.'+data.selectTable + ' limit 100'
-                    console.log('sql:', sql)
+
                     this.setState({
                         selectServer: data.selectServer,
                         selectDatabase: data.selectDatabase,
@@ -67,7 +67,6 @@ class PageContent extends React.Component {
                     client.get('/database/columnslist/'+data.selectServer+'/'+data.selectDatabase+'/'+data.selectTable,
                                 {headers:{'User-Token': this.state.token}}).
                         then(response => {
-                            console.log(response.jsonData)
                             if(response.jsonData.status) {
                                 this.setState({
                                     tableColumns: response.jsonData.data
@@ -89,12 +88,24 @@ class PageContent extends React.Component {
                 client.get('/database/storedprocedures/'+data.selectServer+'/'+data.selectDatabase+'/'+data.spName,
                             {headers:{'User-Token': this.state.token}}).
                     then(response => {
-                        console.log(response.jsonData)
                         this.setState({
                             sql: response.jsonData.data.procedureData
                         })
                     })
                 
+            }
+            else if('database' === data.type){
+                const client = new FetchHttpClient(config.serverDomain);
+                client.addMiddleware(json());
+                client.get('/database/serverinfo/'+data.selectServer,{headers:{'User-Token': this.state.token}}).then( response => {
+                    this.setState({
+                        selectServer: data.selectServer,
+                        selectDatabase: data.selectDatabase,
+                        selectServerName: response.jsonData.data.dbServerName,
+                        selectServerType: response.jsonData.data.dbServerType,
+
+                    })
+                })
             }
 
         })
@@ -103,15 +114,17 @@ class PageContent extends React.Component {
 
 
     execeteSql() {
-        console.log('executeSql', this.state.token)
-        this.setState({queryLoading:true});
+        
+        this.setState({
+            queryLoading: true,
+            queryResult: []
+        });
         const client = new FetchHttpClient(config.serverDomain);
         client.addMiddleware(json());
         client.post('/database/query/'+this.state.selectServer+'/'+this.state.selectDatabase,
         {headers:{'Content-Type': 'text/plain','User-Token': this.state.token},body: this.state.sql}).then(response => {
             this.setState({queryLoading: false});
             if(response.jsonData.status){
-                console.log(response.jsonData.data)
                 if(0 === response.jsonData.data.length){
                     confirm({
                         title:'提示',
@@ -165,7 +178,6 @@ class PageContent extends React.Component {
     }
 
     handleTextareaChange(e) {
-        console.log('newCode', e)
         this.setState({
             sql: e
         })
@@ -193,6 +205,11 @@ class PageContent extends React.Component {
             )
         }
     }
+    selectColumn(e){
+        this.setState({
+            sql: this.state.sql+ ' ' + e.target.value
+        })
+    }
     render(){
         const {sql, queryResult} = this.state;
 
@@ -219,7 +236,7 @@ class PageContent extends React.Component {
                                     * 敲入关键字首字母后可以使用Ctrl进行快速补全
                                 </div>
                                 <div id="tablefieldscontainer"><label>字段</label>
-                                    <select id="tablefields" name="dummy" size="13" multiple="multiple"  >
+                                    <select id="tablefields" name="dummy" size="13" multiple="multiple" onChange={this.selectColumn.bind(this)}>
                                         {this.state.tableColumns.map( column =>
                                             <option value={column.columnName} title="">{column.columnName} - {column.columnType}({column.columnLength})</option>
                                         )}
