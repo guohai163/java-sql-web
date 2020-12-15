@@ -5,10 +5,12 @@ import './PageContent.css'
 import FetchHttpClient, { json } from 'fetch-http-client';
 import config from "./config";
 import { CSVLink } from "react-csv";
-import { Modal } from 'antd';
-import cookie from 'react-cookies'
+import { Modal, Spin, Empty } from 'antd';
+import cookie from 'react-cookies';
+import { LoadingOutlined } from '@ant-design/icons';
 
 const { confirm } = Modal;
+const antIcon = <LoadingOutlined style={{ fontSize: 34 }} spin />;
 
 class PageContent extends React.Component {
     constructor(props){
@@ -23,7 +25,8 @@ class PageContent extends React.Component {
             spName: '',
             selectServerName: '',
             selectServerType: '',
-            token: cookie.load('token')
+            token: cookie.load('token'),
+            queryLoading: false
         }
     }
 
@@ -84,10 +87,12 @@ class PageContent extends React.Component {
 
     execeteSql() {
         console.log('executeSql', this.state.token)
+        this.setState({queryLoading:true});
         const client = new FetchHttpClient(config.serverDomain);
         client.addMiddleware(json());
         client.post('/database/query/'+this.state.selectServer+'/'+this.state.selectDatabase,
         {headers:{'Content-Type': 'text/plain','User-Token': this.state.token},body: this.state.sql}).then(response => {
+            this.setState({queryLoading: false});
             if(response.jsonData.status){
                 console.log(response.jsonData.data)
                 if(0 === response.jsonData.data.length){
@@ -210,7 +215,7 @@ class PageContent extends React.Component {
                                
                             <div className="clearfloat"></div>
                     </fieldset>
-                    <div className="responsivetable">
+                    <div className={this.state.queryLoading || this.state.queryResult.length === 0?'hide':'responsivetable'}>
                         <table className="table_results ajax pma_table">
                             <thead>
                                 {this.printTableHeader()}
@@ -220,6 +225,12 @@ class PageContent extends React.Component {
                                     {this.printTableData()}
                             </tbody>
                         </table>
+                    </div>
+                    <div className={this.state.queryLoading?'query_load':'hide'}>
+                        <Spin indicator={antIcon} />数据查询中...
+                    </div>
+                    <div className={!this.state.queryLoading && 0 === this.state.queryResult.length ?'query_load':'hide'}> 
+                        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} />
                     </div>
                 </div>
             </div>

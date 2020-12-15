@@ -102,3 +102,10 @@ td {
 .right_area {
     margin-left: 240px;
 }
+.query_load {
+    text-align: center;
+    margin-top: 20px;
+}
+.responsivetable {
+    margin-left: 5px;
+}

@@ -6,8 +6,11 @@ import dot from './images/dot.gif'
 import config from './config'
 import Pubsub from 'pubsub-js'
 import cookie from 'react-cookies'
-import { Modal } from 'antd';
+import { LoadingOutlined } from '@ant-design/icons';
+import { Modal, Spin } from 'antd';
+
 const { confirm } = Modal;
+const antIcon = <LoadingOutlined style={{ fontSize: 24 }} spin />;
 
 class Navigation extends React.Component {
     constructor(props){
@@ -25,7 +28,8 @@ class Navigation extends React.Component {
             showTableColumn: '',
             columntData: [],
             spList: [],
-            token: cookie.load('token')
+            token: cookie.load('token'),
+            tableLoading: false
         }
         this.serverChange = this.serverChange.bind(this);
         this.handleSize = this.handleSize.bind(this)
@@ -46,12 +50,17 @@ class Navigation extends React.Component {
     getServerList() {
         const client = new FetchHttpClient(config.serverDomain);
         client.addMiddleware(json());
-        client.get('/database/serverlist',{headers:{'User-Token': this.state.token}}).then(response => {
+        client.get('/database/serverlist',{headers:{'User-Token': this.state.token}})
+        .then(response => {
             if(response.jsonData.status) {
                 this.setState({
                     serverList: response.jsonData.data
                 })
             }
+        })
+        .catch(rejected => {
+            console.log('catch',rejected)
+
         })
     }
     dbChange(dbName,event) {
@@ -63,7 +72,8 @@ class Navigation extends React.Component {
             return
         }
         this.setState({
-            selectDatabase: dbName
+            selectDatabase: dbName,
+            tableLoading: true
         })
         // 获取表
         const client = new FetchHttpClient(config.serverDomain);
@@ -71,11 +81,12 @@ class Navigation extends React.Component {
         client.get('/database/tablelist/'+this.state.selectServer+'/'+dbName,{headers:{'User-Token': this.state.token}}).then(response => {
             if(response.jsonData.status) {
                 this.setState({
-                    tableList: response.jsonData.data
+                    tableList: response.jsonData.data,
+                    tableLoading: false
                 })
             }
             else{
-                this.setState({tableList: []})
+                this.setState({tableList: [], tableLoading: false})
             }
         })
         //获取存储过程
@@ -220,7 +231,7 @@ class Navigation extends React.Component {
                                             </a>
                                         </div>
                                         <a className="hover_show_full" onClick={this.dbChange.bind(this,db.dbName)}>{db.dbName}</a>
-                                        <div className="clearfloat"></div>
+                                        <div className={this.state.tableLoading && this.state.selectDatabase === db.dbName?'clearfloat':'hide'}><Spin indicator={antIcon} /></div>
                                         <div className={this.state.selectDatabase == db.dbName?'list_container':'hide'}>                                            
                                             <ul>
                                                 {this.state.tableList.map(table =>
