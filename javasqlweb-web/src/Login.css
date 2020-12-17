@@ -27,7 +27,6 @@ label {
     width: 10em;
     font-weight: bolder;
     display: inline-block;
-    margin-left: 2em;
 }
 input[type=text], input[type=password] {
     box-sizing: border-box;
@@ -42,4 +41,13 @@ input[type=text], input[type=password] {
 .center {
     text-align: center;
     width: 100%;
+}
+.item {
+    width: 280px;
+    margin: 12px auto;
+}
+.btn{
+    margin-top: 10px;
+    margin-bottom: 10px;
+    margin-right: 10px;
 }

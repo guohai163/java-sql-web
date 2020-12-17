@@ -7,10 +7,13 @@ import config from './config'
 import Pubsub from 'pubsub-js'
 import cookie from 'react-cookies'
 import { LoadingOutlined } from '@ant-design/icons';
-import { Modal, Spin } from 'antd';
+import { Modal, Spin, Input } from 'antd';
+import cache from './utils';
+import cacheLocalStorage from './utils';
 
 const { confirm } = Modal;
 const antIcon = <LoadingOutlined style={{ fontSize: 24 }} spin />;
+const CACHE_TTL = 1000*60*60*24;
 
 class Navigation extends React.Component {
     constructor(props){
@@ -27,7 +30,9 @@ class Navigation extends React.Component {
             showTableColumn: '',
             columntData: [],
             token: cookie.load('token'),
-            tableLoading: false
+            tableLoading: false,
+            filterTableList: [],
+            filterSpList: []
         }
         this.serverChange = this.serverChange.bind(this);
         this.handleSize = this.handleSize.bind(this)
@@ -74,27 +79,46 @@ class Navigation extends React.Component {
             tableLoading: true,
             tableList: []
         })
-        const selectData = {selectServer: this.state.selectServer,
-            selectDatabase: this.state.selectDatabase,
+        const selectData = {
+            selectServer: this.state.selectServer,
+            selectDatabase: dbName,
             type: 'database'
             };
+        console.log('selectData',selectData)
         Pubsub.publish('dataSelect', selectData);
 
         // 获取表
-        const client = new FetchHttpClient(config.serverDomain);
-        client.addMiddleware(json());
-        client.get('/database/tablelist/'+this.state.selectServer+'/'+dbName,{headers:{'User-Token': this.state.token}}).then(response => {
-            if(response.jsonData.status) {
-                this.setState({
-                    tableList: response.jsonData.data,
-                    tableLoading: false
-                })
+        // 优先尝试从缓存获取
+        const requestKey = '/database/tablelist/'+this.state.selectServer+'/'+dbName;
+    
+        const tableData = cache.get(requestKey);
+        if(null === tableData) {
+            const client = new FetchHttpClient(config.serverDomain);
+            client.addMiddleware(json());
+            client.get(requestKey,{headers:{'User-Token': this.state.token}}).then(response => {
+                if(response.jsonData.status) {
 
-            }
-            else{
-                this.setState({tableList: [], tableLoading: false})
-            }
-        })
+                    this.setState({
+                        tableList: response.jsonData.data,
+                        filterTableList: response.jsonData.data,
+                        tableLoading: false
+                    })
+                    cache.set(requestKey, response.jsonData.data, CACHE_TTL);
+    
+                }
+                else{
+                    this.setState({tableList: [], filterTableList: [], tableLoading: false})
+                }
+            })
+        }
+        else {
+            this.setState({
+                tableList: tableData,
+                filterTableList: tableData,
+                tableLoading: false
+            })
+        }
+
         //获取存储过程
         this.getSpList(dbName);
     }
@@ -115,20 +139,45 @@ class Navigation extends React.Component {
 
         }
     }
-    getSpList(dbName) {
-        const client = new FetchHttpClient(config.serverDomain);
-        client.addMiddleware(json());
-        client.get('/database/storedprocedures/'+this.state.selectServer+'/'+dbName,{headers:{'User-Token': this.state.token}}).then(response => {
+    filterTable(parm) {
+        console.log(parm.target.value)
 
-            if(response.jsonData.status) {
-                this.setState({
-                    spList: response.jsonData.data
-                })
-            }
-            else{
-                this.setState({spList:[]})
-            }
+        let filterResult = this.state.tableList.filter(item => item.tableName.indexOf(parm.target.value) !== -1)
+        let filterSpResult = this.state.spList.filter(item => item.procedureName.indexOf(parm.target.value) !== -1)
+
+        this.setState({
+            filterTableList: filterResult,
+            filterSpList: filterSpResult
         })
+        
+    }
+    getSpList(dbName) {
+        const requestKey = '/database/storedprocedures/'+this.state.selectServer+'/'+dbName
+        const spData = cache.get(requestKey)
+        if(null === spData) {
+            const client = new FetchHttpClient(config.serverDomain);
+            client.addMiddleware(json());
+            client.get(requestKey,{headers:{'User-Token': this.state.token}}).then(response => {
+    
+                if(response.jsonData.status) {
+                    this.setState({
+                        spList: response.jsonData.data,
+                        filterSpList: response.jsonData.data
+                    })
+                    cache.set(requestKey, response.jsonData.data, CACHE_TTL)
+                }
+                else{
+                    this.setState({spList:[], filterSpList:[]})
+                }
+            })
+        }
+        else{
+            this.setState({
+                spList: spData,
+                filterSpList: spData
+            })
+        }
+
     }
     spChange(spName,event) {
         const selectData = {selectServer: this.state.selectServer,
@@ -210,7 +259,7 @@ class Navigation extends React.Component {
                             <label>服务器：</label>
                             <select id="select_server" onChange={this.serverChange}>
                                 <option value="0">请选择服务器</option>
-                                {this.state.serverList.map(server => <option name={server.dbServerName} value={server.code}>{server.dbServerName}</option>)}
+                                {this.state.serverList.map(server => <option name={server.dbServerName} key={server.code} value={server.code}>{server.dbServerName}</option>)}
                             </select>
                         </div>
                         <div id="navigation_tree_content" style={{height: deskHeight}}>
@@ -222,7 +271,7 @@ class Navigation extends React.Component {
                                             <a className="expander loaded" href="#" onClick={this.dbChange.bind(this,db.dbName)}><span className="hide aPath">cm9vdA==.aW5mb3JtYXRpb25fc2NoZW1h</span>
                                             <span className="hide vPath">cm9vdA==.aW5mb3JtYXRpb25fc2NoZW1h</span>
                                             <span className="hide pos">0</span>
-                                            <img src={dot} title="扩展/收起" alt="扩展/收起" className="icon ic_b_plus"></img>
+                                            <img src={dot} title="扩展/收起" alt="扩展/收起" className={this.state.selectDatabase === db.dbName?'icon ic_b_minus':'icon ic_b_plus'}></img>
                                             </a>
                                         </div>
                                         <div className="block">
@@ -234,12 +283,13 @@ class Navigation extends React.Component {
                                         <div className={this.state.tableLoading && this.state.selectDatabase === db.dbName?'clearfloat':'hide'}><Spin indicator={antIcon} /></div>
                                         <div className={this.state.selectDatabase == db.dbName?'list_container':'hide'}>                                            
                                             <ul>
-                                                {this.state.tableList.map(table =>
+                                                <li className="filter_input"><Input placeholder="Filter" size="small" allowClear onChange={this.filterTable.bind(this)}></Input></li>
+                                                {this.state.filterTableList.map(table =>
                                                     <li className="view">
                                                     <div className="block"><i></i>
                                                     <a className="expander" href="#">
                                                     <span className="hide pos2_name">views</span><span className="hide pos2_value">0</span>
-                                                    <img src={dot} title="扩展/收起" alt="扩展/收起" className="icon ic_b_plus" onClick={this.showTableColumn.bind(this,table.tableName)}></img>
+                                                    <img src={dot} title="扩展/收起" alt="扩展/收起" className={this.state.showTableColumn == table.tableName?'icon ic_b_minus':'icon ic_b_plus'} onClick={this.showTableColumn.bind(this,table.tableName)}></img>
                                                     </a></div>
                                                     <div className="block"><a href="#"><img src={dot} title="视图" alt="视图" className="icon ic_b_props" /></a></div>
                                                     <a className="hover_show_full" href="#" title="" onClick={this.tableChange.bind(this,table.tableName)}> {table.tableName} ({table.tableRows})</a>

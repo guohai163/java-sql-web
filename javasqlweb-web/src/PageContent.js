@@ -15,7 +15,7 @@ import 'codemirror/mode/sql/sql';
 import 'codemirror/addon/hint/show-hint.css';
 import 'codemirror/addon/hint/show-hint.js';
 import 'codemirror/addon/hint/sql-hint.js';
-import 'codemirror/theme/lucario.css';
+import 'codemirror/theme/idea.css';
 
 const { confirm } = Modal;
 const antIcon = <LoadingOutlined style={{ fontSize: 34 }} spin />;
@@ -24,7 +24,7 @@ const options={
     lineNumbers: true,                     //显示行号
     mode: {name: "text/x-mysql"},          //定义mode
     extraKeys: {"Ctrl": "autocomplete"},   //自动提示配置
-    theme: "lucario"                  //选中的theme
+    theme: "idea"                  //选中的theme
 };  
 
 
@@ -217,9 +217,9 @@ class PageContent extends React.Component {
             <div className="right_area">
                 <div id="menubar">
                     <div id="serverinfo">
-                        <img src={dot} title="" alt="" className="icon ic_s_host item"/>
+                        <img src={dot} title="" alt="" className="icon ic_s_host "/>
                         服务器: {this.state.selectServerName} ({this.state.selectServerType}) >> 
-                        <img src={dot} title="" alt="" className="icon ic_s_db item"/>
+                        <img src={dot} title="" alt="" className="icon ic_s_db "/>
                         数据库: {this.state.selectDatabase}
                     </div>
                 </div>

@@ -5,7 +5,9 @@ import FetchHttpClient, { json } from 'fetch-http-client';
 import config from "./config";
 import cookie from 'react-cookies'
 import QRCode from 'qrcode.react'
-import { Modal } from 'antd';
+import { Modal, Input } from 'antd';
+import { UserOutlined,UnlockOutlined,VerifiedOutlined } from '@ant-design/icons';
+
 const { confirm } = Modal;
 
 class Login extends React.Component {
@@ -125,12 +127,10 @@ class Login extends React.Component {
                     <fieldset>
                     <legend>登录</legend>
                     <div className="item">
-                    <label htmlFor="input_username">用户名：</label>
-                    <input type="text" name="username" id="input_username" size="24" className="textfield" onChange={this.handleInputChange} />
+                    <Input prefix={<UserOutlined />} placeholder="用户名" name="username" onChange={this.handleInputChange} />
                     </div>
                     <div className="item">
-                    <label htmlFor="input_password">密码：</label>
-                    <input type="password" name="password" id="input_password" size="24" className="textfield" onChange={this.handleInputChange} />
+                    <Input.Password prefix={<UnlockOutlined />} placeholder="密码" name="password" onChange={this.handleInputChange} onPressEnter={this.login.bind(this)} />
                     </div>    
                     </fieldset>
                     <fieldset className="tblFooters">
@@ -142,8 +142,8 @@ class Login extends React.Component {
                         <legend>绑定OTP</legend>
                         <div className="item qrcode">
                         <label>
-                        使用手机 Google Authenticator 应用扫描以下二维码<br></br>获取6位验证码<br></br>
-                        <a href="https://github.com/google/google-authenticator-android/releases">安卓版本</a>
+                        使用手机 Google Authenticator 应用扫描以下二维码<br></br>
+                        <a href="https://github.com/google/google-authenticator-android/releases">安卓版本</a><br />
                         <a href="https://apps.apple.com/cn/app/google-authenticator/id388497605">iOS版本</a>
                         </label>
                         <br></br>
@@ -152,8 +152,7 @@ class Login extends React.Component {
                         <label>Secret: {this.state.authSecret}</label>
                         </div>
                         <div className="item">
-                        <label htmlFor="input_password">双因子动态码：</label>
-                        <input type="text" name="otpPass" size="24" className="textfield" onChange={this.handleInputChange} />
+                        <Input prefix={<VerifiedOutlined />} placeholder="双因子动态码" name="otpPass" onChange={this.handleInputChange}  onPressEnter={this.bindOtp.bind(this)} />
                         </div>
                     </fieldset>
                     <fieldset className="tblFooters">
@@ -164,8 +163,10 @@ class Login extends React.Component {
                 <fieldset>
                         <legend>验证OTP</legend>
                         <div className="item">
-                        <label htmlFor="input_password">双因子动态码：</label>
-                        <input type="text" name="otpPass" size="24" className="textfield" onChange={this.handleInputChange} />
+
+                        
+                        <Input prefix={<VerifiedOutlined />} placeholder="双因子动态码" name="otpPass" onChange={this.handleInputChange}  onPressEnter={this.verifyOtp.bind(this)} />
+
                         </div>
                     </fieldset>
                     <fieldset className="tblFooters">

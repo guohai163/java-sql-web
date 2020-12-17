@@ -87,6 +87,9 @@
     background-image: url(./images/b_routines.png);
 
 }
+.ic_b_minus {
+    background-image: url(./images/b_minus.png);
+}
 li {
     display: list-item;
     text-align: -webkit-match-parent;
@@ -110,4 +113,8 @@ ul{
 }
 .hover_show_full {
     font-size: 12px;
+}
+
+.filter_input {
+    width: 80%;
 }
