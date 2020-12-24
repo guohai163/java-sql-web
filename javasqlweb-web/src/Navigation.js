@@ -1,7 +1,7 @@
 import React from 'react';
 import FetchHttpClient, { json } from 'fetch-http-client';
 import './Navigation.css';
-import logo from './images/logo_left.png'
+import logo from './images/logo.svg'
 import dot from './images/dot.gif'
 import config from './config'
 import Pubsub from 'pubsub-js'
@@ -84,7 +84,6 @@ class Navigation extends React.Component {
             selectDatabase: dbName,
             type: 'database'
             };
-        console.log('selectData',selectData)
         Pubsub.publish('dataSelect', selectData);
 
         // 获取表
@@ -235,6 +234,21 @@ class Navigation extends React.Component {
                 }
             })
     }
+    jumpAdmin(){
+        if('admin' === config.userName){
+            window.location.href = '/admin'
+        }
+        else{
+            confirm({
+                title:'提示',
+                content: '您无权限进入管理页面',
+                onOk(){
+                },
+                onCancel(){
+                }
+            });
+        }
+    }
     render(){
         const {deskHeight, columntData, spList} = this.state;
         return (
@@ -243,15 +257,21 @@ class Navigation extends React.Component {
                 <div id="navigation_content">
                     <div id="navigation_header">
                         <div id="logo">
-                            <img src={logo} alt="logo" />
+                            <img src={logo} alt="logo" />{config.version}
                         </div>
                         <div id="navipanellinks">
-                            <button href="#" title="设置">
-                                <img src={dot} alt="setting" className="icon ic_s_cog"></img>
-                            </button>
+
+                            <a href="#" title="刷新" onClick={this.getServerList.bind(this)}>
+                                <img src={dot} alt="刷新" className="icon ic_s_reload"></img>
+                            </a>
+                            
+                            <a href="#" title="设置" onClick={this.jumpAdmin.bind(this)}>
+                                <img src={dot} alt="setting" className={'admin' === config.userName?'icon ic_s_cog':'hide'}></img>
+                            </a>
                             <a href="#" title="退出" onClick={this.logout.bind(this)}>
                                 <img src={dot} alt="exit" className="icon ic_s_loggoff"></img>
                             </a>
+                            
                         </div>
                     </div>
                     <div id="navigation_tree">
@@ -265,7 +285,7 @@ class Navigation extends React.Component {
                         <div id="navigation_tree_content" style={{height: deskHeight}}>
                             <ul>
                                 {this.state.dbList.map(db => 
-                                    <li className="database">
+                                    <li className="database" key={db.dbName}>
                                         <div className="block">
                                             <i></i><b></b>
                                             <a className="expander loaded" href="#" onClick={this.dbChange.bind(this,db.dbName)}><span className="hide aPath">cm9vdA==.aW5mb3JtYXRpb25fc2NoZW1h</span>

@@ -59,7 +59,7 @@
     min-height: 16px;
 }
 #navigation_tree_content {
-    width: 100%;
+    width: 98%;
     position: absolute;
     overflow: hidden;
     overflow-y: auto;
@@ -90,6 +90,9 @@
 .ic_b_minus {
     background-image: url(./images/b_minus.png);
 }
+.ic_s_reload {
+    background-image: url(./images/s_reload.png);
+}
 li {
     display: list-item;
     text-align: -webkit-match-parent;
@@ -117,4 +120,7 @@ ul{
 
 .filter_input {
     width: 80%;
+}
+#navipanellinks a{
+    margin-left: 5px;
 }

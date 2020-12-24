@@ -22,3 +22,5 @@ spring:
 mybatis:
   configuration:
     map-underscore-to-camel-case: true
+project:
+  version: 0.4.15

@@ -84,6 +84,7 @@ public class UserServiceImpl implements UserService {
             // 非登录完成状态
             return new Result<>(false,"未登录", null);
         }
+        user.setAuthSecret("");
         return new Result<>(true,"success", user);
     }
 

@@ -11,15 +11,18 @@ class JavaSqlAdmin extends React.Component {
     
     componentWillMount(){
         let token = cookie.load('token')
-        console.log('token is:',token)
         if(undefined === token){
             this.props.history.push('/login');
         }
         const client = new FetchHttpClient(config.serverDomain);
         client.addMiddleware(json());
+        client.get('/version').then(response => {
+            if(response.jsonData.status){
+                config.version = response.jsonData.data
+            }
+        })
         client.get('/user/check',{headers: { 'User-Token': token }})
             .then(response => {
-                console.log(response.status)
                 if(response.status !== 200){
                     this.props.history.push('/login');
                 }
@@ -27,7 +30,15 @@ class JavaSqlAdmin extends React.Component {
                     this.props.history.push('/login');
                     
                 }
+                else {
+                    config.userName = response.jsonData.data.userName;
+                }
             })
+            .catch(rejected => {
+                console.log('catch',rejected)
+                this.props.history.push('/login');
+            })
+
     }
     render(){
         return (

@@ -62,6 +62,7 @@ public class DBOperationMssql implements DBOperation {
     @Override
     public List<DatabaseNameBean> getDbList() throws SQLException {
         List<DatabaseNameBean> listDnb = new ArrayList<>();
+        checkConnection();
         Statement st = sqlConn.createStatement();
         ResultSet rs = st.executeQuery("SELECT database_id,name FROM sys.databases ;");
         while (rs.next()){
@@ -85,7 +86,7 @@ public class DBOperationMssql implements DBOperation {
      */
     @Override
     public List<TablesNameBean> getTableList(String dbName) throws SQLException {
-
+        checkConnection();
         List<TablesNameBean> listTnb = new ArrayList<>();
         Statement st = sqlConn.createStatement();
         ResultSet rs = st.executeQuery(String.format("use [%s];" +
@@ -114,6 +115,7 @@ public class DBOperationMssql implements DBOperation {
     @Override
     public List<ColumnsNameBean> getColumnsList(String dbName, String tableName) throws SQLException {
         List<ColumnsNameBean> listCnb = new ArrayList<>();
+        checkConnection();
         Statement st = sqlConn.createStatement();
         ResultSet rs = st.executeQuery(String.format("use [%s];" +
                 "SELECT b.name column_name,c.name column_type,c.length column_length \n" +
@@ -145,6 +147,7 @@ public class DBOperationMssql implements DBOperation {
     @Override
     public List<TableIndexesBean> getIndexesList(String dbName, String tableName) throws SQLException {
         List<TableIndexesBean> listTib = new ArrayList<>();
+        checkConnection();
         Statement st = sqlConn.createStatement();
         ResultSet rs = st.executeQuery(String.format("use [%s];" +
                 "exec sp_helpindex '%s'", dbName, tableName));
@@ -173,6 +176,7 @@ public class DBOperationMssql implements DBOperation {
     @Override
     public List<StoredProceduresBean> getStoredProceduresList(String dbName) throws SQLException {
         List<StoredProceduresBean> listSp = new ArrayList<>();
+        checkConnection();
         Statement st = sqlConn.createStatement();
         ResultSet rs = st.executeQuery(String.format("use [%s];" +
                 "SELECT name FROM sysobjects WHERE type='P'", dbName));
@@ -200,6 +204,7 @@ public class DBOperationMssql implements DBOperation {
     @Override
     public StoredProceduresBean getStoredProcedure(String dbName, String spName) throws SQLException {
         StoredProceduresBean spBean = null;
+        checkConnection();
         Statement st = sqlConn.createStatement();
         ResultSet rs = st.executeQuery(String.format("use [%s];" +
                 "select definition from sys.sql_modules WHERE object_id = object_id('%s')", dbName, spName));
@@ -226,6 +231,7 @@ public class DBOperationMssql implements DBOperation {
     @Override
     public Object queryDatabaseBySql(String dbName, String sql) throws SQLException {
         List<Map<String, Object>> listData = new ArrayList<>();
+        checkConnection();
         // TODO: 缺少SQL检查
         sql = limitSql(sql);
         Statement st = sqlConn.createStatement();
@@ -259,10 +265,26 @@ public class DBOperationMssql implements DBOperation {
      * @return
      */
     private String limitSql(String sql){
-        if (!sql.toLowerCase().contains("top") && !sql.toLowerCase().contains("distinct")) {
-            return sql.toLowerCase().replace("select", "select top " + LIMIT_NUMBER);
-        }
+        // TODO: 规则不严谨，暂时注释掉
+        //        if (!sql.toLowerCase().contains("top") && !sql.toLowerCase().contains("distinct")) {
+//            return sql.toLowerCase().replace("select", "select top " + LIMIT_NUMBER);
+//        }
         //TODO:包含top的也要做数量检查
         return sql;
+    }
+
+    /**
+     * 检查连接状态后再使用
+     */
+    private void checkConnection(){
+        try {
+            if(sqlConn.isClosed()){
+                sqlConn = DriverManager.getConnection(sqlUrl,
+                        connectConfigBean.getDbServerUsername(),
+                        connectConfigBean.getDbServerPassword());
+            }
+        } catch (SQLException throwables) {
+            throwables.printStackTrace();
+        }
     }
 }

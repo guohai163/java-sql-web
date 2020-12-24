@@ -43,7 +43,8 @@ class PageContent extends React.Component {
             selectServerType: '',
             token: cookie.load('token'),
             queryLoading: false,
-            sqlValue: ''
+            sqlValue: '',
+            selectedSql: ''
         }
     }
 
@@ -114,7 +115,7 @@ class PageContent extends React.Component {
 
 
     execeteSql() {
-        
+        let sql = ''===this.state.selectedSql?this.state.sql:this.state.selectedSql;
         this.setState({
             queryLoading: true,
             queryResult: []
@@ -122,7 +123,7 @@ class PageContent extends React.Component {
         const client = new FetchHttpClient(config.serverDomain);
         client.addMiddleware(json());
         client.post('/database/query/'+this.state.selectServer+'/'+this.state.selectDatabase,
-        {headers:{'Content-Type': 'text/plain','User-Token': this.state.token},body: this.state.sql}).then(response => {
+        {headers:{'Content-Type': 'text/plain','User-Token': this.state.token},body: sql}).then(response => {
             this.setState({queryLoading: false});
             if(response.jsonData.status){
                 if(0 === response.jsonData.data.length){
@@ -210,6 +211,13 @@ class PageContent extends React.Component {
             sql: this.state.sql+ ' ' + e.target.value
         })
     }
+    mouseSelected(dom) {
+        this.setState({
+            selectedSql: dom.getSelection()
+        })
+    }
+
+
     render(){
         const {sql, queryResult} = this.state;
 
@@ -232,8 +240,8 @@ class PageContent extends React.Component {
                                     {/* <textarea value={sql} onChange={this.handleTextareaChange.bind(this)} tabIndex="100" name="sql_query" id="sqlquery" cols="40" rows="20">
 
                                     </textarea> */}
-                                    <CodeMirror ref="editor" value={sql} onBeforeChange={(editor, data, value) => { this.setState({sql: value});}}  options={options} />
-                                    * 敲入关键字首字母后可以使用Ctrl进行快速补全
+                                    <CodeMirror ref="editor" onCursorActivity={this.mouseSelected.bind(this)} value={sql} onBeforeChange={(editor, data, value) => { this.setState({sql: value});}}  options={options} />
+                                    * 敲入关键字首字母后可以使用Ctrl进行快速补全，选中部分SQL只会执行选中部分的语句！
                                 </div>
                                 <div id="tablefieldscontainer"><label>字段</label>
                                     <select id="tablefields" name="dummy" size="13" multiple="multiple" onChange={this.selectColumn.bind(this)}>
@@ -247,9 +255,8 @@ class PageContent extends React.Component {
                         </fieldset>
                     </div>
                     <fieldset id="queryboxfooter" className="tblFooters">
-                                       
                         <input className="btn btn-primary" type="submit" id="button_submit_query" name="SQL"
-                               tabIndex="200" value="执行" onClick={this.execeteSql.bind(this)} />
+                               tabIndex="200" value="执行SQL" onClick={this.execeteSql.bind(this)} />
                                { 0 !== queryResult.length? (<CSVLink data={queryResult}>导出查询结果</CSVLink>):(<span></span>) }
                                
                             <div className="clearfloat"></div>
