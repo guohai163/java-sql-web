@@ -5,8 +5,8 @@ import FetchHttpClient, { json } from 'fetch-http-client';
 import config from "./config";
 import cookie from 'react-cookies'
 import QRCode from 'qrcode.react'
-import { Modal, Input } from 'antd';
-import { UserOutlined,UnlockOutlined,VerifiedOutlined } from '@ant-design/icons';
+import { Modal, Input, Tag } from 'antd';
+import { UserOutlined,UnlockOutlined,VerifiedOutlined,AppleOutlined,AndroidOutlined } from '@ant-design/icons';
 
 const { confirm } = Modal;
 
@@ -143,8 +143,14 @@ class Login extends React.Component {
                         <div className="item qrcode">
                         <label>
                         使用手机 Google Authenticator 应用扫描以下二维码<br></br>
-                        <a href="https://github.com/google/google-authenticator-android/releases">安卓版本</a><br />
-                        <a href="https://apps.apple.com/cn/app/google-authenticator/id388497605">iOS版本</a>
+                        <Tag icon={<AppleOutlined />} color="#000">
+                            <a href="https://apps.apple.com/cn/app/google-authenticator/id388497605" target="view_window">iOS版本</a>
+                        </Tag>
+                        <Tag icon={<AndroidOutlined />} color="#3ddc84">
+                            <a href="https://github.com/google/google-authenticator-android/releases" target="view_window">安卓版本</a>
+                        </Tag>
+                        
+                        
                         </label>
                         <br></br>
                         <QRCode value={this.state.qrCode}></QRCode>

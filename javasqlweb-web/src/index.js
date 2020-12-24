@@ -8,7 +8,8 @@ import {
 } from "react-router-dom";
 import JavaSqlAdmin from './JavaSqlAdmin';
 import reportWebVitals from './reportWebVitals';
-import Login from './Login'
+import Admin from './Admin';
+import Login from './Login';
 
 
 class Root extends React.Component {
@@ -18,6 +19,7 @@ class Root extends React.Component {
         <Router>
           <Switch>
             <Route path="/login"><Login /></Route>
+            <Route path="/admin"><Admin /></Route>
             <Route path="/"><JavaSqlAdmin /></Route>
           </Switch>
 
