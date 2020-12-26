@@ -1,4 +1,7 @@
 # JavaSqlWeb - 一个运营环境数据查询系统
+![code size](https://img.shields.io/github/languages/code-size/guohai163/java-sql-web.svg?style=flat-square&color=6699FF)
+![docker pulls](https://img.shields.io/docker/pulls/gcontainer/java-sql-web?style=flat-square&color=6699FF)
+
 
 ## 项目介绍
 
