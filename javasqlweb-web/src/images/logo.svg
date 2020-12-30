@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="127" height="28" viewBox="0 0 127 28">
+  <defs>
+    <style>
+      .cls-1 {
+        font-size: 18px;
+        fill: red;
+        font-family: "Adobe Heiti Std";
+      }
+
+      .cls-2 {
+        fill: #01b73e;
+      }
+
+      .cls-3 {
+        fill: #342929;
+      }
+    </style>
+  </defs>
+  <text id="javaSqlWeb" class="cls-1" x="16.281" y="18.91">java<tspan class="cls-2">Sql<tspan class="cls-3">Web</tspan></tspan></text>
+</svg>

@@ -1,0 +1,36 @@
+#logo{
+    margin: 8px auto;
+    text-align: center;
+    width: 185px;
+}
+.ant-layout-footer{
+    padding-right: 5px 50px;
+    text-align: right;
+    font-size: 12px;
+    height: 5vh;
+}
+.ant-layout-header {
+    height: 5vh;
+    position: fixed;
+    z-index: 1;
+    width: 100%;
+
+    font: #fff;
+}
+.ant-layout-content{
+    margin-top: 5vh;
+    
+    height: 90vh;
+}
+.left_menu {
+    background-color: #f3f3f3;
+    position: fixed;
+    overflow: auto;
+    height: 100vh;
+    z-index: 2;
+}
+.div_content {
+    height: 90vh;
+    overflow: auto;
+    padding: 5px;
+}
