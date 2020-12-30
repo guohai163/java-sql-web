@@ -9,7 +9,6 @@ import cookie from 'react-cookies'
 import { LoadingOutlined } from '@ant-design/icons';
 import { Modal, Spin, Input } from 'antd';
 import cache from './utils';
-import cacheLocalStorage from './utils';
 
 const { confirm } = Modal;
 const antIcon = <LoadingOutlined style={{ fontSize: 24 }} spin />;
@@ -33,6 +32,7 @@ class Navigation extends React.Component {
             tableLoading: false,
             filterTableList: [],
             filterSpList: []
+            
         }
         this.serverChange = this.serverChange.bind(this);
         this.handleSize = this.handleSize.bind(this)
@@ -47,7 +47,7 @@ class Navigation extends React.Component {
     }
     handleSize = () => {
         this.setState({
-            deskHeight:window.innerHeight - 120 
+            deskHeight:window.innerHeight - 138
         })
     }
     getServerList() {
@@ -67,7 +67,8 @@ class Navigation extends React.Component {
         })
     }
     dbChange(dbName,event) {
-
+        let start_time = Date.now();
+        console.log('start_time',start_time)
         if(dbName === this.state.selectDatabase) {
             this.setState({
                 selectDatabase: ''
@@ -77,7 +78,8 @@ class Navigation extends React.Component {
         this.setState({
             selectDatabase: dbName,
             tableLoading: true,
-            tableList: []
+            tableList: [],
+            spList: []
         })
         const selectData = {
             selectServer: this.state.selectServer,
@@ -91,6 +93,7 @@ class Navigation extends React.Component {
         const requestKey = '/database/tablelist/'+this.state.selectServer+'/'+dbName;
     
         const tableData = cache.get(requestKey);
+        console.log('加载完缓存：',Date.now()-start_time);
         if(null === tableData) {
             const client = new FetchHttpClient(config.serverDomain);
             client.addMiddleware(json());
@@ -117,9 +120,9 @@ class Navigation extends React.Component {
                 tableLoading: false
             })
         }
-
+        console.log('方法走完存：',Date.now()-start_time);
         //获取存储过程
-        this.getSpList(dbName);
+        // this.getSpList(dbName);
     }
     serverChange(event) {
         //当不为“请选择服务器”时进行相应 操作
@@ -132,6 +135,11 @@ class Navigation extends React.Component {
                         selectServer: event.target.value,
                         dbList: response.jsonData.data
                     })
+                    const selectData = {
+                        selectServer: this.state.selectServer,
+                        type: 'server'
+                        };
+                    Pubsub.publish('dataSelect', selectData);
                 }
                 
             })
@@ -159,6 +167,16 @@ class Navigation extends React.Component {
             client.get(requestKey,{headers:{'User-Token': this.state.token}}).then(response => {
     
                 if(response.jsonData.status) {
+                    if(0 === response.jsonData.data.length){
+                        confirm({
+                            title:'提示',
+                            content: '该库无存储过程',
+                            onOk(){
+                            },
+                            onCancel(){
+                            }
+                        });
+                    }
                     this.setState({
                         spList: response.jsonData.data,
                         filterSpList: response.jsonData.data
@@ -171,6 +189,16 @@ class Navigation extends React.Component {
             })
         }
         else{
+            if(0 === spData.length){
+                confirm({
+                    title:'提示',
+                    content: '该库无存储过程',
+                    onOk(){
+                    },
+                    onCancel(){
+                    }
+                });
+            }
             this.setState({
                 spList: spData,
                 filterSpList: spData
@@ -198,13 +226,11 @@ class Navigation extends React.Component {
         Pubsub.publish('dataSelect', selectData);
     }
     showTableColumn(tableName, event){
-        this.setState({
-            showTableColumn: tableName
-        })
+        this.setState({showTableColumn:tableName})
         const client = new FetchHttpClient(config.serverDomain);
         client.addMiddleware(json());
-        client.get('/database/columnslist/'+this.state.selectServer+'/'+this.state.selectDatabase+'/'+tableName,{headers:{'User-Token': this.state.token}}).
-            then(response => {
+        client.get('/database/columnslist/'+this.state.selectServer+'/'+this.state.selectDatabase+'/'+tableName,{headers:{'User-Token': this.state.token}})
+            .then(response => {
                     if(response.jsonData.status){
                         this.setState({
                             columntData: response.jsonData.data
@@ -215,8 +241,8 @@ class Navigation extends React.Component {
     logout(){
         const client = new FetchHttpClient(config.serverDomain);
         client.addMiddleware(json());
-        client.get('/user/logout',{headers:{'User-Token': this.state.token}}).
-            then(response => {
+        client.get('/user/logout',{headers:{'User-Token': this.state.token}})
+            .then(response => {
                 if(response.jsonData.status){
                     this.setState({token:''})
                     cookie.remove('token', { path: '/' })
@@ -261,7 +287,7 @@ class Navigation extends React.Component {
                         </div>
                         <div id="navipanellinks">
 
-                            <a href="#" title="刷新" onClick={this.getServerList.bind(this)}>
+                            <a title="刷新" onClick={this.getServerList.bind(this)}>
                                 <img src={dot} alt="刷新" className="icon ic_s_reload"></img>
                             </a>
                             
@@ -301,20 +327,20 @@ class Navigation extends React.Component {
                                         </div>
                                         <a className="hover_show_full" onClick={this.dbChange.bind(this,db.dbName)}>{db.dbName}</a>
                                         <div className={this.state.tableLoading && this.state.selectDatabase === db.dbName?'clearfloat':'hide'}><Spin indicator={antIcon} /></div>
-                                        <div className={this.state.selectDatabase == db.dbName?'list_container':'hide'}>                                            
+                                        <div className={this.state.selectDatabase === db.dbName?'list_container':'hide'}>                                            
                                             <ul>
                                                 <li className="filter_input"><Input placeholder="Filter" size="small" allowClear onChange={this.filterTable.bind(this)}></Input></li>
                                                 {this.state.filterTableList.map(table =>
-                                                    <li className="view">
+                                                    <li className="view" key={table.tableName}>
                                                     <div className="block"><i></i>
                                                     <a className="expander" href="#">
                                                     <span className="hide pos2_name">views</span><span className="hide pos2_value">0</span>
-                                                    <img src={dot} title="扩展/收起" alt="扩展/收起" className={this.state.showTableColumn == table.tableName?'icon ic_b_minus':'icon ic_b_plus'} onClick={this.showTableColumn.bind(this,table.tableName)}></img>
+                                                    <img src={dot} title="扩展/收起" alt="扩展/收起" className={this.state.showTableColumn === table.tableName?'icon ic_b_minus':'icon ic_b_plus'} onClick={this.showTableColumn.bind(this,table.tableName)}></img>
                                                     </a></div>
                                                     <div className="block"><a href="#"><img src={dot} title="视图" alt="视图" className="icon ic_b_props" /></a></div>
                                                     <a className="hover_show_full" href="#" title="" onClick={this.tableChange.bind(this,table.tableName)}> {table.tableName} ({table.tableRows})</a>
                                                     <div className="clearfloat"></div>
-                                                    <div className={this.state.showTableColumn == table.tableName?'list_container':'hide'}>
+                                                    <div className={this.state.showTableColumn === table.tableName?'list_container':'hide'}>
                                                         <ul>
                                                             {columntData.map(column =>
                                                                 <li>{column.columnName}({column.columnType})</li>
@@ -323,18 +349,24 @@ class Navigation extends React.Component {
                                                     </div>
                                                     </li>
                                                 )}
-                                               {spList.map( sp =>
-                                                    <li className="view">
-                                                    <div className="block"><i></i>
-                                                    <a className="expander" href="#">
-                                                    <span className="hide pos2_name">views</span><span className="hide pos2_value">0</span>
-                                                    <img src={dot} title="扩展/收起" alt="扩展/收起" className="icon"></img>
-                                                    </a></div>
-                                                    <div className="block"><a href="#"><img src={dot} title="视图" alt="视图" className="icon ic_b_routines" /></a></div>
-                                                    <a className="hover_show_full" href="#" title="" onClick={this.spChange.bind(this,sp.procedureName)}> {sp.procedureName}</a>
-                                                    <div className="clearfloat"></div>
-                                                    </li>
-                                               )}
+                                                <li className="view">
+                                                    <a href="#" onClick={this.getSpList.bind(this,db.dbName)}>
+                                                    <img src={dot} className={spList.length === 0?'icon ic_b_plus':'icon ic_b_minus'}></img>
+                                                    <img src={dot} title="视图" alt="视图" className="icon ic_b_routines" />
+                                                    存储过程</a>
+                                                    <div className={spList.length === 0?'hide':'list_container'}>
+                                                        <ul>
+                                                        {spList.map( sp =>
+                                                                <li className="view">
+                                                                <div className="block"><a href="#"><img src={dot} title="视图" alt="视图" className="icon ic_b_routines" /></a></div>
+                                                                <a className="hover_show_full" href="#" title="" onClick={this.spChange.bind(this,sp.procedureName)}> {sp.procedureName}</a>
+                                                                <div className="clearfloat"></div>
+                                                                </li>
+                                                        )}
+                                                        </ul>
+                                                    </div>
+                                                </li>
+
                                             </ul>
                                         </div>
                                     </li>

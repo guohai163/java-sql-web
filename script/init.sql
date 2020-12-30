@@ -31,6 +31,7 @@ CREATE TABLE `db_query_log` (
   `code` int(11) NOT NULL COMMENT '自增值',
   `query_ip` varchar(45) NOT NULL COMMENT '查询人IP',
   `query_name` varchar(45) NOT NULL COMMENT '查询人',
+  `query_database` varchar(45) NOT NULL COMMENT '查询语句的库',
   `query_sqlscript` varchar(8000) NOT NULL COMMENT '查询脚本',
   `query_time` datetime NOT NULL COMMENT '查询时间'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -67,3 +68,5 @@ COMMIT;
 --ADD COLUMN `auth_secret` VARCHAR(45) NULL AFTER `token`,
 --ADD COLUMN `auth_status` VARCHAR(45) NOT NULL DEFAULT 'UNBIND' AFTER `auth_secret`,
 --ADD COLUMN `login_status` VARCHAR(45) NOT NULL DEFAULT 'LOGGING' AFTER `auth_status`;
+-- ALTER TABLE `javasqlweb_db`.`db_query_log`
+-- ADD COLUMN `query_database` VARCHAR(45) NULL AFTER `query_name`;

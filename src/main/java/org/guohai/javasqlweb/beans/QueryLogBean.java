@@ -29,6 +29,10 @@ public class QueryLogBean {
     private String queryName;
 
     /**
+     * 执行查询时的库
+     */
+    private String queryDatabase;
+    /**
      * 查询脚本
      */
     private String querySqlscript;

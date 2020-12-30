@@ -80,6 +80,12 @@
 .ic_s_db {
     background-image: url(./images/s_db.png);
 }
+.ic_ms_db {
+    background-image: url(./images/mssql_db.png);
+}
+.ic_ms_table {
+    background-image: url(./images/mssql_table.png);
+}
 .ic_b_props {
     background-image: url(./images/b_props.png);
 }

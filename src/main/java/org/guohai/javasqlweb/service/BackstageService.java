@@ -1,5 +1,6 @@
 package org.guohai.javasqlweb.service;
 
+import org.guohai.javasqlweb.beans.ConnectConfigBean;
 import org.guohai.javasqlweb.beans.QueryLogBean;
 import org.guohai.javasqlweb.beans.Result;
 
@@ -16,4 +17,10 @@ public interface BackstageService {
      * @return
      */
     Result<List<QueryLogBean>> getQueryLog();
+
+    /**
+     * 获取连接表
+     * @return
+     */
+    Result<List<ConnectConfigBean>> getConnData();
 }

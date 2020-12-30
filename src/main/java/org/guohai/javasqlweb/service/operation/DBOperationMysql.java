@@ -22,6 +22,11 @@ public class DBOperationMysql implements DBOperation {
     private ConnectConfigBean connectConfigBean;
 
     /**
+     * 连接字符串
+     */
+    private String sqlUrl;
+
+    /**
      * 连接实例
      */
     private Connection sqlConn;
@@ -45,7 +50,7 @@ public class DBOperationMysql implements DBOperation {
      */
     DBOperationMysql(ConnectConfigBean conn) throws ClassNotFoundException, SQLException {
         connectConfigBean = conn;
-        String sqlUrl = String.format("jdbc:mysql://%s:%s",conn.getDbServerHost(),conn.getDbServerPort());
+        sqlUrl = String.format("jdbc:mysql://%s:%s",conn.getDbServerHost(),conn.getDbServerPort());
         Class.forName(DB_DRIVER);
         sqlConn = DriverManager.getConnection(sqlUrl,
                 connectConfigBean.getDbServerUsername(),
@@ -61,6 +66,8 @@ public class DBOperationMysql implements DBOperation {
     @Override
     public List<DatabaseNameBean> getDbList() throws SQLException {
         List<DatabaseNameBean> listDnb = new ArrayList<>();
+        // jiancha lianjie
+        checkConnection();
         Statement st = sqlConn.createStatement();
         ResultSet rs = st.executeQuery("SHOW DATABASES;");
         while (rs.next()){
@@ -227,5 +234,20 @@ public class DBOperationMysql implements DBOperation {
         }
         //TODO:包含top的也要做数量检查
         return sql;
+    }
+
+    /**
+     * 检查连接状态后再使用
+     */
+    private void checkConnection(){
+        try {
+            if(sqlConn.isClosed()){
+                sqlConn = DriverManager.getConnection(sqlUrl,
+                        connectConfigBean.getDbServerUsername(),
+                        connectConfigBean.getDbServerPassword());
+            }
+        } catch (SQLException throwables) {
+            throwables.printStackTrace();
+        }
     }
 }

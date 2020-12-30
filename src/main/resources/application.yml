@@ -6,7 +6,7 @@ spring:
   datasource:
     type: com.alibaba.druid.pool.DruidDataSource
     druid:
-      url: jdbc:mysql://${MARIADB_PORT_3306_TCP_ADDR:localhost}:3306/javasqlweb_db?useUnicode=true&characterEncoding=UTF-8&allowMultiQueries=true
+      url: jdbc:mysql://${MARIADB_PORT_3306_TCP_ADDR:localhost}:3306/javasqlweb_db?useUnicode=true&characterEncoding=UTF-8&allowMultiQueries=true&serverTimezone=Hongkong
       username: root
       password: ${MARIADB_ENV_MYSQL_ROOT_PASSWORD:Passw0rd}
   freemarker:
@@ -19,8 +19,11 @@ spring:
     expose-request-attributes: true
     expose-session-attributes: true
     request-context-attribute: request
+  jackson:
+    time-zone: GMT+8
+    date-format: yyyy-MM-dd HH:mm:ss
 mybatis:
   configuration:
     map-underscore-to-camel-case: true
 project:
-  version: 0.4.15
+  version: 0.4.21

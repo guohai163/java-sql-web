@@ -5,7 +5,7 @@ import './PageContent.css'
 import FetchHttpClient, { json } from 'fetch-http-client';
 import config from "./config";
 import { CSVLink } from "react-csv";
-import { Modal, Spin, Empty } from 'antd';
+import { Modal, Spin, Empty, List } from 'antd';
 import cookie from 'react-cookies';
 import { LoadingOutlined } from '@ant-design/icons';
 
@@ -16,6 +16,7 @@ import 'codemirror/addon/hint/show-hint.css';
 import 'codemirror/addon/hint/show-hint.js';
 import 'codemirror/addon/hint/sql-hint.js';
 import 'codemirror/theme/idea.css';
+import 'antd/dist/antd.css';
 
 const { confirm } = Modal;
 const antIcon = <LoadingOutlined style={{ fontSize: 34 }} spin />;
@@ -44,7 +45,8 @@ class PageContent extends React.Component {
             token: cookie.load('token'),
             queryLoading: false,
             sqlValue: '',
-            selectedSql: ''
+            selectedSql: '',
+            historySql: []
         }
     }
 
@@ -55,7 +57,7 @@ class PageContent extends React.Component {
                 const client = new FetchHttpClient(config.serverDomain);
                 client.addMiddleware(json());
                 client.get('/database/serverinfo/'+data.selectServer,{headers:{'User-Token': this.state.token}}).then( response => {
-                    let sql = 'mssql' === response.jsonData.data.dbServerType ? 'SELECT top 100 * FROM ' + data.selectTable : 'SELECT * FROM '+data.selectDatabase+'.'+data.selectTable + ' limit 100'
+                    let sql = 'mssql' === response.jsonData.data.dbServerType ? 'SELECT top 100 * FROM [' + data.selectTable +']' : 'SELECT * FROM `'+data.selectDatabase+'`.`'+data.selectTable + '` limit 100'
 
                     this.setState({
                         selectServer: data.selectServer,
@@ -63,11 +65,12 @@ class PageContent extends React.Component {
                         selectTable: data.selectTable,
                         selectServerName: response.jsonData.data.dbServerName,
                         selectServerType: response.jsonData.data.dbServerType,
-                        sql: sql
+                        sql: sql,
+                        historySql: localStorage.getItem(data.selectServer+'_history_sql')===null?[]:JSON.parse(localStorage.getItem(data.selectServer+'_history_sql'))
                     })
                     client.get('/database/columnslist/'+data.selectServer+'/'+data.selectDatabase+'/'+data.selectTable,
-                                {headers:{'User-Token': this.state.token}}).
-                        then(response => {
+                                {headers:{'User-Token': this.state.token}})
+                        .then(response => {
                             if(response.jsonData.status) {
                                 this.setState({
                                     tableColumns: response.jsonData.data
@@ -87,8 +90,8 @@ class PageContent extends React.Component {
                 const client = new FetchHttpClient(config.serverDomain);
                 client.addMiddleware(json());
                 client.get('/database/storedprocedures/'+data.selectServer+'/'+data.selectDatabase+'/'+data.spName,
-                            {headers:{'User-Token': this.state.token}}).
-                    then(response => {
+                            {headers:{'User-Token': this.state.token}})
+                    .then(response => {
                         this.setState({
                             sql: response.jsonData.data.procedureData
                         })
@@ -104,8 +107,22 @@ class PageContent extends React.Component {
                         selectDatabase: data.selectDatabase,
                         selectServerName: response.jsonData.data.dbServerName,
                         selectServerType: response.jsonData.data.dbServerType,
-
+                        historySql: localStorage.getItem(data.selectServer+'_history_sql')===null?[]:JSON.parse(localStorage.getItem(data.selectServer+'_history_sql'))
                     })
+                })
+            }
+            else if('server' === data.type){
+                const client = new FetchHttpClient(config.serverDomain);
+                client.addMiddleware(json());
+                client.get('/database/serverinfo/'+data.selectServer,{headers:{'User-Token': this.state.token}}).then( response => {
+                    this.setState({
+                        selectServer: data.selectServer,
+                        selectDatabase: '',
+                        selectServerName: response.jsonData.data.dbServerName,
+                        selectServerType: response.jsonData.data.dbServerType,
+                        historySql: localStorage.getItem(data.selectServer+'_history_sql')===null?[]:JSON.parse(localStorage.getItem(data.selectServer+'_history_sql'))
+                    })
+
                 })
             }
 
@@ -116,6 +133,24 @@ class PageContent extends React.Component {
 
     execeteSql() {
         let sql = ''===this.state.selectedSql?this.state.sql:this.state.selectedSql;
+        if('' === sql){
+            confirm({
+                title:'提示',
+                content: '请输入SQL语句后再执行',
+                onOk(){                        },
+                onCancel(){                        }
+            });
+            return;
+        }
+        if('' === this.state.selectDatabase){
+            confirm({
+                title:'提示',
+                content: '请选择数据库后再执行',
+                onOk(){                        },
+                onCancel(){                        }
+            });
+            return;
+        }
         this.setState({
             queryLoading: true,
             queryResult: []
@@ -137,10 +172,23 @@ class PageContent extends React.Component {
                 this.setState({
                     queryResult: response.jsonData.data
                 })
+                // 检查数组中是否有此成员
+                let historySql = this.state.historySql;
+                if(historySql.indexOf(sql) === -1){
+                    historySql.unshift(sql)
+                    localStorage.setItem(this.state.selectServer + '_history_sql', JSON.stringify(historySql));
+                    this.setState({
+                        historySql: historySql
+                    })
+                }
             }else {
                 this.setState({
                     queryResult: []
                 })
+                confirm({
+                    title:'错误',
+                    content: response.jsonData.message
+                });
             }
 
         })
@@ -190,7 +238,7 @@ class PageContent extends React.Component {
 
             return (
                 data.map( row => {
-                return(<tr>{
+                return(<tr key={row[0]}>{
                     Object.keys(row).map( col => {
                         return (<td>{PageContent.dataColumnShow(row[col])}</td>)
                     })
@@ -216,19 +264,36 @@ class PageContent extends React.Component {
             selectedSql: dom.getSelection()
         })
     }
-
-
+    historSqlToText(sqlScript){
+        this.setState({
+            sql: sqlScript
+        })
+    }
+    deleteHistorySql(sql) {
+        let sqlArr = this.state.historySql;
+        let pos = sqlArr.indexOf(sql)
+        if( -1 !== pos ){
+            sqlArr.splice(pos, 1)
+            this.setState({
+                historySql: sqlArr
+            })
+        }
+    }
+    
     render(){
-        const {sql, queryResult} = this.state;
+        const {sql, queryResult, selectDatabase} = this.state;
 
         return (
             <div className="right_area">
                 <div id="menubar">
                     <div id="serverinfo">
-                        <img src={dot} title="" alt="" className="icon ic_s_host "/>
-                        服务器: {this.state.selectServerName} ({this.state.selectServerType}) >> 
-                        <img src={dot} title="" alt="" className="icon ic_s_db "/>
-                        数据库: {this.state.selectDatabase}
+                        <img src={dot}  alt="SERVERIMG" className="icon ic_s_host "/>
+                        服务器: {this.state.selectServerName} ({this.state.selectServerType}) 
+                        <span className={'' === selectDatabase?'hide':'none'}>
+                        &gt;&gt; <img src={dot} className="icon ic_s_db " alt="DBIMG"/>数据库: {this.state.selectDatabase}
+                        </span>
+                        
+
                     </div>
                 </div>
                 <div className='page_content'>
@@ -243,12 +308,17 @@ class PageContent extends React.Component {
                                     <CodeMirror ref="editor" onCursorActivity={this.mouseSelected.bind(this)} value={sql} onBeforeChange={(editor, data, value) => { this.setState({sql: value});}}  options={options} />
                                     * 敲入关键字首字母后可以使用Ctrl进行快速补全，选中部分SQL只会执行选中部分的语句！
                                 </div>
-                                <div id="tablefieldscontainer"><label>字段</label>
-                                    <select id="tablefields" name="dummy" size="13" multiple="multiple" onChange={this.selectColumn.bind(this)}>
+                                <label>历史记录</label>
+                                <div id="tablefieldscontainer">
+                                    {/* <select id="tablefields" name="dummy" size="13" multiple="multiple" onChange={this.selectColumn.bind(this)}>
                                         {this.state.tableColumns.map( column =>
                                             <option value={column.columnName} title="">{column.columnName} - {column.columnType}({column.columnLength})</option>
                                         )}
-                                    </select>
+                                    </select> */}
+                                    <List dataSource={this.state.historySql} renderItem={item => (
+                                        <List.Item key={item}><a key={item} onClick={this.historSqlToText.bind(this, item)}>{item.length>60?item.substring(0,60)+'...':item}</a><button className="btn_right" onClick={this.deleteHistorySql.bind(this, item)}>删除</button></List.Item>
+                                    )}></List>
+
                                 </div>
                                 <div className="clearfloat"></div>
                             </div>

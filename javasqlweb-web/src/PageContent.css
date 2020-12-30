@@ -52,17 +52,20 @@ textarea {
 }
 div#tablefieldscontainer {
     float: right;
-    width: 29%;
-    margin-top: -20px;
+    width: 30%;
+    height: 300px;
+    overflow: auto;
 }
 label {
     display: inline-block;
     margin-bottom: .5rem;
-    cursor: default;
+
 }
-div#tablefieldscontainer select {
+div#tablefieldscontainer ul {
     width: 100%;
-    background: #fff;
+}
+.sql_li {
+    cursor: pointer;
 }
 select {
     -moz-border-radius: 2px;
@@ -108,4 +111,7 @@ td {
 }
 .responsivetable {
     margin-left: 5px;
+}
+.btn_right {
+    float: right;
 }

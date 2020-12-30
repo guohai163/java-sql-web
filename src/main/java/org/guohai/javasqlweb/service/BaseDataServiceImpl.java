@@ -8,6 +8,7 @@ import org.guohai.javasqlweb.service.operation.DBOperationFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -186,10 +187,11 @@ public class BaseDataServiceImpl implements BaseDataService{
      * @param serverCode
      * @param dbName
      * @param sql
+     * @param userIp
      * @return
      */
     @Override
-    public Result<Object> quereyDataBySql(Integer serverCode, String dbName, String sql, String token) {
+    public Result<Object> quereyDataBySql(Integer serverCode, String dbName, String sql, String token, String userIp) {
         UserBean user = adminDao.getUserByToken(token);
         if(null == user){
             return new Result<>(false,"",null);
@@ -197,11 +199,11 @@ public class BaseDataServiceImpl implements BaseDataService{
         DBOperation operation = createDbOperation(serverCode);
         if(null != operation){
             try{
-                baseConfigDao.saveQueryLog(user.getUserName(),sql);
+                baseConfigDao.saveQueryLog(user.getUserName(),dbName,sql, userIp,new Date());
                 return new Result<>(true,"", operation.queryDatabaseBySql(dbName, sql));
             } catch (Exception e) {
                 e.printStackTrace();
-                return new Result<>(false,"",null);
+                return new Result<>(false,e.getMessage(),null);
             }
         }else{
             return new Result<>(false,"",null);

@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import javax.servlet.http.HttpServletRequest;
 import java.util.List;
 
 /**
@@ -132,7 +133,8 @@ public class BaseDataController {
     public Result<Object> quereyData(@PathVariable("serverCode") String serverCode,
                                      @PathVariable("dbName") String dbName,
                                      @RequestHeader(value = "User-Token", required =  false) String token,
+                                     HttpServletRequest request,
                                      @RequestBody String sql){
-        return baseDataService.quereyDataBySql(Integer.parseInt(serverCode), dbName, sql, token);
+        return baseDataService.quereyDataBySql(Integer.parseInt(serverCode), dbName, sql, token, request.getRemoteAddr());
     }
 }

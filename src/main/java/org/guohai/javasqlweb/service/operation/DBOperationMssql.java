@@ -245,7 +245,7 @@ public class DBOperationMssql implements DBOperation {
             Map<String, Object> rowData = new LinkedHashMap<String, Object>();
             for(int i=1;i<=columnCount;i++){
                 rowData.put(md.getColumnName(i),md.getColumnType(i) == 93
-                        ? rs.getDate(i) + " " + rs.getTime(i)
+                        ? (rs.getObject(i)==null?"NULL":rs.getDate(i) + " " + rs.getTime(i))
                         : rs.getObject(i));
             }
             listData.add(rowData);

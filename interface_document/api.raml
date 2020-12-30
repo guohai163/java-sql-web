@@ -1,5 +1,5 @@
 #%RAML 1.0
-title: javaSqlAdmin
+title: javaSqlWeb
 version: v1
 baseUri: http://127.0.0.1:8002
 
@@ -141,6 +141,10 @@ baseUri: http://127.0.0.1:8002
 /api:
   /backstage:
     /querylog:
+      get:
+        responses:
+          200:
+    /connlist:
       get:
         responses:
           200:
