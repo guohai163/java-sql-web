@@ -330,7 +330,7 @@ class Navigation extends React.Component {
                                         <div className={this.state.selectDatabase === db.dbName?'list_container':'hide'}>                                            
                                             <ul>
                                                 <li className="filter_input"><Input placeholder="Filter" size="small" allowClear onChange={this.filterTable.bind(this)}></Input></li>
-                                                {this.state.filterTableList.map(table =>
+                                                {this.state.selectDatabase !== db.dbName?'':this.state.filterTableList.map(table =>
                                                     <li className="view" key={table.tableName}>
                                                     <div className="block"><i></i>
                                                     <a className="expander" href="#">
