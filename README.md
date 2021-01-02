@@ -2,6 +2,7 @@
 ![code size](https://img.shields.io/github/languages/code-size/guohai163/java-sql-web.svg?style=flat-square&color=6699FF)
 ![docker pulls](https://img.shields.io/docker/pulls/gcontainer/java-sql-web?style=flat-square&color=6699FF)
 
+![屏幕截图](./doc/pic/demo.png)
 
 ## 项目介绍
 
@@ -36,3 +37,4 @@ open http://localhost
 2. 查询的目标数据库支持SqlServer和MySql
 3. 后台会记录每次SQL执行脚本
 4. 支持查询结果的csv格式导出
+5. 脚本输入框语法高亮，智能提醒
