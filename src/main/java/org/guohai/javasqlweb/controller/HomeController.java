@@ -1,5 +1,6 @@
 package org.guohai.javasqlweb.controller;
 
+import com.alibaba.druid.stat.DruidStatManagerFacade;
 import org.guohai.javasqlweb.beans.Result;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,5 +34,11 @@ public class HomeController {
     public Result<String > version(){
         LOG.info(version);
         return new Result<>(true,"", version) ;
+    }
+
+    @RequestMapping(value = "/stat")
+    @ResponseBody
+    public Object druidStat(){
+        return DruidStatManagerFacade.getInstance().getDataSourceStatDataList();
     }
 }

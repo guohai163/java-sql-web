@@ -28,9 +28,7 @@ public class DBOperationOracle implements DBOperation  {
         dbConfig.put("url",String.format("jdbc:mysql://%s:%s",conn.getDbServerHost(),conn.getDbServerPort()));
         dbConfig.put("username",conn.getDbServerUsername());
         dbConfig.put("password",conn.getDbServerPassword());
-        dbConfig.put("driverClassName","com.mysql.cj.jdbc.Driver");
         dbConfig.put("initialSize","5");
-        dbConfig.put("testOnBorrow","true");
         dbConfig.put("validationQuery","SELECT now();");
         sqlDs = DruidDataSourceFactory.createDataSource(dbConfig);
     }
