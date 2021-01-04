@@ -20,12 +20,16 @@ public class DBOperationFactory {
      */
     private static final String MSSQL = "mssql";
 
-    public static DBOperation createDbOperation(ConnectConfigBean conn) throws SQLException, ClassNotFoundException {
+    private static final String MYSQL_P = "mysqlp";
+
+    public static DBOperation createDbOperation(ConnectConfigBean conn) throws Exception {
         DBOperation operation = null;
         if(MYSQL.equals(conn.getDbServerType())) {
             operation = new DBOperationMysql(conn);
         } else if(MSSQL.equals(conn.getDbServerType())) {
             operation = new DBOperationMssql(conn);
+        }else if(MYSQL_P.equals(conn.getDbServerType())) {
+            operation = new DBOperationOracle(conn);
         }
         return operation;
     }
