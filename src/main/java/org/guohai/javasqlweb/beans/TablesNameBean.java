@@ -3,6 +3,11 @@ package org.guohai.javasqlweb.beans;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
+/**
+ * 表实体
+ * @author guohai
+ * @date 2020-12-1
+ */
 @Data
 @AllArgsConstructor
 public class TablesNameBean {

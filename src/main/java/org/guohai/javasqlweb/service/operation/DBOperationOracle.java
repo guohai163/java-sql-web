@@ -14,6 +14,11 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.*;
 
+/**
+ * oracle库操作类
+ * @author guohai
+ * @date 2021-1-1
+ */
 public class DBOperationOracle implements DBOperation  {
 
     private static final Logger LOG  = LoggerFactory.getLogger(DBOperationOracle.class);
@@ -42,15 +47,7 @@ public class DBOperationOracle implements DBOperation  {
     @Override
     public List<DatabaseNameBean> getDbList() throws SQLException, ClassNotFoundException {
         List<DatabaseNameBean> listDnb = new ArrayList<>();
-        getActiveCount();
-        Connection conn =sqlDs.getConnection();
-        Statement st = conn.createStatement();
-        ResultSet rs = st.executeQuery("SHOW DATABASES;");
-        while (rs.next()){
-            listDnb.add(new DatabaseNameBean(rs.getString("Database")));
-        }
-        // 关闭rs和statement,释放连接回连接池
-        closeResource(rs, st, conn);
+
         return listDnb;
     }
 
@@ -136,26 +133,4 @@ public class DBOperationOracle implements DBOperation  {
         LOG.info(String.format("目前%s的连接数%d", connConfigName,activeCount));
     }
 
-    /**
-     * 关闭连接
-     * @param resultSet
-     * @param statement
-     * @param connection
-     */
-    private void closeResource(ResultSet resultSet, Statement statement, Connection connection){
-        try {
-            if (resultSet != null) {
-                resultSet.close();
-            }
-            if (statement != null) {
-                statement.close();
-            }
-            if(null != connection){
-                connection.close();
-            }
-        } catch (SQLException throwable) {
-            throwable.printStackTrace();
-        }
-
-    }
 }

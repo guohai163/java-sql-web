@@ -6,6 +6,8 @@ import lombok.NoArgsConstructor;
 
 /**
  * 存储过程实体
+ * @author guohai
+ * @date 2020-12-1
  */
 @Data
 @NoArgsConstructor

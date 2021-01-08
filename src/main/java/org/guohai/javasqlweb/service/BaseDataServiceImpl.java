@@ -13,6 +13,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 基础数据操作服务类
+ * @author guohai
+ * @date 2020-12-1
+ */
 @Service
 public class BaseDataServiceImpl implements BaseDataService{
 

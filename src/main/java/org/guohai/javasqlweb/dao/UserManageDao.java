@@ -98,6 +98,12 @@ public interface UserManageDao {
     @Select("SELECT code,user_name,auth_status FROM user_tb;")
     List<UserBean> getUserList();
 
+    /**
+     * 增加新用户
+     * @param userName
+     * @param userPass
+     * @return
+     */
     @Insert("INSERT INTO `user_tb` (`user_name`,`pass_word`,`token`) VALUES" +
             "(#{name},md5(CONCAT(md5(#{pass}),'jsa')),'');")
     Boolean addNewUser(@Param("name") String userName,@Param("pass") String userPass);

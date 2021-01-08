@@ -39,6 +39,7 @@ public interface BaseConfigDao {
      * @param dbname
      * @param sql
      * @param userIp
+     * @param logDate
      * @return
      */
     @Insert("INSERT INTO `db_query_log`\n" +

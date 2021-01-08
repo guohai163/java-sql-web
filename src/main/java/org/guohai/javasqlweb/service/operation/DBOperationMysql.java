@@ -199,7 +199,6 @@ public class DBOperationMysql implements DBOperation {
     public Object queryDatabaseBySql(String dbName, String sql) throws SQLException {
         List<Map<String, Object>> listData = new ArrayList<>();
         // TODO: 缺少SQL检查
-        sql = limitSql(sql);
         Statement st = sqlConn.createStatement();
         ResultSet rs = st.executeQuery(String.format("%s;", sql));
         // 获得结果集结构信息,元数据
@@ -224,17 +223,7 @@ public class DBOperationMysql implements DBOperation {
         }
         return listData;
     }
-    /**
-     * 检查SQL语句中是否有top属性
-     * @return
-     */
-    private String limitSql(String sql){
-        if (!sql.toLowerCase().contains("limit") && !sql.toLowerCase().contains("distinct")) {
-            return sql.toLowerCase().replace("$", " limit " + LIMIT_NUMBER);
-        }
-        //TODO:包含top的也要做数量检查
-        return sql;
-    }
+
 
     /**
      * 检查连接状态后再使用

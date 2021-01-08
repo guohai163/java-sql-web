@@ -12,6 +12,8 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.*;
 
+import static org.guohai.javasqlweb.config.ConstantUtils.DB_LIMIT;
+
 /**
  * 基于alibaba druid连接池的mysql实现类
  * @author guohai
@@ -205,7 +207,12 @@ public class DBOperationMssqlDruid implements DBOperation {
         java.sql.ResultSetMetaData md = rs.getMetaData();
         // 获得列数
         int columnCount = md.getColumnCount();
+        int dataCount = 0;
         while (rs.next()){
+            if(dataCount>DB_LIMIT){
+                break;
+            }
+            dataCount++;
             Map<String, Object> rowData = new LinkedHashMap<String, Object>();
             for(int i=1;i<=columnCount;i++){
                 rowData.put(md.getColumnName(i),md.getColumnType(i) == 93
