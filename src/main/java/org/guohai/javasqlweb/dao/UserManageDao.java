@@ -109,4 +109,13 @@ public interface UserManageDao {
      */
     @Delete("DELETE FROM `user_tb` WHERE user_name=#{name};")
     Boolean delUser(@Param("name") String userName);
+
+    /**
+     * 通过有效Token直接修改用户密码
+     * @param token
+     * @param newPass
+     * @return
+     */
+    @Update("UPDATE user_tb SET pass_word=md5(CONCAT(md5(#{newpass}),'jsa')) WHERE token=#{token}")
+    Boolean changeUserPassword(@Param("token") String token, @Param("newpass") String newPass);
 }

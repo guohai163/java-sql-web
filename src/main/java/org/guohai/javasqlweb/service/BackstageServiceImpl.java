@@ -1,9 +1,6 @@
 package org.guohai.javasqlweb.service;
 
-import org.guohai.javasqlweb.beans.ConnectConfigBean;
-import org.guohai.javasqlweb.beans.QueryLogBean;
-import org.guohai.javasqlweb.beans.Result;
-import org.guohai.javasqlweb.beans.UserBean;
+import org.guohai.javasqlweb.beans.*;
 import org.guohai.javasqlweb.dao.BaseConfigDao;
 import org.guohai.javasqlweb.dao.UserManageDao;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,6 +12,8 @@ import java.util.Map;
 
 /**
  * 后台服务
+ * @author guohai
+ * @date 2021-1-1
  */
 @Service
 public class BackstageServiceImpl implements BackstageService{
@@ -128,5 +127,22 @@ public class BackstageServiceImpl implements BackstageService{
         }
         baseConfigDao.delServerByCode(code);
         return new Result<>(true, "","删除成功");
+    }
+
+    /**
+     * 通过有效token修改用户密码
+     *
+     * @param token
+     * @param newPass
+     * @return
+     */
+    @Override
+    public Result<String> changeUserPass(String token, String newPass) {
+        UserBean user = userDao.getUserByToken(token);
+        if(null == user || user.getLoginStatus() != UserLoginStatus.LOGGED){
+            return new Result<>(false,"","用户token无效");
+        }
+        userDao.changeUserPassword(token, newPass);
+        return new Result<>(true, "","密码修改成功");
     }
 }

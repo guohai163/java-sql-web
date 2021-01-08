@@ -42,8 +42,7 @@ public class DBOperationMssqlDruid implements DBOperation {
     DBOperationMssqlDruid(ConnectConfigBean conn) throws Exception {
         connConfigName = conn.getDbServerName();
         Map dbConfig = new HashMap();
-        dbConfig.put("url",String.format("jdbc:sqlserver://%s:%s?useUnicode=true&characterEncoding=UTF-8",
-                conn.getDbServerHost(),conn.getDbServerPort()));
+        dbConfig.put("url",String.format("jdbc:sqlserver://%s:%s",conn.getDbServerHost(),conn.getDbServerPort()));
         dbConfig.put("username",conn.getDbServerUsername());
         dbConfig.put("password",conn.getDbServerPassword());
         dbConfig.put("initialSize","2");

@@ -7,6 +7,8 @@ import org.guohai.javasqlweb.beans.Result;
 import org.guohai.javasqlweb.beans.UserBean;
 import org.guohai.javasqlweb.config.AdminPageRequired;
 import org.guohai.javasqlweb.service.BackstageService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -25,6 +27,8 @@ import java.util.Map;
 @RequestMapping(value = "/api/backstage")
 @CrossOrigin
 public class BackstageController {
+
+    private static final Logger LOG  = LoggerFactory.getLogger(BackstageController.class);
 
     @Autowired
     BackstageService backstageService;
@@ -122,5 +126,19 @@ public class BackstageController {
     @RequestMapping(value = "/delserver", method = RequestMethod.POST)
     public Result<String> delServer(@RequestBody Integer code){
         return backstageService.delServer(code);
+    }
+
+    /**
+     * 修改用户密码
+     * @param token
+     * @param newPass
+     * @return
+     */
+    @ResponseBody
+    @RequestMapping(value = "/change_new_pass", method = RequestMethod.POST)
+    public Result<String> changeNewPass(@RequestHeader(value = "User-Token", required =  false) String token,
+                                        @RequestBody String newPass){
+        LOG.debug(String.format("将为用户token为%s的修改密码", token));
+        return backstageService.changeUserPass(token,newPass);
     }
 }

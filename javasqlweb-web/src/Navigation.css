@@ -41,6 +41,9 @@
 .ic_s_loggoff {
     background-image: url(./images/s_loggoff.png);
 }
+.ic_u_pass {
+    background-image: url(./images/b_userpass.png);
+}
 #navigation_tree {
     margin-left: 5px;
 }

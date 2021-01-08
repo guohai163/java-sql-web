@@ -66,4 +66,12 @@ public interface BackstageService {
      * @return
      */
     Result<String> delServer(Integer code);
+
+    /**
+     * 通过有效token修改用户密码
+     * @param token
+     * @param newPass
+     * @return
+     */
+    Result<String> changeUserPass(String token, String newPass);
 }

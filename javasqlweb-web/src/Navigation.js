@@ -7,7 +7,7 @@ import config from './config'
 import Pubsub from 'pubsub-js'
 import cookie from 'react-cookies'
 import { LoadingOutlined } from '@ant-design/icons';
-import { Modal, Spin, Input } from 'antd';
+import { Modal, Spin, Input, Form } from 'antd';
 import cache from './utils';
 
 const { confirm } = Modal;
@@ -31,7 +31,9 @@ class Navigation extends React.Component {
             token: cookie.load('token'),
             tableLoading: false,
             filterTableList: [],
-            filterSpList: []
+            filterSpList: [],
+            passVisible: false,
+            inputData: {}
             
         }
         this.serverChange = this.serverChange.bind(this);
@@ -275,8 +277,49 @@ class Navigation extends React.Component {
             });
         }
     }
+    modalHandleOk(){
+        // 修改密码弹层确认
+        console.log(this.state.inputData)
+        const client = new FetchHttpClient(config.serverDomain);
+        client.addMiddleware(json());
+        client.post('/api/backstage/change_new_pass',{headers: { 'Content-Type': 'application/json','User-Token': this.state.token },
+            body:this.state.inputData['userNewPassword']})
+         .then(response => {
+            console.log(response.jsonData)
+            if(true === response.jsonData.status){
+                confirm({
+                    title:'提示',
+                    content: '密码修改成功',
+                    onOk(){},
+                    onCancel(){}
+                });
+                this.setState({passVisible:false});
+            }
+            else{
+                confirm({
+                    title:'提示',
+                    content: response.jsonData.data,
+                    onOk(){                        },
+                    onCancel(){                        }
+                });
+            }
+         })
+    }
+    modalHandleCancel(){
+        this.setState({passVisible:false,inputData:{}});
+    }
+    showPassModal(){
+        this.setState({passVisible:true});
+    }
+    onInputChange(e){
+        let data = this.state.inputData;
+        data[e.target.id] = e.target.value
+        this.setState({
+            inputData: data
+        })
+    }
     render(){
-        const {deskHeight, columntData, spList} = this.state;
+        const {deskHeight, columntData, spList, passVisible} = this.state;
         return (
             <div id='navigation'>
                 <div id='navigation_resizer'></div>
@@ -290,7 +333,9 @@ class Navigation extends React.Component {
                             <a title="刷新" onClick={this.getServerList.bind(this)}>
                                 <img src={dot} alt="刷新" className="icon ic_s_reload"></img>
                             </a>
-                            
+                            <a title="修改密码" onClick={this.showPassModal.bind(this)}>
+                                <img src={dot} alt="修改密码" className="icon ic_u_pass"></img>
+                            </a>
                             <a href="#" title="设置" onClick={this.jumpAdmin.bind(this)}>
                                 <img src={dot} alt="setting" className={'admin' === config.userName?'icon ic_s_cog':'hide'}></img>
                             </a>
@@ -376,6 +421,19 @@ class Navigation extends React.Component {
                         </div>
                     </div>
                 </div>
+                <Modal
+                        title="修改密码"
+                        visible={passVisible}
+                        onOk={this.modalHandleOk.bind(this)}
+                        onCancel={this.modalHandleCancel.bind(this)}
+                    >
+                    <Form size="small" labelCol={{ span: 7 }}>
+                    <Form.Item label="请输入新密码" rules={[{ required: true, message: '请输入密码!' }]}>
+                    <Input.Password onChange={this.onInputChange.bind(this)} value={this.state.inputData['userNewPassword']} id="userNewPassword"/>
+                    </Form.Item>
+                    </Form>
+                    
+                </Modal>
             </div>
             
         )
