@@ -1,12 +1,12 @@
 package org.guohai.javasqlweb.dao;
 
 import com.fasterxml.jackson.databind.jsonFormatVisitors.JsonBooleanFormatVisitor;
-import org.apache.ibatis.annotations.Param;
-import org.apache.ibatis.annotations.Select;
-import org.apache.ibatis.annotations.Update;
+import org.apache.ibatis.annotations.*;
 import org.guohai.javasqlweb.beans.UserBean;
 import org.springframework.stereotype.Repository;
 import org.springframework.web.bind.annotation.PathVariable;
+
+import java.util.List;
 
 /**
  * 管理操作类
@@ -18,12 +18,19 @@ public interface UserManageDao {
     /**
      * 查询指定用户名密码的用户数据是否存在
      * @param name
-     * @param Pass
+     * @param pass
      * @return
      */
     @Select("SELECT user_name,auth_status FROM user_tb WHERE user_name=#{name} AND pass_word=md5(CONCAT(md5(#{pass}),'jsa'))")
-    UserBean getUserByName(@Param("name") String name, @Param("pass") String pass);
+    UserBean checkUserNamePass(@Param("name") String name, @Param("pass") String pass);
 
+    /**
+     * 通过用户名检查用户是否存在
+     * @param name
+     * @return
+     */
+    @Select("SELECT user_name FROM user_tb WHERE user_name=#{name}")
+    UserBean getUserByName(@Param("name") String name);
     /**
      * 更新用户登录令牌
      * @param name
@@ -83,4 +90,23 @@ public interface UserManageDao {
      */
     @Update("UPDATE user_tb SET token='',login_status='LOGOUT' WHERE token=#{token} ")
     Boolean logoutUser(@Param("token") String token);
+
+    /**
+     * 安全的获取一个用户列表
+     * @return
+     */
+    @Select("SELECT code,user_name,auth_status FROM user_tb;")
+    List<UserBean> getUserList();
+
+    @Insert("INSERT INTO `user_tb` (`user_name`,`pass_word`,`token`) VALUES" +
+            "(#{name},md5(CONCAT(md5(#{pass}),'jsa')),'');")
+    Boolean addNewUser(@Param("name") String userName,@Param("pass") String userPass);
+
+    /**
+     * 删除指定用户
+     * @param userName
+     * @return
+     */
+    @Delete("DELETE FROM `user_tb` WHERE user_name=#{name};")
+    Boolean delUser(@Param("name") String userName);
 }

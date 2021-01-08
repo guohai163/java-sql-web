@@ -32,13 +32,8 @@ public class HomeController {
     @ResponseBody
     @RequestMapping(value = "/version")
     public Result<String > version(){
-        LOG.info(version);
         return new Result<>(true,"", version) ;
     }
 
-    @RequestMapping(value = "/stat")
-    @ResponseBody
-    public Object druidStat(){
-        return DruidStatManagerFacade.getInstance().getDataSourceStatDataList();
-    }
+
 }

@@ -11,6 +11,10 @@ import lombok.Data;
 @Data
 public class UserBean {
     /**
+     * 用户编号
+     */
+    private Integer code;
+    /**
      * 用户名
      */
     private String userName;
@@ -42,4 +46,9 @@ public class UserBean {
      * 一次密码
      */
     private String otpPass;
+
+    @Override
+    public String toString(){
+        return String.format("user:%s",userName);
+    }
 }

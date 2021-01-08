@@ -20,16 +20,25 @@ public class DBOperationFactory {
      */
     private static final String MSSQL = "mssql";
 
-    private static final String MYSQL_P = "mysqlp";
+    /**
+     *
+     */
+    private static final String ORACLE = "oracle";
+    /**
+     * 微软数据库的加强版本
+     */
+    private static final String MSSQL_BASE ="mssql_base";
 
     public static DBOperation createDbOperation(ConnectConfigBean conn) throws Exception {
         DBOperation operation = null;
         if(MYSQL.equals(conn.getDbServerType())) {
             operation = new DBOperationMysql(conn);
         } else if(MSSQL.equals(conn.getDbServerType())) {
-            operation = new DBOperationMssql(conn);
-        }else if(MYSQL_P.equals(conn.getDbServerType())) {
+            operation = new DBOperationMssqlDruid(conn);
+        }else if(ORACLE.equals(conn.getDbServerType())) {
             operation = new DBOperationOracle(conn);
+        }else if(MSSQL_BASE.equals(conn.getDbServerType())) {
+            operation = new DBOperationMssql(conn);
         }
         return operation;
     }

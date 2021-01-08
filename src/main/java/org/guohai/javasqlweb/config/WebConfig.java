@@ -22,8 +22,4 @@ public class WebConfig implements WebMvcConfigurer {
         WebMvcConfigurer.super.addInterceptors(registry);
     }
 
-//    @Bean
-//    public AuthenticationInterceptor authenticationInterceptor() {
-//        return new AuthenticationInterceptor();
-//    }
 }

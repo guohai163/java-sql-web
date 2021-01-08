@@ -15,6 +15,7 @@ import java.util.List;
  * 数据基础控制器
  * @author guohai
  */
+@LoginRequired
 @RestController
 @RequestMapping(value = "/database")
 @CrossOrigin
@@ -24,7 +25,7 @@ public class BaseDataController {
     @Autowired
     BaseDataService baseDataService;
 
-    @LoginRequired
+
     @ResponseBody
     @RequestMapping(value = "/serverlist")
     public Result<List<ConnectConfigBean>> getAllConnect(){

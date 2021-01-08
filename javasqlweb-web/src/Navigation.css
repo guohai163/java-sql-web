@@ -61,8 +61,8 @@
 #navigation_tree_content {
     width: 98%;
     position: absolute;
-    overflow: hidden;
-    overflow-y: auto;
+    overflow: auto;
+    /* overflow-y: auto; */
 }
 .navigation_server {
 

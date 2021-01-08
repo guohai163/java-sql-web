@@ -57,8 +57,12 @@ class PageContent extends React.Component {
                 const client = new FetchHttpClient(config.serverDomain);
                 client.addMiddleware(json());
                 client.get('/database/serverinfo/'+data.selectServer,{headers:{'User-Token': this.state.token}}).then( response => {
-                    let sql = 'mssql' === response.jsonData.data.dbServerType ? 'SELECT top 100 * FROM [' + data.selectTable +']' : 'SELECT * FROM `'+data.selectDatabase+'`.`'+data.selectTable + '` limit 100'
-
+                    let sql = '';
+                    if('mssql' === response.jsonData.data.dbServerType || 'mssql_druid' === response.jsonData.data.dbServerType){
+                        sql = 'SELECT top 100 * FROM [' + data.selectTable +']';
+                    }else if('mysql' === response.jsonData.data.dbServerType){
+                        sql = 'SELECT * FROM `'+data.selectDatabase+'`.`'+data.selectTable + '` limit 100';
+                    }
                     this.setState({
                         selectServer: data.selectServer,
                         selectDatabase: data.selectDatabase,

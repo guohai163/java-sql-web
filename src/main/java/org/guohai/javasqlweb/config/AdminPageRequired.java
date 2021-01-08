@@ -6,10 +6,11 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * 登录验证注解
+ * 管理后台使用注解
  * @author guohai
+ * @date 2021-1-1
  */
 @Target({ElementType.TYPE, ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
-public @interface LoginRequired {
+public @interface AdminPageRequired {
 }

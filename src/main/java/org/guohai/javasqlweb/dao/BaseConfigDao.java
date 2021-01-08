@@ -1,5 +1,6 @@
 package org.guohai.javasqlweb.dao;
 
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -70,4 +71,44 @@ public interface BaseConfigDao {
             "'*' as `db_server_password`,`db_server_type`,`create_time`\n" +
             "FROM `db_connect_config_tb`;")
     List<ConnectConfigBean> getConnData();
+
+    /**
+     * 获得指定name的连接属性
+     * @param name
+     * @return
+     */
+    @Select("SELECT * FROM db_connect_config_tb WHERE db_server_name=#{name}")
+    ConnectConfigBean getConnectConfigByName(@Param("name") String name);
+
+    /**
+     * 删除指定CODE指服务器
+     * @param code
+     * @return
+     */
+    @Delete("DELETE FROM `db_connect_config_tb`" +
+            "WHERE code=#{code};")
+    Boolean delServerByCode(@Param("code") Integer code);
+
+    /**
+     * 增加服务器
+     * @param server
+     * @return
+     */
+    @Insert("INSERT INTO `db_connect_config_tb`\n" +
+            "(`db_server_name`,\n" +
+            "`db_server_host`,\n" +
+            "`db_server_port`,\n" +
+            "`db_server_username`,\n" +
+            "`db_server_password`,\n" +
+            "`db_server_type`,\n" +
+            "`create_time`)\n" +
+            "VALUES\n" +
+            "(#{server.dbServerName},\n" +
+            "#{server.dbServerHost},\n" +
+            "#{server.dbServerPort},\n" +
+            "#{server.dbServerUsername},\n" +
+            "#{server.dbServerPassword},\n" +
+            "#{server.dbServerType},\n" +
+            "now());")
+    Boolean addConnServer(@Param("server") ConnectConfigBean server);
 }

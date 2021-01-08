@@ -51,9 +51,7 @@ class Login extends React.Component {
                     });
                 }
                 else if(response.jsonData.status){
-                    //
-                    // cookie.save('token', response.jsonData.data.token, {path: '/'})
-                    // this.props.history.push('/');
+
                     if('BINDING' === response.jsonData.data.authStatus){
                         this.setState({
                             authSecret: response.jsonData.data.authSecret,

@@ -34,7 +34,7 @@ public class UserServiceImpl implements UserService {
      */
     @Override
     public Result<UserBean> login(String name, String pass) {
-        UserBean user = userDao.getUserByName(name,pass);
+        UserBean user = userDao.checkUserNamePass(name,pass);
         if(null == user){
             // 登录失败
             return new Result<>(false,"登录失败",null);

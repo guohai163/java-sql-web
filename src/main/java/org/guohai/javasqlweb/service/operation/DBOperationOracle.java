@@ -136,6 +136,12 @@ public class DBOperationOracle implements DBOperation  {
         LOG.info(String.format("目前%s的连接数%d", connConfigName,activeCount));
     }
 
+    /**
+     * 关闭连接
+     * @param resultSet
+     * @param statement
+     * @param connection
+     */
     private void closeResource(ResultSet resultSet, Statement statement, Connection connection){
         try {
             if (resultSet != null) {
@@ -147,8 +153,8 @@ public class DBOperationOracle implements DBOperation  {
             if(null != connection){
                 connection.close();
             }
-        } catch (SQLException throwables) {
-            throwables.printStackTrace();
+        } catch (SQLException throwable) {
+            throwable.printStackTrace();
         }
 
     }
