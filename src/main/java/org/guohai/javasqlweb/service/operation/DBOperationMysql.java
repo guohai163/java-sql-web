@@ -196,7 +196,7 @@ public class DBOperationMysql implements DBOperation {
      * @return
      */
     @Override
-    public Object queryDatabaseBySql(String dbName, String sql) throws SQLException {
+    public Object[] queryDatabaseBySql(String dbName, String sql) throws SQLException {
         List<Map<String, Object>> listData = new ArrayList<>();
         // TODO: 缺少SQL检查
         Statement st = sqlConn.createStatement();
@@ -221,7 +221,7 @@ public class DBOperationMysql implements DBOperation {
         if (st != null) {
             st.close();
         }
-        return listData;
+        return null;
     }
 
 

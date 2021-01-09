@@ -1,42 +1,45 @@
 package org.guohai.javasqlweb.service.operation;
 
-import com.alibaba.druid.pool.DruidDataSource;
 import com.alibaba.druid.pool.DruidDataSourceFactory;
 import org.guohai.javasqlweb.beans.*;
-import org.guohai.javasqlweb.controller.BaseDataController;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
-import java.sql.Connection;
-import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
-/**
- * oracle库操作类
- * @author guohai
- * @date 2021-1-1
- */
-public class DBOperationOracle implements DBOperation  {
+public class DbOperationMysqlDruid implements DBOperation{
 
-    private static final Logger LOG  = LoggerFactory.getLogger(DBOperationOracle.class);
+    /**
+     * 日志
+     */
+    private static final Logger LOG  = LoggerFactory.getLogger(DbOperationMysqlDruid.class);
 
-    private static DataSource sqlDs;
+    /**
+     * 数据源
+     */
+    private DataSource sqlDs;
 
-    private String  connConfigName;
+    /**
+     * 构造方法
+     * @param conn
+     * @throws Exception
+     */
+    DbOperationMysqlDruid(ConnectConfigBean conn) throws Exception {
 
-    DBOperationOracle(ConnectConfigBean conn) throws Exception {
-        connConfigName = conn.getDbServerName();
         Map dbConfig = new HashMap();
-        dbConfig.put("url",String.format("jdbc:mysql://%s:%s",conn.getDbServerHost(),conn.getDbServerPort()));
+        dbConfig.put("url",String.format("jdbc:mysql://%s:%s?useUnicode=true&characterEncoding=UTF-8",
+                conn.getDbServerHost(),conn.getDbServerPort()));
         dbConfig.put("username",conn.getDbServerUsername());
         dbConfig.put("password",conn.getDbServerPassword());
-        dbConfig.put("initialSize","5");
-        dbConfig.put("validationQuery","SELECT now();");
+        dbConfig.put("initialSize","2");
+        dbConfig.put("validationQuery","select now()");
         sqlDs = DruidDataSourceFactory.createDataSource(dbConfig);
     }
+
     /**
      * 获得实例服务器库列表
      *
@@ -46,9 +49,7 @@ public class DBOperationOracle implements DBOperation  {
      */
     @Override
     public List<DatabaseNameBean> getDbList() throws SQLException, ClassNotFoundException {
-        List<DatabaseNameBean> listDnb = new ArrayList<>();
-
-        return listDnb;
+        return null;
     }
 
     /**
@@ -126,11 +127,4 @@ public class DBOperationOracle implements DBOperation  {
     public Object[] queryDatabaseBySql(String dbName, String sql) throws SQLException {
         return null;
     }
-
-    private void getActiveCount(){
-        DruidDataSource drs = (DruidDataSource) sqlDs;
-        int activeCount = drs.getActiveCount();
-        LOG.info(String.format("目前%s的连接数%d", connConfigName,activeCount));
-    }
-
 }

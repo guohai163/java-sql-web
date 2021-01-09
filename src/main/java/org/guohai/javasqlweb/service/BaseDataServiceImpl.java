@@ -205,7 +205,10 @@ public class BaseDataServiceImpl implements BaseDataService{
         if(null != operation){
             try{
                 baseConfigDao.saveQueryLog(user.getUserName(),dbName,sql, userIp,new Date());
-                return new Result<>(true,"", operation.queryDatabaseBySql(dbName, sql));
+                Object[] result = operation.queryDatabaseBySql(dbName, sql);
+                return new Result<>(true,
+                        Integer.parseInt(result[0].toString())>Integer.parseInt(result[1].toString())?String.format("实际"):"",
+                        result[2]);
             } catch (Exception e) {
                 e.printStackTrace();
                 return new Result<>(false,e.getMessage(),null);

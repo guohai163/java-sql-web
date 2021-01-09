@@ -32,17 +32,12 @@ public class DBOperationMssqlDruid implements DBOperation {
     private DataSource sqlDs;
 
     /**
-     * 当前连接数据库名
-     */
-    private String  connConfigName;
-
-    /**
      * 构造方法
      * @param conn
      * @throws Exception
      */
     DBOperationMssqlDruid(ConnectConfigBean conn) throws Exception {
-        connConfigName = conn.getDbServerName();
+
         Map dbConfig = new HashMap();
         dbConfig.put("url",String.format("jdbc:sqlserver://%s:%s",conn.getDbServerHost(),conn.getDbServerPort()));
         dbConfig.put("username",conn.getDbServerUsername());
@@ -197,7 +192,8 @@ public class DBOperationMssqlDruid implements DBOperation {
      * @throws SQLException 抛出异常
      */
     @Override
-    public Object queryDatabaseBySql(String dbName, String sql) throws SQLException {
+    public Object[] queryDatabaseBySql(String dbName, String sql) throws SQLException {
+        Object[] result = new Object[3];
         List<Map<String, Object>> listData = new ArrayList<>();
         Connection conn = sqlDs.getConnection();
         Statement st = conn.createStatement();
@@ -207,6 +203,7 @@ public class DBOperationMssqlDruid implements DBOperation {
         java.sql.ResultSetMetaData md = rs.getMetaData();
         // 获得列数
         int columnCount = md.getColumnCount();
+
         int dataCount = 0;
         while (rs.next()){
             if(dataCount>DB_LIMIT){
@@ -221,8 +218,12 @@ public class DBOperationMssqlDruid implements DBOperation {
             }
             listData.add(rowData);
         }
+        rs.last();
+        result[0] = rs.getRow();
+        result[1] = listData.size();
+        result[2] = listData;
         closeResource(rs,st,conn);
-        return listData;
+        return result;
     }
 
     /**

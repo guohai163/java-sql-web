@@ -68,5 +68,5 @@ public interface DBOperation {
      * @return
      * @throws SQLException 抛出异常
      */
-    Object queryDatabaseBySql(String dbName, String sql) throws SQLException;
+     Object[] queryDatabaseBySql(String dbName, String sql) throws SQLException;
 }
