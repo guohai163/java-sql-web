@@ -6,6 +6,7 @@ import org.guohai.javasqlweb.dao.BaseConfigDao;
 import org.guohai.javasqlweb.service.operation.DbOperation;
 import org.guohai.javasqlweb.service.operation.DbOperationFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.Date;
@@ -27,6 +28,8 @@ public class BaseDataServiceImpl implements BaseDataService{
     @Autowired
     UserManageDao adminDao;
 
+    @Value("${project.limit}")
+    private Integer limit;
     /**
      * 服务器实例集合
      */
@@ -205,7 +208,7 @@ public class BaseDataServiceImpl implements BaseDataService{
         if(null != operation){
             try{
                 baseConfigDao.saveQueryLog(user.getUserName(),dbName,sql, userIp,new Date());
-                Object[] result = operation.queryDatabaseBySql(dbName, sql);
+                Object[] result = operation.queryDatabaseBySql(dbName, sql, limit);
                 String returnResult = Integer.parseInt(result[0].toString())>Integer.parseInt(result[1].toString())?
                         String.format("实际数据条数为%s，因程序限制只显示%s条数据",result[0].toString(),result[1].toString()):
                         "";

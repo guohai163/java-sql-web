@@ -193,10 +193,11 @@ public class DbOperationMysql implements DbOperation {
      *
      * @param dbName
      * @param sql
+     * @param limit
      * @return
      */
     @Override
-    public Object[] queryDatabaseBySql(String dbName, String sql) throws SQLException {
+    public Object[] queryDatabaseBySql(String dbName, String sql, Integer limit) throws SQLException {
         List<Map<String, Object>> listData = new ArrayList<>();
         // TODO: 缺少SQL检查
         Statement st = sqlConn.createStatement();

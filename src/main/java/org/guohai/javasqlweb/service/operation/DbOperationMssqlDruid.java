@@ -12,7 +12,6 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.*;
 
-import static org.guohai.javasqlweb.config.ConstantUtils.DB_LIMIT;
 import static org.guohai.javasqlweb.util.Utils.closeResource;
 
 /**
@@ -31,6 +30,7 @@ public class DbOperationMssqlDruid implements DbOperation {
      * 数据源
      */
     private DataSource sqlDs;
+
 
     /**
      * 构造方法
@@ -189,11 +189,12 @@ public class DbOperationMssqlDruid implements DbOperation {
      *
      * @param dbName
      * @param sql
+     * @param limit
      * @return
      * @throws SQLException 抛出异常
      */
     @Override
-    public Object[] queryDatabaseBySql(String dbName, String sql) throws SQLException {
+    public Object[] queryDatabaseBySql(String dbName, String sql, Integer limit) throws SQLException {
         Object[] result = new Object[3];
         List<Map<String, Object>> listData = new ArrayList<>();
         Connection conn = sqlDs.getConnection();
@@ -209,7 +210,7 @@ public class DbOperationMssqlDruid implements DbOperation {
         rs.beforeFirst();
         int dataCount = 1;
         while (rs.next()){
-            if(dataCount>DB_LIMIT){
+            if(dataCount>limit){
                 break;
             }
             dataCount++;

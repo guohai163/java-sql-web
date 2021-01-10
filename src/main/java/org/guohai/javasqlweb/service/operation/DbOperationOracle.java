@@ -115,11 +115,12 @@ public class DbOperationOracle implements DbOperation {
      *
      * @param dbName
      * @param sql
+     * @param limit
      * @return
      * @throws SQLException 抛出异常
      */
     @Override
-    public Object[] queryDatabaseBySql(String dbName, String sql) throws SQLException {
+    public Object[] queryDatabaseBySql(String dbName, String sql, Integer limit) throws SQLException {
         return null;
     }
 

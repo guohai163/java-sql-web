@@ -65,8 +65,9 @@ public interface DbOperation {
      * 执行查询的SQL
      * @param dbName
      * @param sql
+     * @param limit
      * @return
      * @throws SQLException 抛出异常
      */
-     Object[] queryDatabaseBySql(String dbName, String sql) throws SQLException;
+     Object[] queryDatabaseBySql(String dbName, String sql, Integer limit) throws SQLException;
 }
