@@ -9,7 +9,7 @@ import java.util.List;
  * 单例工厂的抽象接口
  * @author guohai
  */
-public interface DBOperation {
+public interface DbOperation {
 
     /**
      * 获得实例服务器库列表

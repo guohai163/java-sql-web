@@ -13,7 +13,7 @@ import java.util.Map;
  * @author guohai
  * @date 2020-12-1
  */
-public class DBOperationMysql implements DBOperation {
+public class DbOperationMysql implements DbOperation {
 
     //region 私有变量区
     /**
@@ -48,7 +48,7 @@ public class DBOperationMysql implements DBOperation {
      * @throws ClassNotFoundException
      * @throws SQLException
      */
-    DBOperationMysql(ConnectConfigBean conn) throws ClassNotFoundException, SQLException {
+    DbOperationMysql(ConnectConfigBean conn) throws ClassNotFoundException, SQLException {
         connectConfigBean = conn;
         sqlUrl = String.format("jdbc:mysql://%s:%s?useUnicode=true&characterEncoding=UTF-8",conn.getDbServerHost(),conn.getDbServerPort());
         Class.forName(DB_DRIVER);

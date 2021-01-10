@@ -3,8 +3,8 @@ package org.guohai.javasqlweb.service;
 import org.guohai.javasqlweb.beans.*;
 import org.guohai.javasqlweb.dao.UserManageDao;
 import org.guohai.javasqlweb.dao.BaseConfigDao;
-import org.guohai.javasqlweb.service.operation.DBOperation;
-import org.guohai.javasqlweb.service.operation.DBOperationFactory;
+import org.guohai.javasqlweb.service.operation.DbOperation;
+import org.guohai.javasqlweb.service.operation.DbOperationFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -30,7 +30,7 @@ public class BaseDataServiceImpl implements BaseDataService{
     /**
      * 服务器实例集合
      */
-    private static Map<Integer,DBOperation> operationMap = new HashMap<>();
+    private static Map<Integer, DbOperation> operationMap = new HashMap<>();
 
     @Override
     public Result<List<ConnectConfigBean>> getAllDataConnect() {
@@ -59,7 +59,7 @@ public class BaseDataServiceImpl implements BaseDataService{
     @Override
     public Result<List<DatabaseNameBean>> getDbName(Integer serverCode) {
 
-        DBOperation operation = createDbOperation(serverCode);
+        DbOperation operation = createDbOperation(serverCode);
         if(null != operation){
             try{
                 return new Result<>(true,"", operation.getDbList());
@@ -82,7 +82,7 @@ public class BaseDataServiceImpl implements BaseDataService{
      */
     @Override
     public Result<List<TablesNameBean>> getTableList(Integer serverCode, String dbName) {
-        DBOperation operation = createDbOperation(serverCode);
+        DbOperation operation = createDbOperation(serverCode);
         if(null != operation){
             try{
                 return new Result<>(true,"", operation.getTableList(dbName));
@@ -105,7 +105,7 @@ public class BaseDataServiceImpl implements BaseDataService{
     @Override
     public Result<List<ColumnsNameBean>> getColumnList(Integer serverCode, String dbName, String tableName) {
         
-        DBOperation operation = createDbOperation(serverCode);
+        DbOperation operation = createDbOperation(serverCode);
         if(null != operation){
             try{
                 return new Result<>(true,"", operation.getColumnsList(dbName, tableName));
@@ -128,7 +128,7 @@ public class BaseDataServiceImpl implements BaseDataService{
      */
     @Override
     public Result<List<TableIndexesBean>> getTableIndexes(Integer serverCode, String dbName, String tableName) {
-        DBOperation operation = createDbOperation(serverCode);
+        DbOperation operation = createDbOperation(serverCode);
         if(null != operation){
             try{
                 return new Result<>(true,"", operation.getIndexesList(dbName, tableName));
@@ -150,7 +150,7 @@ public class BaseDataServiceImpl implements BaseDataService{
      */
     @Override
     public Result<List<StoredProceduresBean>> getSpList(Integer serverCode, String dbName) {
-        DBOperation operation = createDbOperation(serverCode);
+        DbOperation operation = createDbOperation(serverCode);
         if(null != operation){
             try{
                 return new Result<>(true,"", operation.getStoredProceduresList(dbName));
@@ -173,7 +173,7 @@ public class BaseDataServiceImpl implements BaseDataService{
      */
     @Override
     public Result<StoredProceduresBean> getSpByName(Integer serverCode, String dbName, String spName) {
-        DBOperation operation = createDbOperation(serverCode);
+        DbOperation operation = createDbOperation(serverCode);
         if(null != operation){
             try{
                 return new Result<>(true,"", operation.getStoredProcedure(dbName, spName));
@@ -201,14 +201,15 @@ public class BaseDataServiceImpl implements BaseDataService{
         if(null == user){
             return new Result<>(false,"",null);
         }
-        DBOperation operation = createDbOperation(serverCode);
+        DbOperation operation = createDbOperation(serverCode);
         if(null != operation){
             try{
                 baseConfigDao.saveQueryLog(user.getUserName(),dbName,sql, userIp,new Date());
                 Object[] result = operation.queryDatabaseBySql(dbName, sql);
-                return new Result<>(true,
-                        Integer.parseInt(result[0].toString())>Integer.parseInt(result[1].toString())?String.format("实际"):"",
-                        result[2]);
+                String returnResult = Integer.parseInt(result[0].toString())>Integer.parseInt(result[1].toString())?
+                        String.format("实际数据条数为%s，因程序限制只显示%s条数据",result[0].toString(),result[1].toString()):
+                        "";
+                return new Result<>(true, returnResult, result[2]);
             } catch (Exception e) {
                 e.printStackTrace();
                 return new Result<>(false,e.getMessage(),null);
@@ -223,14 +224,14 @@ public class BaseDataServiceImpl implements BaseDataService{
      * @param serverCode
      * @return
      */
-    private DBOperation createDbOperation(Integer serverCode){
-        DBOperation dbOperation = operationMap.get(serverCode);
+    private DbOperation createDbOperation(Integer serverCode){
+        DbOperation dbOperation = operationMap.get(serverCode);
         if(null == dbOperation){
             synchronized (BaseDataServiceImpl.class) {
                 if(null == operationMap.get(serverCode)){
                     ConnectConfigBean connConfigBean = baseConfigDao.getConnectConfig(serverCode);
                     try{
-                        dbOperation = DBOperationFactory.createDbOperation(connConfigBean);
+                        dbOperation = DbOperationFactory.createDbOperation(connConfigBean);
                         operationMap.put(serverCode,dbOperation);
                     } catch (Exception e){
                         e.printStackTrace();

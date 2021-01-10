@@ -2,13 +2,11 @@ package org.guohai.javasqlweb.service.operation;
 
 import org.guohai.javasqlweb.beans.ConnectConfigBean;
 
-import java.sql.SQLException;
-
 /**
  * 数据库操作工厂类
  * @author guohai
  */
-public class DBOperationFactory {
+public class DbOperationFactory {
 
     /**
      * MYSQL常量
@@ -26,14 +24,14 @@ public class DBOperationFactory {
     private static final String ORACLE = "oracle";
 
 
-    public static DBOperation createDbOperation(ConnectConfigBean conn) throws Exception {
-        DBOperation operation = null;
+    public static DbOperation createDbOperation(ConnectConfigBean conn) throws Exception {
+        DbOperation operation = null;
         if(MYSQL.equals(conn.getDbServerType())) {
-            operation = new DBOperationMysql(conn);
+            operation = new DbOperationMysqlDruid(conn);
         } else if(MSSQL.equals(conn.getDbServerType())) {
-            operation = new DBOperationMssqlDruid(conn);
+            operation = new DbOperationMssqlDruid(conn);
         }else if(ORACLE.equals(conn.getDbServerType())) {
-            operation = new DBOperationOracle(conn);
+            operation = new DbOperationOracle(conn);
         }
         return operation;
     }

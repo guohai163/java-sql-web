@@ -27,6 +27,7 @@ mybatis:
     map-underscore-to-camel-case: true
 project:
   version: 0.4.31
+  limit: 10000
 logging:
   level:
     org:

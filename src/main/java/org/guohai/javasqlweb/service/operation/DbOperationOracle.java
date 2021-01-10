@@ -3,15 +3,11 @@ package org.guohai.javasqlweb.service.operation;
 import com.alibaba.druid.pool.DruidDataSource;
 import com.alibaba.druid.pool.DruidDataSourceFactory;
 import org.guohai.javasqlweb.beans.*;
-import org.guohai.javasqlweb.controller.BaseDataController;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
-import java.sql.Connection;
-import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.*;
 
 /**
@@ -19,15 +15,15 @@ import java.util.*;
  * @author guohai
  * @date 2021-1-1
  */
-public class DBOperationOracle implements DBOperation  {
+public class DbOperationOracle implements DbOperation {
 
-    private static final Logger LOG  = LoggerFactory.getLogger(DBOperationOracle.class);
+    private static final Logger LOG  = LoggerFactory.getLogger(DbOperationOracle.class);
 
     private static DataSource sqlDs;
 
     private String  connConfigName;
 
-    DBOperationOracle(ConnectConfigBean conn) throws Exception {
+    DbOperationOracle(ConnectConfigBean conn) throws Exception {
         connConfigName = conn.getDbServerName();
         Map dbConfig = new HashMap();
         dbConfig.put("url",String.format("jdbc:mysql://%s:%s",conn.getDbServerHost(),conn.getDbServerPort()));

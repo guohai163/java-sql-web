@@ -13,18 +13,19 @@ import java.sql.Statement;
 import java.util.*;
 
 import static org.guohai.javasqlweb.config.ConstantUtils.DB_LIMIT;
+import static org.guohai.javasqlweb.util.Utils.closeResource;
 
 /**
  * 基于alibaba druid连接池的mysql实现类
  * @author guohai
  * @date 2021-1-5
  */
-public class DBOperationMssqlDruid implements DBOperation {
+public class DbOperationMssqlDruid implements DbOperation {
 
     /**
      * 日志
      */
-    private static final Logger LOG  = LoggerFactory.getLogger(DBOperationMssqlDruid.class);
+    private static final Logger LOG  = LoggerFactory.getLogger(DbOperationMssqlDruid.class);
 
     /**
      * 数据源
@@ -36,7 +37,7 @@ public class DBOperationMssqlDruid implements DBOperation {
      * @param conn
      * @throws Exception
      */
-    DBOperationMssqlDruid(ConnectConfigBean conn) throws Exception {
+    DbOperationMssqlDruid(ConnectConfigBean conn) throws Exception {
 
         Map dbConfig = new HashMap();
         dbConfig.put("url",String.format("jdbc:sqlserver://%s:%s",conn.getDbServerHost(),conn.getDbServerPort()));
@@ -196,15 +197,17 @@ public class DBOperationMssqlDruid implements DBOperation {
         Object[] result = new Object[3];
         List<Map<String, Object>> listData = new ArrayList<>();
         Connection conn = sqlDs.getConnection();
-        Statement st = conn.createStatement();
+        Statement st = conn.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE,ResultSet.CONCUR_READ_ONLY);
         ResultSet rs = st.executeQuery(String.format("use [%s];" +
                 "%s;", dbName, sql));
         // 获得结果集结构信息,元数据
         java.sql.ResultSetMetaData md = rs.getMetaData();
         // 获得列数
         int columnCount = md.getColumnCount();
-
-        int dataCount = 0;
+        rs.last();
+        result[0] = rs.getRow();
+        rs.beforeFirst();
+        int dataCount = 1;
         while (rs.next()){
             if(dataCount>DB_LIMIT){
                 break;
@@ -218,34 +221,11 @@ public class DBOperationMssqlDruid implements DBOperation {
             }
             listData.add(rowData);
         }
-        rs.last();
-        result[0] = rs.getRow();
+
         result[1] = listData.size();
         result[2] = listData;
         closeResource(rs,st,conn);
         return result;
     }
 
-    /**
-     * 关闭连接，释放连接回连接池
-     * @param resultSet
-     * @param statement
-     * @param connection
-     */
-    private void closeResource(ResultSet resultSet, Statement statement, Connection connection){
-        try {
-            if (resultSet != null) {
-                resultSet.close();
-            }
-            if (statement != null) {
-                statement.close();
-            }
-            if(null != connection){
-                connection.close();
-            }
-        } catch (SQLException throwable) {
-            throwable.printStackTrace();
-        }
-
-    }
 }

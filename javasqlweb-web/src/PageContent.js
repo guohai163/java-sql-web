@@ -173,6 +173,13 @@ class PageContent extends React.Component {
                         onCancel(){                        }
                     });
                 }
+                if('' !== response.jsonData.message){
+                    confirm({
+                        title:'提示',
+                        content: response.jsonData.message,
+                        onOk(){},
+                    });
+                }
                 this.setState({
                     queryResult: response.jsonData.data
                 })
