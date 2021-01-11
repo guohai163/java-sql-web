@@ -210,6 +210,31 @@ class Admin extends React.Component {
                 }
             })
     }
+    unbindOtp(user){
+        const client = new FetchHttpClient(config.serverDomain);
+        client.addMiddleware(json());
+        client.post('/api/backstage/unbind_opt',{headers: { 'Content-Type': 'application/json','User-Token': this.state.token },
+                body:JSON.stringify({userName: user})})
+            .then(response => {
+                if(true === response.jsonData.status){
+                    confirm({
+                        title:'提示',
+                        content: '用户otp解绑成功',
+                        onOk(){},
+                        onCancel(){}
+                    });
+                    this.menuClick({'key':'2'});
+                }
+                else{
+                    confirm({
+                        title:'提示',
+                        content: response.jsonData.data,
+                        onOk(){                        },
+                        onCancel(){                        }
+                    });
+                }
+            })
+    }
     serverDeleteBtn(serverCode){
         const client = new FetchHttpClient(config.serverDomain);
         client.addMiddleware(json());
@@ -245,7 +270,7 @@ class Admin extends React.Component {
                                 {title:'用户名', dataIndex:'dbServerUsername'},
                                 {title:'服务器类型', dataIndex:'dbServerType'},
                                 {title:'创建时间', dataIndex:'createTime'},
-                                {title:'操作', render: (text, record) => (<Space size="middle"><a onClick={this.serverDeleteBtn.bind(this,record.code)}>Delete</a></Space>)}];
+                                {title:'操作', render: (text, record) => (<Space size="middle"><a onClick={this.serverDeleteBtn.bind(this,record.code)}>删除</a></Space>)}];
         const druidColumns = [{title: '连接名', dataIndex:'Name'},
                                 {title: '连接地址', dataIndex:'URL'},
                               {title: '数据库类型', dataIndex:'DbType'},
@@ -255,7 +280,8 @@ class Admin extends React.Component {
         const userListColumns = [{title:'编号', dataIndex: 'code'},
                                 {title:'用户名',dataIndex: 'userName'},
                                 {title:'二次验证绑定',dataIndex: 'authStatus'},
-                                {title:'操作', render: (text, record) => (<Space size="middle"><a onClick={this.userDeleteBtn.bind(this,record.userName)}>Delete</a></Space>)}]
+                                {title:'操作', render: (text, record) => (<Space size="middle"><a onClick={this.userDeleteBtn.bind(this,record.userName)}>删除</a>
+                                    <a onClick={this.unbindOtp.bind(this,record.userName)}>解绑OTP</a></Space>)}]
         let {configVisible,confirmLoading,userAddVisible} = this.state;
         return (
             <>

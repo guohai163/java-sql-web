@@ -124,4 +124,12 @@ public interface UserManageDao {
      */
     @Update("UPDATE user_tb SET pass_word=md5(CONCAT(md5(#{newpass}),'jsa')) WHERE token=#{token}")
     Boolean changeUserPassword(@Param("token") String token, @Param("newpass") String newPass);
+
+    /**
+     * 管理员为用户解绑OTP
+     * @param userName
+     * @return
+     */
+    @Update("UPDATE user_tb SET auth_secret='',auth_status='UNBIND' WHERE user_name=#{name};")
+    Boolean unbindUserOtp(@Param("name") String userName);
 }

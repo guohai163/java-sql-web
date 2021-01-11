@@ -74,4 +74,11 @@ public interface BackstageService {
      * @return
      */
     Result<String> changeUserPass(String token, String newPass);
+
+    /**
+     * 管理员为用户解绑OTP
+     * @param userName
+     * @return
+     */
+    Result<String> unbindUserOtp(String userName);
 }

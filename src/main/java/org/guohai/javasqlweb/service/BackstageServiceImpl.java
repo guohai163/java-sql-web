@@ -145,4 +145,19 @@ public class BackstageServiceImpl implements BackstageService{
         userDao.changeUserPassword(token, newPass);
         return new Result<>(true, "","密码修改成功");
     }
+
+    /**
+     * 管理员为用户解绑OTP
+     *
+     * @param userName
+     * @return
+     */
+    @Override
+    public Result<String> unbindUserOtp(String userName) {
+        if(null == userDao.getUserByName(userName)){
+            return new Result<>(false, "","用户不存在" ) ;
+        }
+        userDao.unbindUserOtp(userName);
+        return new Result<>(true, "","解绑OTP成功");
+    }
 }

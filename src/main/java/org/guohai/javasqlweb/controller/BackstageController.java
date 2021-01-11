@@ -141,4 +141,15 @@ public class BackstageController {
         LOG.debug(String.format("将为用户token为%s的修改密码", token));
         return backstageService.changeUserPass(token,newPass);
     }
+
+    /**
+     * 为指定用户解绑OTP
+     * @param userName
+     * @return
+     */
+    @ResponseBody
+    @RequestMapping(value = "/unbind_opt", method = RequestMethod.POST)
+    public Result<String> unbindUserOtp(@RequestBody String userName){
+        return backstageService.unbindUserOtp(userName);
+    }
 }

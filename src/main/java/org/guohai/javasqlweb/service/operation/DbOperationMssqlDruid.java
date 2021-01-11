@@ -154,7 +154,7 @@ public class DbOperationMssqlDruid implements DbOperation {
         Connection conn = sqlDs.getConnection();
         Statement st = conn.createStatement();
         ResultSet rs = st.executeQuery(String.format("use [%s];" +
-                "SELECT name FROM sysobjects WHERE type='P'", dbName));
+                "SELECT name FROM sysobjects WHERE type='P' ORDER BY name", dbName));
         while (rs.next()){
             listSp.add(new StoredProceduresBean(rs.getString("name")));
         }
