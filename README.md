@@ -38,10 +38,9 @@ open http://localhost
 
 1. 使用浏览器打开上一步容器安装的机器IP。默认用户名密码为admin/admin。点击登录
 ![login](./doc/pic/web-login.png)
-
 2. 为了保证系统的安全，首次登录我们需要绑定OTP动态码，可以点击下载安卓或iOS版本客户端。安装好后扫码即可得到6位的动态码。之后每次登录不用绑定但依然要输入6位动态码。
 ![otp-ui](./doc/pic/bind-otp.png)
-![otp-mobile](./doc/pic/opt.png)
+![otp-mobile](./doc/pic/otp.png)
 
 3. 进入主界面后我们先进入后台进行基本的设置管理。
 ![admin](./doc/pic/admin.png)
