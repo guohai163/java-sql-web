@@ -81,4 +81,12 @@ public interface BackstageService {
      * @return
      */
     Result<String> unbindUserOtp(String userName);
+
+    /**
+     * 更新服务器数据
+     * @param server
+     * @return
+     */
+    Result<String> updateServerData(ConnectConfigBean server);
+
 }

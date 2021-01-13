@@ -98,7 +98,9 @@ class Admin extends React.Component {
     connHandleOk(){
         const client = new FetchHttpClient(config.serverDomain);
         client.addMiddleware(json());
-        client.post('/api/backstage/addserver',{headers: { 'Content-Type': 'application/json','User-Token': this.state.token },
+        console.log(this.state.inputData.code)
+        if(undefined === this.state.inputData.code){
+            client.post('/api/backstage/addserver',{headers: { 'Content-Type': 'application/json','User-Token': this.state.token },
                 body:JSON.stringify(this.state.inputData)})
             .then(response => {
                 if(true === response.jsonData.status){
@@ -120,6 +122,32 @@ class Admin extends React.Component {
                     });
                 }
             })
+        }else{
+            console.log(this.state.inputData)
+            client.post('/api/backstage/update_server',{headers: { 'Content-Type': 'application/json','User-Token': this.state.token },
+                body:JSON.stringify(this.state.inputData)})
+            .then(response => {
+                if(true === response.jsonData.status){
+                    confirm({
+                        title:'提示',
+                        content: '服务器更新成功',
+                        onOk(){},
+                        onCancel(){}
+                    });
+                    this.setState({configVisible: false, inputData:{}})
+                    this.menuClick({'key':'3'});
+                }
+                else{
+                    confirm({
+                        title:'提示',
+                        content: response.jsonData.data,
+                        onOk(){                        },
+                        onCancel(){                        }
+                    });
+                }
+            })
+        }
+
     }
     userHandleOk(){
 
@@ -172,7 +200,8 @@ class Admin extends React.Component {
     connHandleCancel(){
         this.setState({
             configVisible: false,
-            userAddVisible: false
+            userAddVisible: false,
+            inputData: {}
         })
     }
     serverAddBtn(){
@@ -263,8 +292,8 @@ class Admin extends React.Component {
     showEditServerBtn(serverCode){
         console.log(serverCode)
         console.log(this.state.connList)
-        // this.state.spList.filter(item => item.procedureName.indexOf(parm.target.value) !== -1)
-        console.log(this.state.connList.filter(item => item.code === serverCode))
+        // this.state.spList.filter(item => item.procedureName.indexOf(parm.target.value) !== -1)this.state.inputData.dbServerType
+        console.log(this.state.connList.filter(item => item.code === serverCode)[0])
         this.setState({
             inputData: this.state.connList.filter(item => item.code === serverCode)[0],
             configVisible: true
@@ -374,22 +403,22 @@ class Admin extends React.Component {
                     >
                         <Form size="small" labelCol={{ span: 7 }}>
                             <Form.Item label="服务器名">
-                                <Input onChange={this.onInputChange.bind(this)} id="dbServerName"/>
+                                <Input onChange={this.onInputChange.bind(this)} id="dbServerName" value={this.state.inputData.dbServerName}/>
                             </Form.Item>
                             <Form.Item label="服务器地址">
-                                <Input onChange={this.onInputChange.bind(this)} id="dbServerHost"/>
+                                <Input onChange={this.onInputChange.bind(this)} id="dbServerHost" value={this.state.inputData.dbServerHost}/>
                             </Form.Item>
                             <Form.Item label="服务器端口">
-                                <InputNumber min={1} max={65535} onChange={this.onPortChange.bind(this)} id="dbServerPort"/>
+                                <InputNumber min={1} max={65535} onChange={this.onPortChange.bind(this)} id="dbServerPort" value={this.state.inputData.dbServerPort}/>
                             </Form.Item>
                             <Form.Item label="服务器用户名">
-                                <Input onChange={this.onInputChange.bind(this)} id="dbServerUsername"/>
+                                <Input onChange={this.onInputChange.bind(this)} id="dbServerUsername" value={this.state.inputData.dbServerUsername}/>
                             </Form.Item>
                             <Form.Item label="服务器密码">
-                                <Input.Password onChange={this.onInputChange.bind(this)} id="dbServerPassword"/>
+                                <Input.Password onChange={this.onInputChange.bind(this)} id="dbServerPassword" value={this.state.inputData.dbServerPassword}/>
                             </Form.Item>
                             <Form.Item label="服务器类型">
-                            <Select onChange={this.onSelectChange.bind(this)}>
+                            <Select onChange={this.onSelectChange.bind(this)} value={this.state.inputData.dbServerType} placeholder="Select a type">
                                 <Select.Option value="mssql">mssql</Select.Option>
                                 <Select.Option value="mysql">mysql</Select.Option>
                             </Select>

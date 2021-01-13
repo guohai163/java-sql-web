@@ -160,4 +160,19 @@ public class BackstageServiceImpl implements BackstageService{
         userDao.unbindUserOtp(userName);
         return new Result<>(true, "","解绑OTP成功");
     }
+
+    /**
+     * 更新服务器数据
+     *
+     * @param server
+     * @return
+     */
+    @Override
+    public Result<String> updateServerData(ConnectConfigBean server) {
+        if(null == baseConfigDao.getConnectConfigByCode(server.getCode())){
+            return new Result<>(false, "","服务器不存在" );
+        }
+        baseConfigDao.updateConnServer(server);
+        return new Result<>(true, "","修改成功");
+    }
 }

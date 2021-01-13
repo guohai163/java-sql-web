@@ -1,9 +1,6 @@
 package org.guohai.javasqlweb.dao;
 
-import org.apache.ibatis.annotations.Delete;
-import org.apache.ibatis.annotations.Insert;
-import org.apache.ibatis.annotations.Param;
-import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.*;
 import org.guohai.javasqlweb.beans.ConnectConfigBean;
 import org.guohai.javasqlweb.beans.QueryLogBean;
 import org.springframework.stereotype.Repository;
@@ -69,7 +66,7 @@ public interface BaseConfigDao {
      * @return
      */
     @Select("SELECT `code`,`db_server_name`,`db_server_host`,`db_server_port`,`db_server_username`,\n" +
-            "'*' as `db_server_password`,`db_server_type`,`create_time`\n" +
+            "'' as `db_server_password`,`db_server_type`,`create_time`\n" +
             "FROM `db_connect_config_tb`;")
     List<ConnectConfigBean> getConnData();
 
@@ -80,6 +77,14 @@ public interface BaseConfigDao {
      */
     @Select("SELECT * FROM db_connect_config_tb WHERE db_server_name=#{name}")
     ConnectConfigBean getConnectConfigByName(@Param("name") String name);
+
+    /**
+     * 获得指定code的连接属性
+     * @param code
+     * @return
+     */
+    @Select("SELECT * FROM db_connect_config_tb WHERE code=#{code}")
+    ConnectConfigBean getConnectConfigByCode(@Param("code") Integer code);
 
     /**
      * 删除指定CODE指服务器
@@ -112,4 +117,24 @@ public interface BaseConfigDao {
             "#{server.dbServerType},\n" +
             "now());")
     Boolean addConnServer(@Param("server") ConnectConfigBean server);
+
+    /**
+     * 更新服务器信息
+     * @param server
+     * @return
+     */
+    @Update("<script>" +
+            "UPDATE `db_connect_config_tb`\n" +
+            "SET\n" +
+            "`db_server_name` = #{server.dbServerName},\n" +
+            "`db_server_host` = #{server.dbServerHost},\n" +
+            "`db_server_port` = #{server.dbServerPort},\n" +
+            "`db_server_username` = #{server.dbServerUsername},\n" +
+            "<if test='server.dbServerPassword != null and server.dbServerPassword != \"\"'>" +
+            "`db_server_password` = #{server.dbServerPassword}," +
+            "</if>" +
+            "`db_server_type` = #{server.dbServerType}\n" +
+            "WHERE `code` = #{server.code};"+
+            "</script>")
+    Boolean updateConnServer(@Param("server")ConnectConfigBean server);
 }

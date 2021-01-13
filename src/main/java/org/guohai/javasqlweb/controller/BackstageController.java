@@ -152,4 +152,15 @@ public class BackstageController {
     public Result<String> unbindUserOtp(@RequestBody String userName){
         return backstageService.unbindUserOtp(userName);
     }
+
+    /**
+     * 更新服务器信息
+     * @param server
+     * @return
+     */
+    @ResponseBody
+    @RequestMapping(value = "/update_server", method = RequestMethod.POST)
+    public Result<String> updateServer(@RequestBody ConnectConfigBean server){
+        return backstageService.updateServerData(server);
+    }
 }
