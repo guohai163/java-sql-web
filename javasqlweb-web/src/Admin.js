@@ -260,6 +260,16 @@ class Admin extends React.Component {
                 }
             })
     }
+    showEditServerBtn(serverCode){
+        console.log(serverCode)
+        console.log(this.state.connList)
+        // this.state.spList.filter(item => item.procedureName.indexOf(parm.target.value) !== -1)
+        console.log(this.state.connList.filter(item => item.code === serverCode))
+        this.setState({
+            inputData: this.state.connList.filter(item => item.code === serverCode)[0],
+            configVisible: true
+        })
+    }
     render(){
         const queryLogColumns = [{title:'查询者IP', dataIndex:'queryIp'},{title:'查询者', dataIndex:'queryName'},{title:'查询数据库',dataIndex:'queryDatabase'},{title:'查询脚本', dataIndex:'querySqlscript'},
                                     {title:'查询时间', dataIndex:'queryTime'}];
@@ -270,7 +280,8 @@ class Admin extends React.Component {
                                 {title:'用户名', dataIndex:'dbServerUsername'},
                                 {title:'服务器类型', dataIndex:'dbServerType'},
                                 {title:'创建时间', dataIndex:'createTime'},
-                                {title:'操作', render: (text, record) => (<Space size="middle"><a onClick={this.serverDeleteBtn.bind(this,record.code)}>删除</a></Space>)}];
+                                {title:'操作', render: (text, record) => (<Space size="middle"><a onClick={this.showEditServerBtn.bind(this,record.code)}>编辑</a>
+                                    <a onClick={this.serverDeleteBtn.bind(this,record.code)}>删除</a></Space>)}];
         const druidColumns = [{title: '连接名', dataIndex:'Name'},
                                 {title: '连接地址', dataIndex:'URL'},
                               {title: '数据库类型', dataIndex:'DbType'},
