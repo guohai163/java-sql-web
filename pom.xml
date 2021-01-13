@@ -10,7 +10,7 @@
     </parent>
     <groupId>org.guohai</groupId>
     <artifactId>javasqlweb</artifactId>
-    <version>0.4.35</version>
+    <version>0.5.1</version>
     <name>javasqlweb</name>
     <description>java version db query tools</description>
 
@@ -53,7 +53,7 @@
         <dependency>
             <groupId>com.alibaba</groupId>
             <artifactId>druid-spring-boot-starter</artifactId>
-            <version>1.2.3</version>
+            <version>1.2.4</version>
         </dependency>
         <dependency>
             <groupId>org.mybatis.spring.boot</groupId>
