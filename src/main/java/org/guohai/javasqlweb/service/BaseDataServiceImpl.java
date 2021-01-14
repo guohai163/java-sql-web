@@ -5,10 +5,14 @@ import org.guohai.javasqlweb.dao.UserManageDao;
 import org.guohai.javasqlweb.dao.BaseConfigDao;
 import org.guohai.javasqlweb.service.operation.DbOperation;
 import org.guohai.javasqlweb.service.operation.DbOperationFactory;
+import org.guohai.javasqlweb.service.operation.DbOperationMssqlDruid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.sql.SQLException;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -22,6 +26,10 @@ import java.util.Map;
 @Service
 public class BaseDataServiceImpl implements BaseDataService{
 
+    /**
+     * 日志
+     */
+    private static final Logger LOG  = LoggerFactory.getLogger(BaseDataServiceImpl.class);
     @Autowired
     BaseConfigDao baseConfigDao;
 
@@ -220,6 +228,32 @@ public class BaseDataServiceImpl implements BaseDataService{
         }else{
             return new Result<>(false,"",null);
         }
+    }
+
+    /**
+     * 检查所有服务器的健康状态
+     *
+     * @return
+     */
+    @Override
+    public Result<String> serverHealth() {
+        StringBuilder returnMessage = new StringBuilder();
+        Integer serverCode = 1;
+        Boolean serverHealth = true;
+        for(DbOperation value : operationMap.values()){
+            try {
+                value.serverHealth();
+                returnMessage.append(String.format("在健康检查中服务器[%d]正常\n",serverCode));
+                LOG.info(String.format("在健康检查中服务器[%d]正常",serverCode));
+            } catch (SQLException throwables) {
+                returnMessage.append(String.format("在健康检查中服务器[%d]发生异常%s\n",serverCode,throwables.toString()));
+                LOG.error(String.format("在健康检查中服务器[%d]发生异常%s",serverCode,throwables.toString()));
+                throwables.printStackTrace();
+                serverHealth = false;
+            }
+            serverCode++;
+        }
+        return new Result<String>(serverHealth,"",returnMessage.toString());
     }
 
     /**

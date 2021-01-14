@@ -225,6 +225,17 @@ public class DbOperationMysql implements DbOperation {
         return null;
     }
 
+    /**
+     * 服务器连接状态健康检查
+     *
+     * @return
+     * @throws SQLException
+     */
+    @Override
+    public Boolean serverHealth() throws SQLException {
+        return null;
+    }
+
 
     /**
      * 检查连接状态后再使用

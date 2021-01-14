@@ -124,6 +124,17 @@ public class DbOperationOracle implements DbOperation {
         return null;
     }
 
+    /**
+     * 服务器连接状态健康检查
+     *
+     * @return
+     * @throws SQLException
+     */
+    @Override
+    public Boolean serverHealth() throws SQLException {
+        return null;
+    }
+
     private void getActiveCount(){
         DruidDataSource drs = (DruidDataSource) sqlDs;
         int activeCount = drs.getActiveCount();

@@ -70,4 +70,11 @@ public interface DbOperation {
      * @throws SQLException 抛出异常
      */
      Object[] queryDatabaseBySql(String dbName, String sql, Integer limit) throws SQLException;
+
+    /**
+     * 服务器连接状态健康检查
+     * @return
+     * @throws SQLException
+     */
+    Boolean serverHealth() throws SQLException;
 }

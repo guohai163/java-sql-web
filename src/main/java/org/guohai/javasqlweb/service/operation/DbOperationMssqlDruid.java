@@ -45,6 +45,7 @@ public class DbOperationMssqlDruid implements DbOperation {
         dbConfig.put("password",conn.getDbServerPassword());
         dbConfig.put("initialSize","2");
         dbConfig.put("minIdle","1");
+        dbConfig.put("maxWait","10000");
         dbConfig.put("validationQuery","select getdate()");
         sqlDs = DruidDataSourceFactory.createDataSource(dbConfig);
     }
@@ -228,6 +229,20 @@ public class DbOperationMssqlDruid implements DbOperation {
         result[2] = listData;
         closeResource(rs,st,conn);
         return result;
+    }
+
+    /**
+     * 服务器连接状态健康检查
+     * @return
+     * @throws SQLException
+     */
+    @Override
+    public Boolean serverHealth() throws SQLException {
+        Connection conn = sqlDs.getConnection();
+        Statement st = conn.createStatement();
+        ResultSet rs = st.executeQuery("SELECT getdate()");
+        closeResource(rs,st,conn);
+        return true;
     }
 
 }

@@ -82,7 +82,7 @@ public class DbOperationMysqlDruid implements DbOperation {
         Statement st = conn.createStatement();
         ResultSet rs = st.executeQuery(String.format(
                 "SELECT table_name ,table_rows" +
-                "FROM `information_schema`.`tables` WHERE TABLE_SCHEMA = '%s' ORDER BY table_rows DESC;", dbName));
+                "FROM `information_schema`.`tables` WHERE TABLE_SCHEMA = '%s' ORDER BY table_name DESC;", dbName));
         while (rs.next()){
             listTnb.add(new TablesNameBean(rs.getString("table_name"),
                     rs.getInt("table_rows")));
@@ -203,6 +203,17 @@ public class DbOperationMysqlDruid implements DbOperation {
         result[2] = listData;
         closeResource(rs,st,conn);
         return result;
+    }
+
+    /**
+     * 服务器连接状态健康检查
+     *
+     * @return
+     * @throws SQLException
+     */
+    @Override
+    public Boolean serverHealth() throws SQLException {
+        return null;
     }
 
 

@@ -1,0 +1,72 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: org-guohai-javasqladmin
+  namespace: gyyx-oa
+spec:
+  rules:
+    - host: jsa.dev.cn
+      http:
+        paths:
+          - path: /
+            backend:
+              serviceName: org-guohai-javasqladmin
+              servicePort: 8002
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: org-guohai-javasqladmin
+  labels:
+    app: org-guohai-javasqladmin
+spec:
+  ports:
+    - name: http
+      port: 8002
+      targetPort: 8002
+  selector:
+    app: org-guohai-javasqladmin-ss
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: org-guohai-javasqladmin-ss
+spec:
+  serviceName: org-guohai-javasqladmin-ss
+  selector:
+    matchLabels:
+      app: org-guohai-javasqladmin-ss
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: org-guohai-javasqladmin-ss
+    spec:
+      containers:
+        - name: org-guohai-javasqladmin-ss
+          image: repo.gydev.cn:8083/gyyx/javasqlweb:0.5.2
+          livenessProbe:
+            httpGet:
+                path: /health
+                port: 8002
+            initialDelaySeconds: 60
+            periodSeconds: 60
+          resources:
+            limits:
+              memory: "400Mi"
+            requests:
+              memory: "200Mi"
+          env:
+            - name: MARIADB_PORT_3306_TCP_ADDR
+              value: "10.12.54.166"
+            - name: NODE
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          ports:
+            - containerPort: 8002

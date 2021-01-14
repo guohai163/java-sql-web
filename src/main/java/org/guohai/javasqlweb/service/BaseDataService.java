@@ -83,4 +83,10 @@ public interface BaseDataService {
      * @return
      */
     Result<Object> quereyDataBySql(Integer serverCode, String dbName, String sql, String token, String userIp);
+
+    /**
+     * 检查所有服务器的健康状态
+     * @return
+     */
+    Result<String> serverHealth();
 }
