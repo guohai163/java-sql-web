@@ -44,6 +44,8 @@ public class DbOperationMysqlDruid implements DbOperation {
         dbConfig.put("username",conn.getDbServerUsername());
         dbConfig.put("password",conn.getDbServerPassword());
         dbConfig.put("initialSize","2");
+        dbConfig.put("minIdle","1");
+        dbConfig.put("maxWait","10000");
         dbConfig.put("validationQuery","select now()");
         sqlDs = DruidDataSourceFactory.createDataSource(dbConfig);
     }
