@@ -19,7 +19,7 @@ public interface BaseConfigDao {
      * 返回完整的配置项
      * @return
      */
-    @Select("SELECT code,db_server_name,db_server_type FROM db_connect_config_tb;")
+    @Select("SELECT code,db_server_name,db_server_type,db_group FROM db_connect_config_tb;")
     List<ConnectConfigBean> getAllConnectConfig();
 
     /**
@@ -65,8 +65,9 @@ public interface BaseConfigDao {
      * 获取所有的连接配置
      * @return
      */
-    @Select("SELECT `code`,`db_server_name`,`db_server_host`,`db_server_port`,`db_server_username`,\n" +
-            "'' as `db_server_password`,`db_server_type`,`create_time`\n" +
+    @Select("SELECT `code`,`db_server_name`,`db_server_host`,`db_server_port`,`db_server_username`," +
+            "'' as `db_server_password`,`db_server_type`,`create_time` " +
+            ",`db_group` "+
             "FROM `db_connect_config_tb`;")
     List<ConnectConfigBean> getConnData();
 
@@ -107,7 +108,7 @@ public interface BaseConfigDao {
             "`db_server_username`,\n" +
             "`db_server_password`,\n" +
             "`db_server_type`,\n" +
-            "`create_time`)\n" +
+            "`create_time`,`db_group`)\n" +
             "VALUES\n" +
             "(#{server.dbServerName},\n" +
             "#{server.dbServerHost},\n" +
@@ -115,7 +116,7 @@ public interface BaseConfigDao {
             "#{server.dbServerUsername},\n" +
             "#{server.dbServerPassword},\n" +
             "#{server.dbServerType},\n" +
-            "now());")
+            "now(),#{server.dbGroup});")
     Boolean addConnServer(@Param("server") ConnectConfigBean server);
 
     /**
@@ -133,8 +134,16 @@ public interface BaseConfigDao {
             "<if test='server.dbServerPassword != null and server.dbServerPassword != \"\"'>" +
             "`db_server_password` = #{server.dbServerPassword}," +
             "</if>" +
-            "`db_server_type` = #{server.dbServerType}\n" +
+            "`db_server_type` = #{server.dbServerType}," +
+            "`db_group` = #{server.dbGroup}" +
             "WHERE `code` = #{server.code};"+
             "</script>")
     Boolean updateConnServer(@Param("server")ConnectConfigBean server);
+
+    /**
+     * 获取数据库分组
+     * @return
+     */
+    @Select("SELECT distinct db_group FROM db_connect_config_tb;")
+    List<String> getDbGroup();
 }

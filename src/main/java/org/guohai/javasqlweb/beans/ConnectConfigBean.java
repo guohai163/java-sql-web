@@ -44,4 +44,9 @@ public class ConnectConfigBean {
      */
     private Date createTime;
 
+    /**
+     * 数据库分组
+     */
+    String dbGroup;
+
 }

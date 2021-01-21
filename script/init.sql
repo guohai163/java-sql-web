@@ -12,7 +12,8 @@ CREATE TABLE `db_connect_config_tb` (
   `db_server_username` varchar(45) NOT NULL COMMENT '服务器用户名',
   `db_server_password` varchar(45) NOT NULL COMMENT '服务器密码',
   `db_server_type` varchar(45) NOT NULL COMMENT '服务器类型mssql/mysql',
-  `create_time` datetime NOT NULL COMMENT '创建时间'
+  `create_time` datetime NOT NULL COMMENT '创建时间',
+  `db_group` varchar(45) NOT NULL DEFAULT 'default' COMMENT '数据库分组'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 ALTER TABLE `db_connect_config_tb`
@@ -66,3 +67,6 @@ COMMIT;
 --ADD COLUMN `login_status` VARCHAR(45) NOT NULL DEFAULT 'LOGGING' AFTER `auth_status`;
 -- ALTER TABLE `javasqlweb_db`.`db_query_log`
 -- ADD COLUMN `query_database` VARCHAR(45) NULL AFTER `query_name`;
+
+-- ALTER TABLE `javasqlweb_db`.`db_connect_config_tb`
+-- ADD COLUMN `db_group` VARCHAR(45) NOT NULL DEFAULT 'default' AFTER `create_time`;

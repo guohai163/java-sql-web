@@ -138,4 +138,10 @@ public class BaseDataController {
                                      @RequestBody String sql){
         return baseDataService.quereyDataBySql(Integer.parseInt(serverCode), dbName, sql, token, request.getRemoteAddr());
     }
+
+    @ResponseBody
+    @RequestMapping(value = "/server/group")
+    public Result<List<String>> getDbGroup(){
+        return baseDataService.getDbGroup();
+    }
 }

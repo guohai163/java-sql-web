@@ -257,6 +257,16 @@ public class BaseDataServiceImpl implements BaseDataService{
     }
 
     /**
+     * 获取数据库分组
+     *
+     * @return
+     */
+    @Override
+    public Result<List<String>> getDbGroup() {
+        return new Result<>(true, "", baseConfigDao.getDbGroup());
+    }
+
+    /**
      * 使用单例模式创建一个数据操作实例对象
      * @param serverCode
      * @return

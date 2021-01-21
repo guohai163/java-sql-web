@@ -7,10 +7,11 @@ import config from './config'
 import Pubsub from 'pubsub-js'
 import cookie from 'react-cookies'
 import { LoadingOutlined } from '@ant-design/icons';
-import { Modal, Spin, Input, Form } from 'antd';
+import { Modal, Spin, Input, Form, Select } from 'antd';
 import cache from './utils';
 
 const { confirm } = Modal;
+const { Option, OptGroup } = Select;
 const antIcon = <LoadingOutlined style={{ fontSize: 24 }} spin />;
 const CACHE_TTL = 1000*60*60*24;
 
@@ -33,7 +34,8 @@ class Navigation extends React.Component {
             filterTableList: [],
             filterSpList: [],
             passVisible: false,
-            inputData: {}
+            inputData: {},
+            dbGroup: []
             
         }
         this.serverChange = this.serverChange.bind(this);
@@ -56,17 +58,25 @@ class Navigation extends React.Component {
         const client = new FetchHttpClient(config.serverDomain);
         client.addMiddleware(json());
         client.get('/database/serverlist',{headers:{'User-Token': this.state.token}})
-        .then(response => {
-            if(response.jsonData.status) {
-                this.setState({
-                    serverList: response.jsonData.data
-                })
-            }
-        })
-        .catch(rejected => {
-            console.log('catch',rejected)
+            .then(response => {
+                if(response.jsonData.status) {
+                    this.setState({
+                        serverList: response.jsonData.data
+                    })
+                }
+            })
+            .catch(rejected => {
+                console.log('catch',rejected)
 
-        })
+            })
+        client.get('/database/server/group',{headers:{'User-Token': this.state.token}})
+            .then(response => {
+                if(response.jsonData.status) {
+                    this.setState({
+                        dbGroup: response.jsonData.data
+                    })
+                }
+            })
     }
     dbChange(dbName,event) {
         let start_time = Date.now();
@@ -126,15 +136,17 @@ class Navigation extends React.Component {
         //获取存储过程
         // this.getSpList(dbName);
     }
-    serverChange(event) {
-        //当不为“请选择服务器”时进行相应 操作
-        if('0' !== event.target.value) {
+    serverChange(value) {
+
+            let url = '/database/dblist/'+value
+
             const client = new FetchHttpClient(config.serverDomain);
             client.addMiddleware(json());
-            client.get('/database/dblist/'+event.target.value,{headers:{'User-Token': this.state.token}}).then(response => {
+            client.get(url,{headers:{'User-Token': this.state.token}}).then(response => {
+                console.log(response.jsonData)
                 if(response.jsonData.status){
                     this.setState({
-                        selectServer: event.target.value,
+                        selectServer: value,
                         dbList: response.jsonData.data
                     })
                     const selectData = {
@@ -145,8 +157,6 @@ class Navigation extends React.Component {
                 }
                 
             })
-
-        }
     }
     filterTable(parm) {
         console.log(parm.target.value)
@@ -348,10 +358,16 @@ class Navigation extends React.Component {
                     <div id="navigation_tree">
                         <div className="navigation_server">
                             <label>服务器：</label>
-                            <select id="select_server" onChange={this.serverChange}>
-                                <option value="0">请选择服务器</option>
-                                {this.state.serverList.map(server => <option name={server.dbServerName} key={server.code} value={server.code}>{server.dbServerName}</option>)}
-                            </select>
+                            <Select placeholder="请选择服务器" style={{ width: 200 }} onChange={this.serverChange}>
+                                {this.state.dbGroup.map(group => 
+                                    <OptGroup label={group}>
+                                        {this.state.serverList.filter(item => item.dbGroup === group).map(server =>
+                                            <Option value={server.code}>{server.dbServerName}</Option>
+                                            )}
+                                    </OptGroup>
+                                    )}
+          
+                            </Select>
                         </div>
                         <div id="navigation_tree_content" style={{height: deskHeight}}>
                             <ul>

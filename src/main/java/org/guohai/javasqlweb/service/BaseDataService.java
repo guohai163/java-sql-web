@@ -89,4 +89,10 @@ public interface BaseDataService {
      * @return
      */
     Result<String> serverHealth();
+
+    /**
+     * 获取数据库分组
+     * @return
+     */
+    Result<List<String>> getDbGroup();
 }

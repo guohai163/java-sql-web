@@ -308,6 +308,7 @@ class Admin extends React.Component {
                                 {title:'服务器端口', dataIndex:'dbServerPort'},
                                 {title:'用户名', dataIndex:'dbServerUsername'},
                                 {title:'服务器类型', dataIndex:'dbServerType'},
+                                {title:'服务器分组', dataIndex:'dbGroup'},
                                 {title:'创建时间', dataIndex:'createTime'},
                                 {title:'操作', render: (text, record) => (<Space size="middle"><a onClick={this.showEditServerBtn.bind(this,record.code)}>编辑</a>
                                     <a onClick={this.serverDeleteBtn.bind(this,record.code)}>删除</a></Space>)}];
@@ -422,6 +423,9 @@ class Admin extends React.Component {
                                 <Select.Option value="mssql">mssql</Select.Option>
                                 <Select.Option value="mysql">mysql</Select.Option>
                             </Select>
+                            </Form.Item>
+                            <Form.Item label="服务器分组">
+                                <Input onChange={this.onInputChange.bind(this)} id="dbGroup" defaultValue="default" value={this.state.inputData.dbGroup}></Input>
                             </Form.Item>
                         </Form>
                     </Modal>
