@@ -110,7 +110,8 @@ public class DbOperationMysqlDruid implements DbOperation {
         while (rs.next()){
             listCnb.add(new ColumnsNameBean(rs.getString("Field"),
                     rs.getString("Type"),
-                    rs.getString("Type")));
+                    rs.getString("Type"),
+                    ""));
         }
         closeResource(rs,st,conn);
         return listCnb;

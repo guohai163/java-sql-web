@@ -24,4 +24,8 @@ public class ColumnsNameBean {
      */
     private String columnLength;
 
+    /**
+     * 是否可为空
+     */
+    String columnIsNull;
 }

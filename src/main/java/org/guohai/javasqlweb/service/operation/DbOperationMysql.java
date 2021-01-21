@@ -124,7 +124,8 @@ public class DbOperationMysql implements DbOperation {
         while (rs.next()){
             listCnb.add(new ColumnsNameBean(rs.getObject("Field").toString(),
                     rs.getObject("Type").toString(),
-                    rs.getObject("Type").toString()));
+                    rs.getObject("Type").toString(),
+                    ""));
         }
         // 关闭rs和statement
         if (rs != null) {
