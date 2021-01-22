@@ -404,7 +404,7 @@ class Navigation extends React.Component {
                                                     <div className={this.state.showTableColumn === table.tableName?'list_container':'hide'}>
                                                         <ul>
                                                             {this.state.showTableColumn !== table.tableName?'':columntData.map(column =>
-                                                                <li>{column.columnName}({column.columnType}({column.columnLength}),{column.columnIsNull})</li>
+                                                                <li>{column.columnName}({column.columnType}{""===column.columnLength?"":"("+column.columnLength+")"},{column.columnIsNull})</li>
                                                             )}
                                                         </ul>
                                                     </div>
