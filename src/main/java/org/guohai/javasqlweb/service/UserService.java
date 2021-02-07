@@ -53,4 +53,13 @@ public interface UserService {
      * @return
      */
     Result<String> logoutUser(String token);
+
+    /**
+     * 通过链接创建用户
+     * @param user
+     * @param time
+     * @param sign
+     * @return
+     */
+    Result<UserBean> createUserByLink(String user, String time, String sign);
 }

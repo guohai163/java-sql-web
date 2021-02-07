@@ -28,6 +28,7 @@ mybatis:
 project:
   version: 0.5.8
   limit: 5000
+  signkey: jsw
 logging:
   level:
     org:

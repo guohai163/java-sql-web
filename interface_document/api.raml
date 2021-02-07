@@ -139,7 +139,20 @@ baseUri: http://127.0.0.1:8002
               "token": "aaaaaaa",
               "otpPass": "123456"
             }
+  /create_user/{user_name}:
+    get:
 
+      headers:
+        sign:
+          type: string
+      responses:
+        200:
+      queryParameters:
+        timestamp:
+          type: string
+    uriParameters:
+      user_name:
+        type: string
 /api:
   /backstage:
     /querylog:

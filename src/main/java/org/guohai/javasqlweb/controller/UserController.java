@@ -76,4 +76,20 @@ public class UserController {
     public Result<String> verifyOtp(@RequestBody UserBean user){
         return userService.verifyOtp(user.getToken(), user.getOtpPass());
     }
+
+    /**
+     *
+     * @param sign
+     * @param userName
+     * @param timestamp
+     * @return
+     */
+    @ResponseBody
+    @RequestMapping(value = "/create_user/{user_name}")
+    public Result<UserBean> autoCreateUser(@RequestHeader(value = "sign", required =  true) String sign,
+                                           @PathVariable("user_name") String userName,
+                                           String timestamp) {
+        LOG.info(String.format("接收到参数 user: %s, time: %s, sign: %s", userName, timestamp, sign));
+        return userService.createUserByLink(userName, timestamp, sign);
+    }
 }

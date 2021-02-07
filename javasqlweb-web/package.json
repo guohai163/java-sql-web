@@ -11,6 +11,7 @@
     "fetch-http-client": "^1.1.0",
     "pubsub-js": "^1.9.1",
     "qrcode.react": "^1.0.0",
+    "query-string": "^6.13.8",
     "react": "^17.0.1",
     "react-codemirror": "^1.0.0",
     "react-codemirror2": "^7.2.1",

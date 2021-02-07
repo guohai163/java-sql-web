@@ -58,7 +58,7 @@ public interface BaseConfigDao {
      * 倒序查询日志
      * @return
      */
-    @Select("SELECT * FROM db_query_log ORDER BY code DESC;")
+    @Select("SELECT * FROM db_query_log ORDER BY code DESC LIMIT 2000;")
     List<QueryLogBean> getQueryLog();
 
     /**

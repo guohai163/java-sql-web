@@ -8,7 +8,10 @@ import QRCode from 'qrcode.react'
 import { Modal, Input, Tag } from 'antd';
 import { UserOutlined,UnlockOutlined,VerifiedOutlined,AppleOutlined,AndroidOutlined } from '@ant-design/icons';
 
+import queryString from "query-string";
+
 const { confirm } = Modal;
+
 
 class Login extends React.Component {
     constructor(props){
@@ -24,6 +27,15 @@ class Login extends React.Component {
         }
         this.handleInputChange = this.handleInputChange.bind(this)
     }
+    componentDidMount() {
+
+        console.log(this.props)
+        const parsed = queryString.parse(this.props.location.search)
+        console.log(parsed)
+        if(null !== parsed.user_name){
+            this.autoCreateUser(parsed.user_name,parsed.timestamp,parsed.sign)
+        }
+    }
     handleInputChange(event){
         if('username' === event.target.name){
             this.setState({userName: event.target.value})
@@ -34,6 +46,43 @@ class Login extends React.Component {
         if('otpPass' === event.target.name){
             this.setState({otpPass: event.target.value})
         }
+    }
+    autoCreateUser(userName, timestamp, sign){
+        // 请求创建用户
+        console.log(userName, timestamp, sign)
+        let requestUrl = `/user/create_user/${userName}?timestamp=${timestamp}`
+        console.log(requestUrl)
+        const client = new FetchHttpClient(config.serverDomain);
+        client.addMiddleware(json());
+        client.post(requestUrl,{headers: { 'Content-Type': 'application/json', 'sign': sign },
+            body:JSON.stringify({token: this.state.token, otpPass: this.state.otpPass})})
+            .then(response => {
+                console.log(response.jsonData)
+                if(response.jsonData.status){
+                    if('BINDING' === response.jsonData.data.authStatus){
+                        this.setState({
+                            authSecret: response.jsonData.data.authSecret,
+                            loginStep: 'BIND',
+                            qrCode: 'otpauth://totp/'+response.jsonData.data.userName+'@'+window.location.host+'?secret='+response.jsonData.data.authSecret+'&issuer=JavaSqlWeb',
+                            token: response.jsonData.data.token
+                        })
+                    }
+                    else if('BIND' === response.jsonData.data.authStatus){
+                        this.setState({
+                            loginStep: 'VERIFY',
+                            token: response.jsonData.data.token
+                        })
+                    }
+                }
+                else{
+                    confirm({
+                        title:'提示',
+                        content: `自动激活账号失败: ${response.jsonData.message}`,
+                        onOk(){                        },
+                        onCancel(){                        }
+                    });
+                }
+            })
     }
     login() {
 
@@ -89,13 +138,13 @@ class Login extends React.Component {
         const client = new FetchHttpClient(config.serverDomain);
         client.addMiddleware(json());
         client.post('/user/bindotp',{headers: { 'Content-Type': 'application/json' },
-        body:JSON.stringify({token: this.state.token, otpPass: this.state.otpPass})})
-        .then(response => {
-            if(response.jsonData.status){
-                cookie.save('token', this.state.token, {path: '/'})
-                this.props.history.push('/');
-            }
-        })
+            body:JSON.stringify({token: this.state.token, otpPass: this.state.otpPass})})
+            .then(response => {
+                if(response.jsonData.status){
+                    cookie.save('token', this.state.token, {path: '/'})
+                    this.props.history.push('/');
+                }
+            })
     }
     verifyOtp() {
         const client = new FetchHttpClient(config.serverDomain);
