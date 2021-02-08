@@ -190,7 +190,7 @@ public class UserServiceImpl implements UserService {
             return new Result<>(false, "签名没通过", null);
         }
         UserBean userBean = userDao.getUserByName(userName);
-        LOG.info(String.format("数据库查询的用户状态，用户名%s,密保状态%s"));
+
         if( null == userBean){
             // 没有该用户，准备创建用户
             userDao.addNewUser(userName, userName);
@@ -198,6 +198,7 @@ public class UserServiceImpl implements UserService {
             userBean.setUserName(userName);
             userBean.setAuthStatus(OtpAuthStatus.UNBIND);
         }
+        LOG.info(String.format("数据库查询的用户状态，用户名%s,密保状态%s", userBean.getUserName(), userBean.getAuthStatus().toString()));
         userBean.setToken(UUID.randomUUID().toString());
 
         if(OtpAuthStatus.UNBIND == userBean.getAuthStatus() || OtpAuthStatus.BINDING == userBean.getAuthStatus()) {

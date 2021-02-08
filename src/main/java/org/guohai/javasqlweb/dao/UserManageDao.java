@@ -29,7 +29,7 @@ public interface UserManageDao {
      * @param name
      * @return
      */
-    @Select("SELECT user_name FROM user_tb WHERE user_name=#{name}")
+    @Select("SELECT user_name,auth_status FROM user_tb WHERE user_name=#{name}")
     UserBean getUserByName(@Param("name") String name);
     /**
      * 更新用户登录令牌
