@@ -39,7 +39,7 @@ public class DbOperationMysqlDruid implements DbOperation {
     DbOperationMysqlDruid(ConnectConfigBean conn) throws Exception {
 
         Map dbConfig = new HashMap();
-        dbConfig.put("url",String.format("jdbc:mysql://%s:%s?useUnicode=true&characterEncoding=UTF-8",
+        dbConfig.put("url",String.format("jdbc:mysql://%s:%s?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai",
                 conn.getDbServerHost(),conn.getDbServerPort()));
         dbConfig.put("username",conn.getDbServerUsername());
         dbConfig.put("password",conn.getDbServerPassword());

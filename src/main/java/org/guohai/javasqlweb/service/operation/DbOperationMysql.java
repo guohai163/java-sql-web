@@ -50,7 +50,7 @@ public class DbOperationMysql implements DbOperation {
      */
     DbOperationMysql(ConnectConfigBean conn) throws ClassNotFoundException, SQLException {
         connectConfigBean = conn;
-        sqlUrl = String.format("jdbc:mysql://%s:%s?useUnicode=true&characterEncoding=UTF-8",conn.getDbServerHost(),conn.getDbServerPort());
+        sqlUrl = String.format("jdbc:mysql://%s:%s?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai",conn.getDbServerHost(),conn.getDbServerPort());
         Class.forName(DB_DRIVER);
         sqlConn = DriverManager.getConnection(sqlUrl,
                 connectConfigBean.getDbServerUsername(),
