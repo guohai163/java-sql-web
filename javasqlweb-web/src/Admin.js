@@ -12,11 +12,13 @@ import FetchHttpClient, { json } from 'fetch-http-client';
 import {
     DatabaseOutlined,
     UserOutlined,
+    TeamOutlined,
     TableOutlined,
     EditOutlined,
     ConsoleSqlOutlined
   } from '@ant-design/icons';
 const { Header, Footer, Sider, Content } = Layout;
+const { Option } = Select;
 const { confirm } = Modal;
 class Admin extends React.Component {
     constructor(props){
@@ -28,8 +30,11 @@ class Admin extends React.Component {
             configVisible: false,
             userAddVisible: false,
             confirmLoading: false,
+            userGroupAddVisible: false,
             druidList: [],
             userList: [],
+            userGroupList: [],
+            groupUserList: [],
             userCount: 0,
             serverCount: 0,
             inputData: {},
@@ -90,6 +95,20 @@ class Admin extends React.Component {
                 break;
             case '5':
                 window.location.href = '/'
+                break;
+            case '6':
+                client.get('/api/backstage/usergroups',{headers:{'Content-Type': 'text/plain','User-Token': this.state.token}})
+                    .then(response => {
+                        this.setState({
+                            userGroupList: response.jsonData.data
+                        })
+                    })
+                client.get('/api/backstage/userlist',{headers:{'Content-Type': 'text/plain','User-Token': this.state.token}})
+                    .then(response => {
+                        this.setState({
+                            userList: response.jsonData.data
+                        })
+                    })
                 break;
             default:
                 break;
@@ -176,6 +195,9 @@ class Admin extends React.Component {
                 }
             })
     }
+    userGroupHandleOk(){
+        console.log(this.state.inputData)
+    }
     onInputChange(e){
         let data = this.state.inputData;
         data[e.target.id] = e.target.value
@@ -197,10 +219,18 @@ class Admin extends React.Component {
             inputData: data
         })
     }
+    onUserGroupFromUserChange(value){
+        let data = this.state.inputData;
+        data['userList'] = value.map((x) => { return {'code':x}});
+        this.setState({
+            inputData: data
+        })
+    }
     connHandleCancel(){
         this.setState({
             configVisible: false,
             userAddVisible: false,
+            userGroupAddVisible: false,
             inputData: {}
         })
     }
@@ -212,6 +242,11 @@ class Admin extends React.Component {
     userAddBtn() {
         this.setState({
             userAddVisible: true
+        })
+    }
+    userGroupAddBtn() {
+        this.setState({
+            userGroupAddVisible: true
         })
     }
     userDeleteBtn(e){
@@ -263,6 +298,13 @@ class Admin extends React.Component {
                     });
                 }
             })
+    }
+    userGroupDeleteBtn(groupCode){
+        console.log('userGroupDeleteBtn')
+    }
+    userGroupEditBtn(groupCode){
+        console.log('userGroupEditBtn')
+
     }
     serverDeleteBtn(serverCode){
         const client = new FetchHttpClient(config.serverDomain);
@@ -323,7 +365,12 @@ class Admin extends React.Component {
                                 {title:'二次验证绑定',dataIndex: 'authStatus'},
                                 {title:'操作', render: (text, record) => (<Space size="middle"><a onClick={this.userDeleteBtn.bind(this,record.userName)}>删除</a>
                                     <a onClick={this.unbindOtp.bind(this,record.userName)}>解绑OTP</a></Space>)}]
-        let {configVisible,confirmLoading,userAddVisible} = this.state;
+        const userGroupListColumns = [{title: '编号', dataIndex: 'code'},
+                                        {title: '组名', dataIndex: 'groupName'},
+                                        {title: '备注', dataIndex: 'comment'},
+                                        {title:'操作', render: (text, record) => (<Space size="middle"><a onClick={this.userGroupDeleteBtn.bind(this,record.code)}>删除</a>
+                                            <a onClick={this.userGroupEditBtn.bind(this,record.code)}>编辑</a></Space>)}]
+        let {configVisible,confirmLoading,userAddVisible, userGroupAddVisible,userList} = this.state;
         return (
             <>
                 <Layout>
@@ -338,6 +385,9 @@ class Admin extends React.Component {
                         </Menu.Item>
                         <Menu.Item key="2" icon={<UserOutlined />}>
                         账号管理
+                        </Menu.Item>
+                        <Menu.Item key="6" icon={<TeamOutlined />}>
+                        用户组管理
                         </Menu.Item>
                         <Menu.Item key="3" icon={<DatabaseOutlined />}>
                         服务器管理
@@ -433,6 +483,40 @@ class Admin extends React.Component {
                     </div>
                     <div className={this.state.menuSelect === '4' ?'div_content':'hide'}> 
                     <Table columns={queryLogColumns} dataSource={this.state.queryLog} pagination={{ pageSize: 25 }} size="small" />
+                    </div>
+                    <div className={this.state.menuSelect === '6' ?'right_content':'hide'}>
+                        <Button onClick={this.userGroupAddBtn.bind(this)} type="primary" style={{ marginBottom: 16 }}>
+                        增加用户组
+                        </Button>
+                        <Modal
+                            title="增加新用户组"
+                            visible={userGroupAddVisible}
+                            onOk={this.userGroupHandleOk.bind(this)}
+                            confirmLoading={confirmLoading}
+                            onCancel={this.connHandleCancel.bind(this)}
+                        >
+                        <Form size="small" labelCol={{ span: 7 }}>
+                        <Form.Item label="组名">
+                            <Input onChange={this.onInputChange.bind(this)} id="groupName"/>
+                        </Form.Item>
+                        <Form.Item label="备注">
+                            <Input onChange={this.onInputChange.bind(this)} id="groupComment"/>
+                        </Form.Item>
+                        <Form.Item label="用户">
+                            <Select mode="multiple" placeholder="选择进入该组用户" onChange={this.onUserGroupFromUserChange.bind(this)}>
+                            {userList.map( row => {
+                                return(<Option value={row.code} label={row.userName}>
+                                        <div className="demo-option-label-item">
+                                        👤 {row.userName} ({row.code})
+                                        </div>
+                                        </Option>)
+                            })}
+                            
+                            </Select>
+                        </Form.Item>
+                        </Form>
+                        </Modal>
+                        <Table columns={userGroupListColumns} dataSource={this.state.userGroupList} pagination={{ pageSize: 25 }} size="small" />
                     </div>
                     </Content>
                     <Footer>javaSqlWeb ©2020 Created by Hai</Footer>

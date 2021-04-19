@@ -39,13 +39,14 @@ public class DbOperationMysqlDruid implements DbOperation {
     DbOperationMysqlDruid(ConnectConfigBean conn) throws Exception {
 
         Map dbConfig = new HashMap();
-        dbConfig.put("url",String.format("jdbc:mysql://%s:%s?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai",
+        dbConfig.put("url",String.format("jdbc:mysql://%s:%s?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&allowMultiQueries=true",
                 conn.getDbServerHost(),conn.getDbServerPort()));
         dbConfig.put("username",conn.getDbServerUsername());
         dbConfig.put("password",conn.getDbServerPassword());
         dbConfig.put("initialSize","2");
         dbConfig.put("minIdle","1");
         dbConfig.put("maxWait","10000");
+        dbConfig.put("maxActive","20");
         dbConfig.put("validationQuery","select now()");
         sqlDs = DruidDataSourceFactory.createDataSource(dbConfig);
     }

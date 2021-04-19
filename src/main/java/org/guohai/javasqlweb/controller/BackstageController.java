@@ -1,12 +1,11 @@
 package org.guohai.javasqlweb.controller;
 
 import com.alibaba.druid.stat.DruidStatManagerFacade;
-import org.guohai.javasqlweb.beans.ConnectConfigBean;
-import org.guohai.javasqlweb.beans.QueryLogBean;
-import org.guohai.javasqlweb.beans.Result;
-import org.guohai.javasqlweb.beans.UserBean;
+import lombok.Data;
+import org.guohai.javasqlweb.beans.*;
 import org.guohai.javasqlweb.config.AdminPageRequired;
 import org.guohai.javasqlweb.service.BackstageService;
+import org.guohai.javasqlweb.service.PermissionsService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,6 +32,8 @@ public class BackstageController {
     @Autowired
     BackstageService backstageService;
 
+    @Autowired
+    PermissionsService permissionsService;
 
     /**
      * 日志查询
@@ -163,4 +164,29 @@ public class BackstageController {
     public Result<String> updateServer(@RequestBody ConnectConfigBean server){
         return backstageService.updateServerData(server);
     }
+
+    /**
+     * 获取用户组
+     * @return
+     */
+    @ResponseBody
+    @RequestMapping(value = "/usergroups", method = RequestMethod.GET)
+    public Result<List<UsergroupBean>> getAllUsergroup(){
+        return permissionsService.getAllUsergroup();
+    }
+
+    @ResponseBody
+    @RequestMapping(value = "/add_usergroups", method = RequestMethod.POST)
+    public Result<String> addUsergroup(@RequestBody CreateUserGroupParam userGroup){
+
+        return permissionsService.addUsergroup(userGroup.getGroupName(), userGroup.getGroupComment(),
+                userGroup.getUserList());
+    }
+}
+
+@Data
+class CreateUserGroupParam{
+    private String groupName;
+    private String groupComment;
+    private List<UserBean> userList;
 }

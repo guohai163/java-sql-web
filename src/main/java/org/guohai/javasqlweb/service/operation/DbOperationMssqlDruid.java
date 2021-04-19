@@ -46,6 +46,7 @@ public class DbOperationMssqlDruid implements DbOperation {
         dbConfig.put("initialSize","2");
         dbConfig.put("minIdle","1");
         dbConfig.put("maxWait","10000");
+        dbConfig.put("maxActive","20");
         dbConfig.put("validationQuery","select getdate()");
         sqlDs = DruidDataSourceFactory.createDataSource(dbConfig);
     }

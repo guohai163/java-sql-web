@@ -189,3 +189,19 @@ baseUri: http://127.0.0.1:8002
           application/json:
             example: |
               {}
+    /usergroups:
+      get:
+        headers:
+          User-Token:
+            type: string
+    /add_usergroups:
+      post:
+        headers:
+          User-Token:
+            type: string
+            example: "3bfb64a7-7020-43f1-ab3a-51b4d97f1398"
+        body:
+          application/json:
+            example: |
+              {"userGroup": {"groupName": "b", "comment": "t"},
+               "userList": [{"code":1},{"code":2}]}
