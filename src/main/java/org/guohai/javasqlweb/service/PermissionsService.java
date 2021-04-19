@@ -37,12 +37,11 @@ public interface PermissionsService {
     Result<String> addUserToGroup(Integer groupCode, List<UserBean> userList);
 
     /**
-     * 从指定组移除一些用户
+     * 从指定组移除所有用户
      * @param groupCode 组编号
-     * @param userList 用户
      * @return 返回请求结果
      */
-    Result<String> delUserFromGroup(Integer groupCode, List<UserBean> userList);
+    Result<String> delUserFromGroup(Integer groupCode);
 
     /**
      * 删除用户组，同时删除在该组下所有用户

@@ -1,5 +1,6 @@
 package org.guohai.javasqlweb.dao;
 
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Select;
@@ -39,4 +40,20 @@ public interface PermissionsDao {
      */
     @Insert("INSERT INTO `user_permissions`(`user_code`,`group_code`)VALUES(#{userCode},#{groupCode});")
     Boolean addUserPermission(Integer userCode, Integer groupCode);
+
+    /**
+     * 通过用户组编号，删除用户权限
+     * @param groupCode
+     * @return
+     */
+    @Delete("DELETE FROM user_permissions WHERE group_code=#{groupCode};")
+    Boolean delUserPermissionByGroup(Integer groupCode);
+
+    /**
+     * 通过用户组编号，删除用户组
+     * @param groupCode
+     * @return
+     */
+    @Delete("DELETE FROM usergroup WHERE code=#{groupCode};")
+    Boolean delUserGroup(Integer groupCode);
 }

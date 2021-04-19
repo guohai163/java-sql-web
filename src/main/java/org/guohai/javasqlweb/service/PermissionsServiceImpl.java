@@ -70,15 +70,15 @@ public class PermissionsServiceImpl implements PermissionsService {
     }
 
     /**
-     * 从指定组移除一些用户
+     * 从指定组移除所有用户
      *
      * @param groupCode 组编号
-     * @param userList  用户
      * @return 返回请求结果
      */
     @Override
-    public Result<String> delUserFromGroup(Integer groupCode, List<UserBean> userList) {
-        return null;
+    public Result<String> delUserFromGroup(Integer groupCode) {
+        permissionsDao.delUserPermissionByGroup(groupCode);
+        return new Result<>(true,"success","操作成功");
     }
 
     /**
@@ -89,6 +89,8 @@ public class PermissionsServiceImpl implements PermissionsService {
      */
     @Override
     public Result<String> delUsergroup(Integer groupCode) {
-        return null;
+        delUserFromGroup(groupCode);
+        permissionsDao.delUserGroup(groupCode);
+        return new Result<>(true,"success","操作成功");
     }
 }

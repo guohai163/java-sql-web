@@ -63,12 +63,20 @@ CREATE TABLE `usergroup` (
   `comment` VARCHAR(45) NULL COMMENT '备注',
   PRIMARY KEY (`code`));
 
-
-CREATE TABLE user_permissions` (
+-- 用户权限
+CREATE TABLE `user_permissions` (
   `code` INT NOT NULL AUTO_INCREMENT,
   `user_code` INT NOT NULL COMMENT '用户编号',
   `group_code` INT NOT NULL COMMENT '组编号',
   PRIMARY KEY (`code`));
+
+-- 数据库权限
+CREATE TABLE `db_permissions` (
+  `code` INT NOT NULL AUTO_INCREMENT,
+  `db_code` INT NOT NULL COMMENT '数据库编号',
+  `group_code` INT NOT NULL COMMENT '组编号',
+  PRIMARY KEY (`code`));
+
 
 INSERT INTO `user_tb` (`user_name`,`pass_word`,`token`) VALUES
 ('admin',md5(CONCAT(md5('admin'),'jsa')),'');

@@ -197,6 +197,30 @@ class Admin extends React.Component {
     }
     userGroupHandleOk(){
         console.log(this.state.inputData)
+        const client = new FetchHttpClient(config.serverDomain);
+        client.addMiddleware(json());
+        client.post('/api/backstage/add_usergroups',{headers: { 'Content-Type': 'application/json','User-Token': this.state.token},
+        body:JSON.stringify(this.state.inputData)})
+        .then(response => {
+            if(true === response.jsonData.status){
+                confirm({
+                    title:'提示',
+                    content: '用户创建成功',
+                    onOk(){},
+                    onCancel(){}
+                });
+                this.setState({userGroupAddVisible: false, inputData:{}})
+                this.menuClick({'key':'6'});
+            }
+            else{
+                confirm({
+                    title:'提示',
+                    content: response.jsonData.data,
+                    onOk(){                        },
+                    onCancel(){                        }
+                });
+            }
+        })
     }
     onInputChange(e){
         let data = this.state.inputData;
