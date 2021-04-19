@@ -23,6 +23,17 @@ public interface BaseConfigDao {
     List<ConnectConfigBean> getAllConnectConfig();
 
     /**
+     * 通过用户ID获取有权限查询的数据库服务器
+     * @param userCode
+     * @return
+     */
+    @Select("SELECT c.code,c.db_server_name,c.db_server_type,c.db_group FROM user_permissions a " +
+            "join db_permissions b on a.group_code=b.group_code " +
+            "join db_connect_config_tb c on b.db_code=c.code " +
+            "where user_code=#{userCode};")
+    List<ConnectConfigBean> getHavePermConnConfig(Integer userCode);
+
+    /**
      * 获得指定code的连接属性
      * @param code
      * @return

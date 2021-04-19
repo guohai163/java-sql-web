@@ -56,4 +56,14 @@ public interface PermissionsDao {
      */
     @Delete("DELETE FROM usergroup WHERE code=#{groupCode};")
     Boolean delUserGroup(Integer groupCode);
+
+    /**
+     * 增加数据库权限
+     * @param dbCode
+     * @param groupCode
+     * @return
+     */
+    @Insert("INSERT INTO `db_permissions`(`db_code`,`group_code`)VALUES(#{dbCode}, #{groupCode});")
+    Boolean addDbPermission(Integer dbCode, Integer groupCode);
+
 }

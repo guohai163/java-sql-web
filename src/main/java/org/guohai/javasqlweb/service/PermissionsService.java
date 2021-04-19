@@ -1,5 +1,6 @@
 package org.guohai.javasqlweb.service;
 
+import org.apache.ibatis.annotations.Insert;
 import org.guohai.javasqlweb.beans.Result;
 import org.guohai.javasqlweb.beans.UserBean;
 import org.guohai.javasqlweb.beans.UsergroupBean;
@@ -49,5 +50,17 @@ public interface PermissionsService {
      * @return
      */
     Result<String> delUsergroup(Integer groupCode);
+
+    /**
+     *
+     * @param dbCode
+     * @param groupCode
+     * @return
+     */
+    Result<String> addDatabasePermission(Integer dbCode, Integer groupCode);
+
+    Result<String> delDbPermissionByGroup(Integer groupCode);
+
+    Result<String> delDbPermissionBydbCode(Integer dbCode);
 
 }

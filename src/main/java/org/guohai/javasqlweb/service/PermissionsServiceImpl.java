@@ -93,4 +93,24 @@ public class PermissionsServiceImpl implements PermissionsService {
         permissionsDao.delUserGroup(groupCode);
         return new Result<>(true,"success","操作成功");
     }
+
+    /**
+     * @param dbCode
+     * @param groupCode
+     * @return
+     */
+    @Override
+    public Result<String> addDatabasePermission(Integer dbCode, Integer groupCode) {
+        return null;
+    }
+
+    @Override
+    public Result<String> delDbPermissionByGroup(Integer groupCode) {
+        return null;
+    }
+
+    @Override
+    public Result<String> delDbPermissionBydbCode(Integer dbCode) {
+        return null;
+    }
 }
