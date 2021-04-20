@@ -205,3 +205,8 @@ baseUri: http://127.0.0.1:8002
             example: |
               {"userGroup": {"groupName": "b", "comment": "t"},
                "userList": [{"code":1},{"code":2}]}
+    /db_perm:
+      get:
+        headers:
+          User-Token:
+            type: string

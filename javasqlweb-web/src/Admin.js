@@ -15,6 +15,7 @@ import {
     TeamOutlined,
     TableOutlined,
     EditOutlined,
+    LinkOutlined,
     ConsoleSqlOutlined
   } from '@ant-design/icons';
 const { Header, Footer, Sider, Content } = Layout;
@@ -31,13 +32,17 @@ class Admin extends React.Component {
             userAddVisible: false,
             confirmLoading: false,
             userGroupAddVisible: false,
+            permissionAddVisible: false,
             druidList: [],
             userList: [],
             userGroupList: [],
             groupUserList: [],
+            dbPermissionList: [],
             userCount: 0,
             serverCount: 0,
             inputData: {},
+            permissionEditGroupCode: 1,
+            permissionEditServerList: [],
             token: cookie.load('token')
         }
     }
@@ -108,6 +113,24 @@ class Admin extends React.Component {
                         this.setState({
                             userList: response.jsonData.data
                         })
+                    })
+                break;
+            case '7':
+                client.get('/api/backstage/usergroups',{headers:{'Content-Type': 'text/plain','User-Token': this.state.token}})
+                    .then(response => {
+                        this.setState({
+                            userGroupList: response.jsonData.data
+                        })
+                    })
+                client.get('/api/backstage/connlist',{headers:{'Content-Type': 'text/plain','User-Token': this.state.token}})
+                    .then(response => {
+                        this.setState({
+                            connList: response.jsonData.data
+                        })
+                    })
+                client.get('/api/backstage/db_perm',{headers:{'Content-Type': 'text/plain','User-Token': this.state.token}})
+                    .then(response => {
+                        this.setState({dbPermissionList: response.jsonData.data})
                     })
                 break;
             default:
@@ -222,6 +245,33 @@ class Admin extends React.Component {
             }
         })
     }
+    permissionHandleOk() {
+        console.log(this.state.inputData)
+        const client = new FetchHttpClient(config.serverDomain);
+        client.addMiddleware(json());
+        client.post('/api/backstage/add_permission',{headers: { 'Content-Type': 'application/json','User-Token': this.state.token},
+        body:JSON.stringify(this.state.inputData)})
+        .then(response => {
+            if(true === response.jsonData.status){
+                confirm({
+                    title:'提示',
+                    content: '权限添加成功',
+                    onOk(){},
+                    onCancel(){}
+                });
+                this.setState({permissionAddVisible: false, inputData:{}})
+                this.menuClick({'key':'7'});
+            }
+            else{
+                confirm({
+                    title:'提示',
+                    content: response.jsonData.data,
+                    onOk(){                        },
+                    onCancel(){                        }
+                });
+            }
+        })
+    }
     onInputChange(e){
         let data = this.state.inputData;
         data[e.target.id] = e.target.value
@@ -250,17 +300,38 @@ class Admin extends React.Component {
             inputData: data
         })
     }
+    onInputPermissionGroupChange(value){
+        console.log(value)
+        let data = this.state.inputData;
+        data['groupCode'] = value;
+        this.setState({
+            inputData: data,
+            permissionEditGroupCode: value
+        })
+    }
+    onInputPermissionServerChange(value){
+        let data = this.state.inputData;
+        data['serverList'] = value.map((x) => { return {'code':x}});
+        this.setState({
+            inputData: data,
+            permissionEditServerList: value
+        })
+    }
     connHandleCancel(){
         this.setState({
             configVisible: false,
             userAddVisible: false,
             userGroupAddVisible: false,
+            permissionAddVisible: false,
             inputData: {}
         })
     }
     serverAddBtn(){
+        let data = this.state.inputData;
+        data['dbGroup'] = 'default'
         this.setState({
-            configVisible: true
+            configVisible: true,
+            inputData: data
         })
     }
     userAddBtn() {
@@ -272,6 +343,34 @@ class Admin extends React.Component {
         this.setState({
             userGroupAddVisible: true
         })
+    }
+    permissionAddBtn(){
+        this.setState({
+            permissionAddVisible: true,
+            permissionEditGroupCode: 1,
+            permissionEditServerList: []
+        })
+    }
+    dbPermissionDeleteBtn(e){
+        console.log(e)
+    }
+    dbPermissionEditBtn(groupCode){
+        const client = new FetchHttpClient(config.serverDomain);
+        client.addMiddleware(json());
+        client.get('/api/backstage/server_list/'+groupCode,{headers:{'Content-Type': 'text/plain','User-Token': this.state.token}})
+                    .then(response => {
+                        var serverList = response.jsonData.data.map((x) => { return x.code});
+                        console.log(serverList)
+                        let data = this.state.inputData;
+                        data['serverList'] = response.jsonData.data;
+                        data['groupCode'] = groupCode;
+                        this.setState({
+                            permissionAddVisible: true,
+                            permissionEditGroupCode: groupCode,
+                            permissionEditServerList: serverList,
+                            inputData: data
+                        })
+                    })
     }
     userDeleteBtn(e){
         const client = new FetchHttpClient(config.serverDomain);
@@ -328,7 +427,7 @@ class Admin extends React.Component {
     }
     userGroupEditBtn(groupCode){
         console.log('userGroupEditBtn')
-
+        
     }
     serverDeleteBtn(serverCode){
         const client = new FetchHttpClient(config.serverDomain);
@@ -394,7 +493,11 @@ class Admin extends React.Component {
                                         {title: '备注', dataIndex: 'comment'},
                                         {title:'操作', render: (text, record) => (<Space size="middle"><a onClick={this.userGroupDeleteBtn.bind(this,record.code)}>删除</a>
                                             <a onClick={this.userGroupEditBtn.bind(this,record.code)}>编辑</a></Space>)}]
-        let {configVisible,confirmLoading,userAddVisible, userGroupAddVisible,userList} = this.state;
+        const dbPermissionListColumns = [{title: '组名', dataIndex: 'groupName'},
+                                        {title: '服务器列表', dataIndex: 'serverList'},
+                                        {title:'操作', render: (text, record) => (<Space size="middle"><a onClick={this.dbPermissionDeleteBtn.bind(this,record.groupName)}>删除</a>
+                                        <a onClick={this.dbPermissionEditBtn.bind(this,record.groupCode)}>编辑</a></Space>)}]
+        let {configVisible,confirmLoading,userAddVisible, userGroupAddVisible,userList,permissionAddVisible,userGroupList,connList,dbPermissionList} = this.state;
         return (
             <>
                 <Layout>
@@ -415,6 +518,9 @@ class Admin extends React.Component {
                         </Menu.Item>
                         <Menu.Item key="3" icon={<DatabaseOutlined />}>
                         服务器管理
+                        </Menu.Item>
+                        <Menu.Item key="7" icon={<LinkOutlined />}>
+                        权限管理
                         </Menu.Item>
                         <Menu.Item key="4" icon={<TableOutlined />}>
                         查询日志
@@ -541,6 +647,43 @@ class Admin extends React.Component {
                         </Form>
                         </Modal>
                         <Table columns={userGroupListColumns} dataSource={this.state.userGroupList} pagination={{ pageSize: 25 }} size="small" />
+                    </div>
+                    
+                    <div className={this.state.menuSelect === '7' ?'right_content':'hide'}>
+                        <Button onClick={this.permissionAddBtn.bind(this)} type="primary" style={{ marginBottom: 16 }}>
+                        增加授权
+                        </Button>
+
+                        <Modal
+                            title="增加授权"
+                            visible={permissionAddVisible}
+                            onOk={this.permissionHandleOk.bind(this)}
+                            confirmLoading={confirmLoading}
+                            onCancel={this.connHandleCancel.bind(this)}
+                        >
+                        <Form size="small" labelCol={{ span: 7 }}>
+                        <Form.Item label="用户组">
+                            <Select showSearch onChange={this.onInputPermissionGroupChange.bind(this)} id="groupCode" value={this.state.permissionEditGroupCode}>
+                            {userGroupList.map(row => {
+                                return(<Option value={row.code}>👥 {row.groupName}</Option>)
+                            })}
+                            </Select>
+                        </Form.Item>
+                        <Form.Item label="服务器">
+                            <Select mode="multiple" placeholder="选择进入该组用户" onChange={this.onInputPermissionServerChange.bind(this)} value={this.state.permissionEditServerList}>
+                            {connList.map( row => {
+                                return(<Option value={row.code} label={row.dbServerName}>
+                                        <div className="demo-option-label-item">
+                                        🖥 {row.dbServerName} ({row.code})
+                                        </div>
+                                        </Option>)
+                            })}
+                            
+                            </Select>
+                        </Form.Item>
+                        </Form>
+                        </Modal>
+                        <Table columns={dbPermissionListColumns} dataSource={dbPermissionList} pagination={{pageSize: 25 }} size="small"></Table>
                     </div>
                     </Content>
                     <Footer>javaSqlWeb ©2020 Created by Hai</Footer>

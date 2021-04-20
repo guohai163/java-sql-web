@@ -1,10 +1,9 @@
 package org.guohai.javasqlweb.service;
 
 import org.apache.ibatis.annotations.Insert;
-import org.guohai.javasqlweb.beans.Result;
-import org.guohai.javasqlweb.beans.UserBean;
-import org.guohai.javasqlweb.beans.UsergroupBean;
+import org.guohai.javasqlweb.beans.*;
 
+import java.util.HashMap;
 import java.util.List;
 
 /**
@@ -52,15 +51,31 @@ public interface PermissionsService {
     Result<String> delUsergroup(Integer groupCode);
 
     /**
-     *
-     * @param dbCode
+     * 增加用户的数据库权限
+     * @param groupCode 用户组
+     * @param serverList 服务器列表
+     * @return
+     */
+    Result<String> addDatabasePermission(Integer groupCode, List<ConnectConfigBean> serverList);
+
+    /**
+     * 根据组名删除权限
      * @param groupCode
      * @return
      */
-    Result<String> addDatabasePermission(Integer dbCode, Integer groupCode);
-
     Result<String> delDbPermissionByGroup(Integer groupCode);
 
-    Result<String> delDbPermissionBydbCode(Integer dbCode);
+    /**
+     * 根据组名获取服务器列表
+     * @param groupCode
+     * @return
+     */
+    Result<List<ConnectConfigBean>> getServerConfigByGroup(Integer groupCode);
+
+    /**
+     * 获取完整的权限列表
+     * @return
+     */
+    Result<List<DbPermissionBean>> getAllDbPerm();
 
 }

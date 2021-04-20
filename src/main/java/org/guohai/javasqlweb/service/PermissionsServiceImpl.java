@@ -1,14 +1,13 @@
 package org.guohai.javasqlweb.service;
 
-import org.guohai.javasqlweb.beans.Result;
-import org.guohai.javasqlweb.beans.UserBean;
-import org.guohai.javasqlweb.beans.UsergroupBean;
+import org.guohai.javasqlweb.beans.*;
 import org.guohai.javasqlweb.dao.PermissionsDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 
@@ -95,22 +94,54 @@ public class PermissionsServiceImpl implements PermissionsService {
     }
 
     /**
-     * @param dbCode
+     * 增加用户的数据库权限
+     *
+     * @param groupCode  用户组
+     * @param serverList 服务器列表
+     * @return
+     */
+    @Override
+    public Result<String> addDatabasePermission(Integer groupCode, List<ConnectConfigBean> serverList) {
+        // 增加时先进行数据清空
+        delDbPermissionByGroup(groupCode);
+        for(Iterator<ConnectConfigBean> it = serverList.iterator();it.hasNext();){
+            ConnectConfigBean server = it.next();
+            permissionsDao.addDbPermission(server.getCode(), groupCode);
+        }
+        return  new Result<>(true,"success","操作成功");
+    }
+
+    /**
+     * 根据组名删除权限
+     *
      * @param groupCode
      * @return
      */
     @Override
-    public Result<String> addDatabasePermission(Integer dbCode, Integer groupCode) {
-        return null;
-    }
-
-    @Override
     public Result<String> delDbPermissionByGroup(Integer groupCode) {
-        return null;
+        return new Result<>(permissionsDao.delDbPermissions(groupCode),"", "");
     }
 
+    /**
+     * 根据组名获取服务器列表
+     *
+     * @param groupCode
+     * @return
+     */
     @Override
-    public Result<String> delDbPermissionBydbCode(Integer dbCode) {
-        return null;
+    public Result<List<ConnectConfigBean>> getServerConfigByGroup(Integer groupCode) {
+        return new Result<>(true,"success", permissionsDao.getGroupPermissions(groupCode));
+    }
+
+
+    /**
+     * 获取完整的权限列表
+     *
+     * @return
+     */
+    @Override
+    public Result<List<DbPermissionBean>> getAllDbPerm() {
+
+        return new Result<>(true,"success", permissionsDao.getDbPermissions());
     }
 }

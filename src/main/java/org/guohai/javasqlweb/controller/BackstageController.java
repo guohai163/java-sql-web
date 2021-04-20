@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -175,6 +176,11 @@ public class BackstageController {
         return permissionsService.getAllUsergroup();
     }
 
+    /**
+     * 增加用户组
+     * @param userGroup
+     * @return
+     */
     @ResponseBody
     @RequestMapping(value = "/add_usergroups", method = RequestMethod.POST)
     public Result<String> addUsergroup(@RequestBody CreateUserGroupParam userGroup){
@@ -182,11 +188,61 @@ public class BackstageController {
         return permissionsService.addUsergroup(userGroup.getGroupName(), userGroup.getGroupComment(),
                 userGroup.getUserList());
     }
+
+    /**
+     * 为用户组绑定权限
+     * @param perm
+     * @return
+     */
+    @ResponseBody
+    @RequestMapping(value = "/add_permission", method = RequestMethod.POST)
+    public Result<String> addPermission(@RequestBody CreatePermissionParam perm){
+        return permissionsService.addDatabasePermission(perm.getGroupCode(),perm.getServerList());
+    }
+
+    /**
+     * 获取已经授权的权限列表
+     * @return
+     */
+    @ResponseBody
+    @RequestMapping(value = "/db_perm", method = RequestMethod.GET)
+    public Result<List<DbPermissionBean>> getAllDbPerm(){
+        return permissionsService.getAllDbPerm();
+    }
+
+    /**
+     * 获取指定用户组的数据库列表
+     * @param groupCode
+     * @return
+     */
+    @ResponseBody
+    @RequestMapping(value = "/server_list/{group_code}", method = RequestMethod.GET)
+    public Result<List<ConnectConfigBean>> getServerConfigByGroup(@PathVariable("group_code") Integer groupCode){
+        return permissionsService.getServerConfigByGroup(groupCode);
+    }
+
+    @ResponseBody
+    @RequestMapping(value = "/db_perm/{group_code}", method = RequestMethod.DELETE)
+    public Result<String> delDbPermission(@PathVariable("group_code") Integer groupCode) {
+        return permissionsService.delDbPermissionByGroup(groupCode);
+    }
 }
 
+/**
+ * 创建用户组接口参数
+ */
 @Data
 class CreateUserGroupParam{
     private String groupName;
     private String groupComment;
     private List<UserBean> userList;
+}
+
+/**
+ * 创建权限组参数
+ */
+@Data
+class CreatePermissionParam{
+    private Integer groupCode;
+    private List<ConnectConfigBean> serverList;
 }
