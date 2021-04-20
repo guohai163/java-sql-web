@@ -34,6 +34,16 @@ public class PermissionsServiceImpl implements PermissionsService {
     }
 
     /**
+     * 获取含用户列表的组数据
+     *
+     * @return
+     */
+    @Override
+    public Result<List<UsergroupBean>> getGroupDataInUser() {
+        return new Result<>(true,"", permissionsDao.getUserGroupInUser());
+    }
+
+    /**
      * 增加新的用户组
      *
      * @param groupName 组名
@@ -143,5 +153,16 @@ public class PermissionsServiceImpl implements PermissionsService {
     public Result<List<DbPermissionBean>> getAllDbPerm() {
 
         return new Result<>(true,"success", permissionsDao.getDbPermissions());
+    }
+
+    /**
+     * 获取组内用户列表
+     *
+     * @param groupCode
+     * @return
+     */
+    @Override
+    public Result<List<UserBean>> getGroupUser(Integer groupCode) {
+        return new Result<>(true,"", permissionsDao.getGroupUser(groupCode));
     }
 }

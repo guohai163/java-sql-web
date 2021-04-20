@@ -24,4 +24,9 @@ public class UsergroupBean {
      * 备注
      */
     private String comment;
+
+    /**
+     * 用户明细
+     */
+    private String userArray;
 }

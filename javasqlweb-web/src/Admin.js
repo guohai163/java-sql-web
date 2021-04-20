@@ -491,6 +491,7 @@ class Admin extends React.Component {
         const userGroupListColumns = [{title: '编号', dataIndex: 'code'},
                                         {title: '组名', dataIndex: 'groupName'},
                                         {title: '备注', dataIndex: 'comment'},
+                                        {title: '用户列表', dataIndex: 'userArray'},
                                         {title:'操作', render: (text, record) => (<Space size="middle"><a onClick={this.userGroupDeleteBtn.bind(this,record.code)}>删除</a>
                                             <a onClick={this.userGroupEditBtn.bind(this,record.code)}>编辑</a></Space>)}]
         const dbPermissionListColumns = [{title: '组名', dataIndex: 'groupName'},

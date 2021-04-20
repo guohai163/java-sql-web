@@ -173,7 +173,7 @@ public class BackstageController {
     @ResponseBody
     @RequestMapping(value = "/usergroups", method = RequestMethod.GET)
     public Result<List<UsergroupBean>> getAllUsergroup(){
-        return permissionsService.getAllUsergroup();
+        return permissionsService.getGroupDataInUser();
     }
 
     /**
@@ -225,6 +225,17 @@ public class BackstageController {
     @RequestMapping(value = "/db_perm/{group_code}", method = RequestMethod.DELETE)
     public Result<String> delDbPermission(@PathVariable("group_code") Integer groupCode) {
         return permissionsService.delDbPermissionByGroup(groupCode);
+    }
+
+    /**
+     * 获取用户组内，用户列表
+     * @param groupCode
+     * @return
+     */
+    @ResponseBody
+    @RequestMapping(value = "/group_user/{group_code}", method = RequestMethod.GET)
+    public Result<List<UserBean>> getGroupUser(@PathVariable("group_code") Integer groupCode) {
+        return permissionsService.getGroupUser(groupCode);
     }
 }
 

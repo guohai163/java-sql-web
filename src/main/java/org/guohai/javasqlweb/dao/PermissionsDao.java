@@ -6,6 +6,7 @@ import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Select;
 import org.guohai.javasqlweb.beans.ConnectConfigBean;
 import org.guohai.javasqlweb.beans.DbPermissionBean;
+import org.guohai.javasqlweb.beans.UserBean;
 import org.guohai.javasqlweb.beans.UsergroupBean;
 import org.springframework.stereotype.Repository;
 
@@ -27,6 +28,16 @@ public interface PermissionsDao {
     @Select("SELECT * FROM usergroup")
     List<UsergroupBean> getUsergroups();
 
+    /**
+     * 获取组数据，显示用
+     * @return
+     */
+    @Select("SELECT a.code,group_name,comment,COALESCE(group_concat(distinct user_name),'') as user_array \n" +
+            "FROM usergroup a\n" +
+            "left join user_permissions b on a.code=b.group_code\n" +
+            "left join user_tb c on b.user_code=c.code\n" +
+            "group by a.code;")
+    List<UsergroupBean> getUserGroupInUser();
     /**
      * 创建新的用户组
      * @param userGroup
@@ -96,4 +107,13 @@ public interface PermissionsDao {
     @Select(" SELECT code,db_server_name,db_server_type,db_group FROM db_connect_config_tb WHERE code in " +
             "(SELECT db_code FROM `db_permissions` WHERE group_code=#{groupCode})")
     List<ConnectConfigBean> getGroupPermissions(Integer groupCode);
+
+    /**
+     * 返回组内所有用户数据
+     * @param groupCode
+     * @return
+     */
+    @Select("select code,user_name from user_tb where code in " +
+            "(select user_code from user_permissions where group_code=#{groupCode})")
+    List<UserBean> getGroupUser(Integer groupCode);
 }

@@ -20,6 +20,12 @@ public interface PermissionsService {
     Result<List<UsergroupBean>> getAllUsergroup();
 
     /**
+     * 获取含用户列表的组数据
+     * @return
+     */
+    Result<List<UsergroupBean>> getGroupDataInUser();
+
+    /**
      * 增加新的用户组
      * @param groupName 组名
      * @param comment 组的备注
@@ -77,5 +83,12 @@ public interface PermissionsService {
      * @return
      */
     Result<List<DbPermissionBean>> getAllDbPerm();
+
+    /**
+     * 获取组内用户列表
+     * @param groupCode
+     * @return
+     */
+    Result<List<UserBean>> getGroupUser(Integer groupCode);
 
 }
