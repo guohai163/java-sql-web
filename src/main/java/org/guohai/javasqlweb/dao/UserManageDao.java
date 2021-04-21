@@ -45,7 +45,7 @@ public interface UserManageDao {
      * @param token
      * @return
      */
-    @Select("SELECT user_name,auth_status,auth_secret,login_status FROM user_tb WHERE token=#{token}")
+    @Select("SELECT code,user_name,auth_status,auth_secret,login_status FROM user_tb WHERE token=#{token}")
     UserBean getUserByToken(@Param("token") String token);
 
 

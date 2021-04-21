@@ -94,5 +94,12 @@ public interface BaseDataService {
      * 获取数据库分组
      * @return
      */
-    Result<List<String>> getDbGroup();
+    Result<List<String>> getDbGroup(String token);
+
+    /**
+     * 获取指定用户可以看的列表
+     * @param token
+     * @return
+     */
+    Result<List<ConnectConfigBean>> getHavaPermConn(String token);
 }

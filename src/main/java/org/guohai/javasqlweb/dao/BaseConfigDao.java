@@ -153,8 +153,12 @@ public interface BaseConfigDao {
 
     /**
      * 获取数据库分组
+     * @param userCode 用户编号
      * @return
      */
-    @Select("SELECT distinct db_group FROM db_connect_config_tb;")
-    List<String> getDbGroup();
+    @Select("SELECT distinct db_group FROM user_permissions a " +
+            "join db_permissions b on a.group_code=b.group_code " +
+            "join db_connect_config_tb c on b.db_code=c.code " +
+            "where user_code=#{userCode}")
+    List<String> getDbGroup(Integer userCode);
 }

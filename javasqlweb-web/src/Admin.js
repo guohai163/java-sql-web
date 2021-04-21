@@ -18,7 +18,7 @@ import {
     LinkOutlined,
     ConsoleSqlOutlined
   } from '@ant-design/icons';
-const { Header, Footer, Sider, Content } = Layout;
+const { Footer, Sider, Content } = Layout;
 const { Option } = Select;
 const { confirm } = Modal;
 class Admin extends React.Component {
@@ -43,6 +43,8 @@ class Admin extends React.Component {
             inputData: {},
             permissionEditGroupCode: 1,
             permissionEditServerList: [],
+            userGroupEditGroupCode: 1,
+            userGroupEditUserList: [],
             token: cookie.load('token')
         }
     }
@@ -220,30 +222,60 @@ class Admin extends React.Component {
     }
     userGroupHandleOk(){
         console.log(this.state.inputData)
+        console.log(this.state.inputData['groupCode'])
         const client = new FetchHttpClient(config.serverDomain);
         client.addMiddleware(json());
-        client.post('/api/backstage/add_usergroups',{headers: { 'Content-Type': 'application/json','User-Token': this.state.token},
-        body:JSON.stringify(this.state.inputData)})
-        .then(response => {
-            if(true === response.jsonData.status){
-                confirm({
-                    title:'提示',
-                    content: '用户创建成功',
-                    onOk(){},
-                    onCancel(){}
-                });
-                this.setState({userGroupAddVisible: false, inputData:{}})
-                this.menuClick({'key':'6'});
-            }
-            else{
-                confirm({
-                    title:'提示',
-                    content: response.jsonData.data,
-                    onOk(){                        },
-                    onCancel(){                        }
-                });
-            }
-        })
+        if(undefined === this.state.inputData.code){
+            // 走创建新用户组流程
+            client.post('/api/backstage/add_usergroups',{headers: { 'Content-Type': 'application/json','User-Token': this.state.token},
+            body:JSON.stringify(this.state.inputData)})
+                .then(response => {
+                    if(true === response.jsonData.status){
+                        confirm({
+                            title:'提示',
+                            content: '用户创建成功',
+                            onOk(){},
+                            onCancel(){}
+                        });
+                        this.setState({userGroupAddVisible: false, inputData:{}})
+                        this.menuClick({'key':'6'});
+                    }
+                    else{
+                        confirm({
+                            title:'提示',
+                            content: response.jsonData.data,
+                            onOk(){                        },
+                            onCancel(){                        }
+                        });
+                    }
+                })
+        }
+        else{
+            // 走编辑用户组流程
+            client.put('/api/backstage/set_group_data',{headers: { 'Content-Type': 'application/json','User-Token': this.state.token},
+            body:JSON.stringify(this.state.inputData)})
+                .then(response => {
+                    if(true === response.jsonData.status){
+                        confirm({
+                            title:'提示',
+                            content: '用户数据更新成功',
+                            onOk(){},
+                            onCancel(){}
+                        });
+                        this.setState({userGroupAddVisible: false, inputData:{}})
+                        this.menuClick({'key':'6'});
+                    }
+                    else{
+                        confirm({
+                            title:'提示',
+                            content: response.jsonData.data,
+                            onOk(){                        },
+                            onCancel(){                        }
+                        });
+                    }
+                })
+        }
+
     }
     permissionHandleOk() {
         console.log(this.state.inputData)
@@ -297,7 +329,8 @@ class Admin extends React.Component {
         let data = this.state.inputData;
         data['userList'] = value.map((x) => { return {'code':x}});
         this.setState({
-            inputData: data
+            inputData: data,
+            userGroupEdituserList: value
         })
     }
     onInputPermissionGroupChange(value){
@@ -340,15 +373,19 @@ class Admin extends React.Component {
         })
     }
     userGroupAddBtn() {
+
         this.setState({
             userGroupAddVisible: true
         })
     }
     permissionAddBtn(){
+        let data = this.state.inputData
+        data['groupCode'] = 1
         this.setState({
             permissionAddVisible: true,
             permissionEditGroupCode: 1,
-            permissionEditServerList: []
+            permissionEditServerList: [],
+            inputData: data
         })
     }
     dbPermissionDeleteBtn(e){
@@ -366,7 +403,6 @@ class Admin extends React.Component {
                         data['groupCode'] = groupCode;
                         this.setState({
                             permissionAddVisible: true,
-                            permissionEditGroupCode: groupCode,
                             permissionEditServerList: serverList,
                             inputData: data
                         })
@@ -423,10 +459,47 @@ class Admin extends React.Component {
             })
     }
     userGroupDeleteBtn(groupCode){
-        console.log('userGroupDeleteBtn')
+        const client = new FetchHttpClient(config.serverDomain);
+        client.addMiddleware(json());
+        client.delete('/api/backstage/usergroup/'+groupCode,{headers: { 'Content-Type': 'application/json','User-Token': this.state.token}})
+        .then(response => {
+            if(true === response.jsonData.status){
+                confirm({
+                    title:'提示',
+                    content: '用户组删除成功',
+                    onOk(){},
+                    onCancel(){}
+                });
+                this.setState({permissionAddVisible: false, inputData:{}})
+                this.menuClick({'key':'6'});
+            }
+            else{
+                confirm({
+                    title:'提示',
+                    content: response.jsonData.data,
+                    onOk(){                        },
+                    onCancel(){                        }
+                });
+            }
+        })
     }
     userGroupEditBtn(groupCode){
-        console.log('userGroupEditBtn')
+        console.log(groupCode)
+        const client = new FetchHttpClient(config.serverDomain);
+        client.addMiddleware(json());
+        client.get('/api/backstage/group_user/'+groupCode,{headers:{'Content-Type': 'text/plain','User-Token': this.state.token}})
+                    .then(response => {
+                        var userList = response.jsonData.data.map((x) => { return x.code});
+                        console.log(userList)
+                        let data = this.state.userGroupList.filter(item => item.code === groupCode)[0];
+                        data['userList'] = response.jsonData.data;
+                        this.setState({
+                            userGroupAddVisible: true,
+                            userGroupEditGroupCode: groupCode,
+                            userGroupEdituserList: userList,
+                            inputData: data
+                        })
+                    })
         
     }
     serverDeleteBtn(serverCode){
@@ -457,7 +530,6 @@ class Admin extends React.Component {
     showEditServerBtn(serverCode){
         console.log(serverCode)
         console.log(this.state.connList)
-        // this.state.spList.filter(item => item.procedureName.indexOf(parm.target.value) !== -1)this.state.inputData.dbServerType
         console.log(this.state.connList.filter(item => item.code === serverCode)[0])
         this.setState({
             inputData: this.state.connList.filter(item => item.code === serverCode)[0],
@@ -475,8 +547,10 @@ class Admin extends React.Component {
                                 {title:'服务器类型', dataIndex:'dbServerType'},
                                 {title:'服务器分组', dataIndex:'dbGroup'},
                                 {title:'创建时间', dataIndex:'createTime'},
-                                {title:'操作', render: (text, record) => (<Space size="middle"><a onClick={this.showEditServerBtn.bind(this,record.code)}>编辑</a>
-                                    <a onClick={this.serverDeleteBtn.bind(this,record.code)}>删除</a></Space>)}];
+                                {title:'操作', render: (text, record) => (<Space size="middle">
+                                    <Button type="link" onClick={this.showEditServerBtn.bind(this,record.code)}>编辑</Button>
+                                    <Button type="link" onClick={this.serverDeleteBtn.bind(this,record.code)}>删除</Button>
+                                    </Space>)}];
         const druidColumns = [{title: '连接名', dataIndex:'Name'},
                                 {title: '连接地址', dataIndex:'URL'},
                               {title: '数据库类型', dataIndex:'DbType'},
@@ -486,19 +560,26 @@ class Admin extends React.Component {
         const userListColumns = [{title:'编号', dataIndex: 'code'},
                                 {title:'用户名',dataIndex: 'userName'},
                                 {title:'二次验证绑定',dataIndex: 'authStatus'},
-                                {title:'操作', render: (text, record) => (<Space size="middle"><a onClick={this.userDeleteBtn.bind(this,record.userName)}>删除</a>
-                                    <a onClick={this.unbindOtp.bind(this,record.userName)}>解绑OTP</a></Space>)}]
+                                {title:'操作', render: (text, record) => (<Space size="middle">
+                                <Button type="link" onClick={this.unbindOtp.bind(this,record.userName)}>解绑OTP</Button>
+                                    <Button type="link" onClick={this.userDeleteBtn.bind(this,record.userName)}>删除</Button>
+                                </Space>)}]
         const userGroupListColumns = [{title: '编号', dataIndex: 'code'},
                                         {title: '组名', dataIndex: 'groupName'},
                                         {title: '备注', dataIndex: 'comment'},
                                         {title: '用户列表', dataIndex: 'userArray'},
-                                        {title:'操作', render: (text, record) => (<Space size="middle"><a onClick={this.userGroupDeleteBtn.bind(this,record.code)}>删除</a>
-                                            <a onClick={this.userGroupEditBtn.bind(this,record.code)}>编辑</a></Space>)}]
+                                        {title:'操作', render: (text, record) => (<Space size="middle">
+                                        <Button type="link" onClick={this.userGroupEditBtn.bind(this,record.code)}>编辑</Button>
+                                    <Button type="link" onClick={this.userGroupDeleteBtn.bind(this,record.code)}>删除</Button>
+                                    </Space>)}]
         const dbPermissionListColumns = [{title: '组名', dataIndex: 'groupName'},
                                         {title: '服务器列表', dataIndex: 'serverList'},
-                                        {title:'操作', render: (text, record) => (<Space size="middle"><a onClick={this.dbPermissionDeleteBtn.bind(this,record.groupName)}>删除</a>
-                                        <a onClick={this.dbPermissionEditBtn.bind(this,record.groupCode)}>编辑</a></Space>)}]
-        let {configVisible,confirmLoading,userAddVisible, userGroupAddVisible,userList,permissionAddVisible,userGroupList,connList,dbPermissionList} = this.state;
+                                        {title:'操作', render: (text, record) => (<Space size="middle">
+                                        <Button type="link" onClick={this.dbPermissionEditBtn.bind(this,record.code)}>编辑</Button>
+                                    <Button type="link" onClick={this.dbPermissionDeleteBtn.bind(this,record.code)}>删除</Button>
+                                    </Space>)}]
+        let {configVisible,confirmLoading,userAddVisible, userGroupAddVisible,userList,permissionAddVisible,userGroupList,connList,dbPermissionList,
+            userGroupEditGroupCode,userGroupEdituserList} = this.state;
         return (
             <>
                 <Layout>
@@ -628,13 +709,13 @@ class Admin extends React.Component {
                         >
                         <Form size="small" labelCol={{ span: 7 }}>
                         <Form.Item label="组名">
-                            <Input onChange={this.onInputChange.bind(this)} id="groupName"/>
+                            <Input onChange={this.onInputChange.bind(this)} id="groupName" value={this.state.inputData.groupName}/>
                         </Form.Item>
                         <Form.Item label="备注">
-                            <Input onChange={this.onInputChange.bind(this)} id="groupComment"/>
+                            <Input onChange={this.onInputChange.bind(this)} id="comment" value={this.state.inputData.comment}/>
                         </Form.Item>
                         <Form.Item label="用户">
-                            <Select mode="multiple" placeholder="选择进入该组用户" onChange={this.onUserGroupFromUserChange.bind(this)}>
+                            <Select mode="multiple" placeholder="选择进入该组用户" onChange={this.onUserGroupFromUserChange.bind(this)} value={userGroupEdituserList}>
                             {userList.map( row => {
                                 return(<Option value={row.code} label={row.userName}>
                                         <div className="demo-option-label-item">

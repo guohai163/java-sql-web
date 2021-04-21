@@ -59,6 +59,7 @@ class Navigation extends React.Component {
         client.addMiddleware(json());
         client.get('/database/serverlist',{headers:{'User-Token': this.state.token}})
             .then(response => {
+                console.log(response)
                 if(response.jsonData.status) {
                     this.setState({
                         serverList: response.jsonData.data
@@ -71,11 +72,16 @@ class Navigation extends React.Component {
             })
         client.get('/database/server/group',{headers:{'User-Token': this.state.token}})
             .then(response => {
+                console.log(response.jsonData)
                 if(response.jsonData.status) {
                     this.setState({
                         dbGroup: response.jsonData.data
                     })
                 }
+            })
+            .catch(rejected => {
+                console.log('catch',rejected)
+
             })
     }
     dbChange(dbName,event) {

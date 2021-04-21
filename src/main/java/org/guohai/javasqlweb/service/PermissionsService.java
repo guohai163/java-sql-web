@@ -91,4 +91,12 @@ public interface PermissionsService {
      */
     Result<List<UserBean>> getGroupUser(Integer groupCode);
 
+    /**
+     * 更新用户组数据
+     * @param usergroup
+     * @param userList
+     * @return
+     */
+    Result<String> setUserGroupData(UsergroupBean usergroup, List<UserBean> userList);
+
 }

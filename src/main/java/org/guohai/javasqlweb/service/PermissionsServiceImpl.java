@@ -165,4 +165,26 @@ public class PermissionsServiceImpl implements PermissionsService {
     public Result<List<UserBean>> getGroupUser(Integer groupCode) {
         return new Result<>(true,"", permissionsDao.getGroupUser(groupCode));
     }
+
+    /**
+     * 更新用户组数据
+     *
+     * @param usergroup
+     * @param userList
+     * @return
+     */
+    @Override
+    public Result<String> setUserGroupData(UsergroupBean usergroup, List<UserBean> userList) {
+        if(permissionsDao.setUserGroup(usergroup.getCode(), usergroup.getGroupName(), usergroup.getComment())){
+            permissionsDao.delUserPermissionByGroup(usergroup.getCode());
+            for(Iterator<UserBean> it = userList.iterator();it.hasNext();){
+                UserBean user = it.next();
+                permissionsDao.addUserPermission(user.getCode(), usergroup.getCode());
+            }
+        }
+        else{
+            return new Result<>(false,"database operator error", "");
+        }
+        return new Result<>(true,"success", "");
+    }
 }

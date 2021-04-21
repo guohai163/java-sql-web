@@ -28,8 +28,8 @@ public class BaseDataController {
 
     @ResponseBody
     @RequestMapping(value = "/serverlist")
-    public Result<List<ConnectConfigBean>> getAllConnect(){
-        return baseDataService.getAllDataConnect();
+    public Result<List<ConnectConfigBean>> getAllConnect(@RequestHeader(value = "User-Token", required =  false) String token){
+        return baseDataService.getHavaPermConn(token);
     }
 
     /**
@@ -141,7 +141,7 @@ public class BaseDataController {
 
     @ResponseBody
     @RequestMapping(value = "/server/group")
-    public Result<List<String>> getDbGroup(){
-        return baseDataService.getDbGroup();
+    public Result<List<String>> getDbGroup(@RequestHeader(value = "User-Token", required =  false) String token){
+        return baseDataService.getDbGroup(token);
     }
 }

@@ -1,9 +1,6 @@
 package org.guohai.javasqlweb.dao;
 
-import org.apache.ibatis.annotations.Delete;
-import org.apache.ibatis.annotations.Insert;
-import org.apache.ibatis.annotations.Options;
-import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.*;
 import org.guohai.javasqlweb.beans.ConnectConfigBean;
 import org.guohai.javasqlweb.beans.DbPermissionBean;
 import org.guohai.javasqlweb.beans.UserBean;
@@ -104,7 +101,7 @@ public interface PermissionsDao {
      * @param groupCode
      * @return
      */
-    @Select(" SELECT code,db_server_name,db_server_type,db_group FROM db_connect_config_tb WHERE code in " +
+    @Select("SELECT code,db_server_name,db_server_type,db_group FROM db_connect_config_tb WHERE code in " +
             "(SELECT db_code FROM `db_permissions` WHERE group_code=#{groupCode})")
     List<ConnectConfigBean> getGroupPermissions(Integer groupCode);
 
@@ -116,4 +113,8 @@ public interface PermissionsDao {
     @Select("select code,user_name from user_tb where code in " +
             "(select user_code from user_permissions where group_code=#{groupCode})")
     List<UserBean> getGroupUser(Integer groupCode);
+
+    @Update("UPDATE `usergroup` SET `group_name` = #{groupName},`comment` = #{comment} WHERE `code` = #{groupCode};")
+    Boolean setUserGroup(Integer groupCode, String groupName, String comment);
+
 }

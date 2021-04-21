@@ -32,7 +32,8 @@ class Login extends React.Component {
         console.log(this.props)
         const parsed = queryString.parse(this.props.location.search)
         console.log(parsed)
-        if(null !== parsed.user_name){
+        console.log(parsed.user_name)
+        if(undefined !== parsed.user_name &&  null !== parsed.user_name){
             this.autoCreateUser(parsed.user_name,parsed.timestamp,parsed.sign)
         }
     }

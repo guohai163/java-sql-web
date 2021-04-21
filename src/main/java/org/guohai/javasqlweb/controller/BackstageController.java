@@ -176,18 +176,7 @@ public class BackstageController {
         return permissionsService.getGroupDataInUser();
     }
 
-    /**
-     * 增加用户组
-     * @param userGroup
-     * @return
-     */
-    @ResponseBody
-    @RequestMapping(value = "/add_usergroups", method = RequestMethod.POST)
-    public Result<String> addUsergroup(@RequestBody CreateUserGroupParam userGroup){
 
-        return permissionsService.addUsergroup(userGroup.getGroupName(), userGroup.getGroupComment(),
-                userGroup.getUserList());
-    }
 
     /**
      * 为用户组绑定权限
@@ -227,6 +216,9 @@ public class BackstageController {
         return permissionsService.delDbPermissionByGroup(groupCode);
     }
 
+
+
+    //region 用户组操作
     /**
      * 获取用户组内，用户列表
      * @param groupCode
@@ -237,15 +229,49 @@ public class BackstageController {
     public Result<List<UserBean>> getGroupUser(@PathVariable("group_code") Integer groupCode) {
         return permissionsService.getGroupUser(groupCode);
     }
+
+    /**
+     * 删除用户组
+     * @param groupCode
+     * @return
+     */
+    @ResponseBody
+    @RequestMapping(value = "/usergroup/{group_code}", method = RequestMethod.DELETE)
+    public Result<String> delUserGroup(@PathVariable("group_code") Integer groupCode){
+        return permissionsService.delUsergroup(groupCode);
+    }
+
+    /**
+     * 增加用户组
+     * @param userGroup
+     * @return
+     */
+    @ResponseBody
+    @RequestMapping(value = "/add_usergroups", method = RequestMethod.POST)
+    public Result<String> addUsergroup(@RequestBody CreateUserGroupParam userGroup){
+
+        return permissionsService.addUsergroup(userGroup.getGroupName(), userGroup.getComment(),
+                userGroup.getUserList());
+    }
+
+    /**
+     * 更新用户组数据
+     * @param userGroup
+     * @return
+     */
+    @ResponseBody
+    @RequestMapping(value = "/set_group_data", method = RequestMethod.PUT)
+    public Result<String> setUsergroupData(@RequestBody CreateUserGroupParam userGroup){
+        return permissionsService.setUserGroupData(userGroup, userGroup.getUserList());
+    }
+    //endregion
 }
 
 /**
  * 创建用户组接口参数
  */
 @Data
-class CreateUserGroupParam{
-    private String groupName;
-    private String groupComment;
+class CreateUserGroupParam extends UsergroupBean {
     private List<UserBean> userList;
 }
 

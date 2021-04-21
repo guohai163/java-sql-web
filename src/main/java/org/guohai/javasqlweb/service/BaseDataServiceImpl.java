@@ -262,8 +262,27 @@ public class BaseDataServiceImpl implements BaseDataService{
      * @return
      */
     @Override
-    public Result<List<String>> getDbGroup() {
-        return new Result<>(true, "", baseConfigDao.getDbGroup());
+    public Result<List<String>> getDbGroup(String token) {
+        UserBean user = adminDao.getUserByToken(token);
+        if(null == user){
+            return new Result<>(false,"",null);
+        }
+        return new Result<>(true, "", baseConfigDao.getDbGroup(user.getCode()));
+    }
+
+    /**
+     * 获取指定用户可以看的列表
+     *
+     * @param token
+     * @return
+     */
+    @Override
+    public Result<List<ConnectConfigBean>> getHavaPermConn(String token) {
+        UserBean user = adminDao.getUserByToken(token);
+        if(null == user){
+            return new Result<>(false,"",null);
+        }
+        return new Result<>(true, "", baseConfigDao.getHavePermConnConfig(user.getCode()));
     }
 
     /**
