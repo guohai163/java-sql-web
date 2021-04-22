@@ -14,6 +14,7 @@ const { confirm } = Modal;
 const { Option, OptGroup } = Select;
 const antIcon = <LoadingOutlined style={{ fontSize: 24 }} spin />;
 const CACHE_TTL = 1000*60*60*24;
+let table_result ;
 
 class Navigation extends React.Component {
     constructor(props){
@@ -232,7 +233,34 @@ class Navigation extends React.Component {
         };
         Pubsub.publish('dataSelect', selectData);
     }
+    sendColumnName(columnName, event){
+        const selectData = {selectServer: this.state.selectServer,
+            selectDatabase: this.state.selectDatabase,
+            selectColumn: columnName,
+            type: 'column'
+        };
+        Pubsub.publish('dataSelect', selectData);
+    }
+    sendTableName(tableName,event) {
+        table_result = false;
+        window.setTimeout(check, 300);
+        var that = this;
+        function check() {
+            if (table_result != false) return;
+            console.log('单击')
+            const selectData = {selectServer: that.state.selectServer,
+                selectDatabase: that.state.selectDatabase,
+                selectTable: tableName,
+                type: 'tableName'
+            };
+            Pubsub.publish('dataSelect', selectData);
+        }
+
+
+    }
     tableChange(tableName,event){
+        console.log('双击')
+        table_result = true;
         this.setState({
             selectTable: tableName
         })
@@ -405,12 +433,12 @@ class Navigation extends React.Component {
                                                     <img src={dot} title="扩展/收起" alt="扩展/收起" className={this.state.showTableColumn === table.tableName?'icon ic_b_minus':'icon ic_b_plus'} onClick={this.showTableColumn.bind(this,table.tableName)}></img>
                                                     </a></div>
                                                     <div className="block"><a href="#"><img src={dot} title="视图" alt="视图" className="icon ic_b_props" /></a></div>
-                                                    <a className="hover_show_full" href="#" title="" onClick={this.tableChange.bind(this,table.tableName)}> {table.tableName} ({table.tableRows})</a>
+                                                    <a className="hover_show_full" href="#" title="" onDoubleClick={this.tableChange.bind(this,table.tableName)} onClick={this.sendTableName.bind(this,table.tableName)}> {table.tableName} ({table.tableRows})</a>
                                                     <div className="clearfloat"></div>
                                                     <div className={this.state.showTableColumn === table.tableName?'list_container':'hide'}>
                                                         <ul>
                                                             {this.state.showTableColumn !== table.tableName?'':columntData.map(column =>
-                                                                <li>{column.columnName}({column.columnType}{""===column.columnLength?"":"("+column.columnLength+")"},{column.columnIsNull})</li>
+                                                                <li onClick={this.sendColumnName.bind(this,column.columnName)}>{column.columnName}({column.columnType}{""===column.columnLength?"":"("+column.columnLength+")"},{column.columnIsNull})</li>
                                                             )}
                                                         </ul>
                                                     </div>

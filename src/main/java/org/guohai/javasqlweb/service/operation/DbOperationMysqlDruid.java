@@ -112,7 +112,7 @@ public class DbOperationMysqlDruid implements DbOperation {
             listCnb.add(new ColumnsNameBean(rs.getString("Field"),
                     rs.getString("Type"),
                     "",
-                    rs.getString("Null").equals("NO")?"not null":"null"));
+                    "NO".equals(rs.getString("Null"))?"not null":"null"));
         }
         closeResource(rs,st,conn);
         return listCnb;

@@ -92,6 +92,7 @@ public interface BaseDataService {
 
     /**
      * 获取数据库分组
+     * @param token 用户令牌
      * @return
      */
     Result<List<String>> getDbGroup(String token);

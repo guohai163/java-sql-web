@@ -85,6 +85,14 @@ class PageContent extends React.Component {
                 })
 
             }
+            else if('tableName' === data.type) {
+                let sql = this.state.sql + ' ' + data.selectTable;
+                this.setState({sql: sql})
+            }
+            else if('column' === data.type) {
+                let sql = this.state.sql + ' ' + data.selectColumn;
+                this.setState({sql: sql})
+            }
             else if('sp' === data.type){
                 this.setState({
                     selectServer: data.selectServer,
@@ -271,6 +279,10 @@ class PageContent extends React.Component {
         })
     }
     mouseSelected(dom) {
+        let sqlCursor = dom.getCursor()
+        console.log(sqlCursor)
+        let sql = dom.getValue()
+        console.log(sql)
         this.setState({
             selectedSql: dom.getSelection()
         })

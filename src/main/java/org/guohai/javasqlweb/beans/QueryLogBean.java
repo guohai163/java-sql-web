@@ -2,6 +2,7 @@ package org.guohai.javasqlweb.beans;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.RequiredArgsConstructor;
 
 import java.util.Date;
 
@@ -11,6 +12,7 @@ import java.util.Date;
  */
 @Data
 @AllArgsConstructor
+@RequiredArgsConstructor
 public class QueryLogBean {
 
     /**
@@ -21,24 +23,29 @@ public class QueryLogBean {
     /**
      * 查询者IP
      */
-    private String queryIp;
+    private final String queryIp;
 
     /**
      * 查询人
      */
-    private String queryName;
+    private final String queryName;
 
     /**
      * 执行查询时的库
      */
-    private String queryDatabase;
+    private final String queryDatabase;
     /**
      * 查询脚本
      */
-    private String querySqlscript;
+    private final String querySqlscript;
+
+    /**
+     * 查询消耗
+     */
+    private Integer queryConsuming;
 
     /**
      * 查询时间
      */
-    private Date queryTime;
+    private final Date queryTime;
 }

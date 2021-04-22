@@ -12,7 +12,9 @@ import java.util.Iterator;
 import java.util.List;
 
 /**
- *
+ * 权限服务类实现
+ * @author guohai
+ * @date 2021-4-20
  */
 @Service
 public class PermissionsServiceImpl implements PermissionsService {
@@ -187,4 +189,6 @@ public class PermissionsServiceImpl implements PermissionsService {
         }
         return new Result<>(true,"success", "");
     }
+
+
 }

@@ -388,10 +388,32 @@ class Admin extends React.Component {
             inputData: data
         })
     }
-    dbPermissionDeleteBtn(e){
-        console.log(e)
+    dbPermissionDeleteBtn(groupCode){
+        const client = new FetchHttpClient(config.serverDomain);
+        client.addMiddleware(json());
+        client.delete('/api/backstage/db_perm/'+groupCode,{headers:{'Content-Type': 'text/plain','User-Token': this.state.token}})
+                    .then(response => {
+                        if(true === response.jsonData.status){
+                            confirm({
+                                title:'提示',
+                                content: '数据删除成功',
+                                onOk(){},
+                                onCancel(){}
+                            });
+                            this.menuClick({'key':'6'});
+                        }
+                        else{
+                            confirm({
+                                title:'提示',
+                                content: response.jsonData.data,
+                                onOk(){                        },
+                                onCancel(){                        }
+                            });
+                        }
+                    })
     }
     dbPermissionEditBtn(groupCode){
+        console.log(groupCode)
         const client = new FetchHttpClient(config.serverDomain);
         client.addMiddleware(json());
         client.get('/api/backstage/server_list/'+groupCode,{headers:{'Content-Type': 'text/plain','User-Token': this.state.token}})
@@ -575,8 +597,8 @@ class Admin extends React.Component {
         const dbPermissionListColumns = [{title: '组名', dataIndex: 'groupName'},
                                         {title: '服务器列表', dataIndex: 'serverList'},
                                         {title:'操作', render: (text, record) => (<Space size="middle">
-                                        <Button type="link" onClick={this.dbPermissionEditBtn.bind(this,record.code)}>编辑</Button>
-                                    <Button type="link" onClick={this.dbPermissionDeleteBtn.bind(this,record.code)}>删除</Button>
+                                        <Button type="link" onClick={this.dbPermissionEditBtn.bind(this,record.groupCode)}>编辑</Button>
+                                    <Button type="link" onClick={this.dbPermissionDeleteBtn.bind(this,record.groupCode)}>删除</Button>
                                     </Space>)}]
         let {configVisible,confirmLoading,userAddVisible, userGroupAddVisible,userList,permissionAddVisible,userGroupList,connList,dbPermissionList,
             userGroupEditGroupCode,userGroupEdituserList} = this.state;

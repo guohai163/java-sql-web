@@ -99,4 +99,5 @@ public interface PermissionsService {
      */
     Result<String> setUserGroupData(UsergroupBean usergroup, List<UserBean> userList);
 
+
 }

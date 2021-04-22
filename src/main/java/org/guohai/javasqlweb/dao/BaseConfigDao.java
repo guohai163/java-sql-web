@@ -27,7 +27,7 @@ public interface BaseConfigDao {
      * @param userCode
      * @return
      */
-    @Select("SELECT c.code,c.db_server_name,c.db_server_type,c.db_group FROM user_permissions a " +
+    @Select("SELECT DISTINCT c.code,c.db_server_name,c.db_server_type,c.db_group FROM user_permissions a " +
             "join db_permissions b on a.group_code=b.group_code " +
             "join db_connect_config_tb c on b.db_code=c.code " +
             "where user_code=#{userCode};")
@@ -43,11 +43,7 @@ public interface BaseConfigDao {
 
     /**
      * 保存查询日志
-     * @param user
-     * @param dbname
-     * @param sql
-     * @param userIp
-     * @param logDate
+     * @param queryLog
      * @return
      */
     @Insert("INSERT INTO `db_query_log`\n" +
@@ -57,13 +53,22 @@ public interface BaseConfigDao {
             "`query_sqlscript`,\n" +
             "`query_time`)\n" +
             "VALUES\n" +
-            "(#{ip},\n" +
-            "#{user},\n" +
-            "#{dbname},\n" +
-            "#{sql},\n" +
-            "#{log_date});")
-    Boolean saveQueryLog(@Param("user") String user, @Param("dbname") String dbname,
-                         @Param("sql") String sql, @Param("ip") String userIp, @Param("log_date")Date logDate);
+            "(#{queryIp},\n" +
+            "#{queryName},\n" +
+            "#{queryDatabase},\n" +
+            "#{querySqlscript},\n" +
+            "#{queryTime});")
+    @Options(useGeneratedKeys = true, keyProperty = "code", keyColumn = "code")
+    Boolean saveQueryLog(QueryLogBean queryLog);
+
+    /**
+     * 更新处理时长
+     * @param code
+     * @param time
+     * @return
+     */
+    @Update("UPDATE `db_query_log` SET query_consuming=#{time} WHERE code=#{code};")
+    Boolean updateQueryLogTime(Integer code, Integer time);
 
     /**
      * 倒序查询日志

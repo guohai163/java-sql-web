@@ -93,7 +93,7 @@ public interface PermissionsDao {
      * @param groupCode
      * @return
      */
-    @Delete("DELETE FROM `db_permissions` WHERE group_code=#{groupName}")
+    @Delete("DELETE FROM `db_permissions` WHERE group_code=#{groupCode}")
     Boolean delDbPermissions(Integer groupCode);
 
     /**
@@ -114,6 +114,13 @@ public interface PermissionsDao {
             "(select user_code from user_permissions where group_code=#{groupCode})")
     List<UserBean> getGroupUser(Integer groupCode);
 
+    /**
+     * 更新用户组数据
+     * @param groupCode 要更新的组编号
+     * @param groupName 要更新的组名
+     * @param comment 要更新的组备注
+     * @return
+     */
     @Update("UPDATE `usergroup` SET `group_name` = #{groupName},`comment` = #{comment} WHERE `code` = #{groupCode};")
     Boolean setUserGroup(Integer groupCode, String groupName, String comment);
 

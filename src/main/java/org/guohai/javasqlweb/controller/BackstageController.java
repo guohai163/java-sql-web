@@ -2,6 +2,7 @@ package org.guohai.javasqlweb.controller;
 
 import com.alibaba.druid.stat.DruidStatManagerFacade;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import org.guohai.javasqlweb.beans.*;
 import org.guohai.javasqlweb.config.AdminPageRequired;
 import org.guohai.javasqlweb.service.BackstageService;
@@ -151,8 +152,8 @@ public class BackstageController {
      */
     @ResponseBody
     @RequestMapping(value = "/unbind_opt", method = RequestMethod.POST)
-    public Result<String> unbindUserOtp(@RequestBody String userName){
-        return backstageService.unbindUserOtp(userName);
+    public Result<String> unbindUserOtp(@RequestBody UserBean user){
+        return backstageService.unbindUserOtp(user.getUserName());
     }
 
     /**
@@ -216,6 +217,9 @@ public class BackstageController {
         return permissionsService.delDbPermissionByGroup(groupCode);
     }
 
+    //region 权限管理
+
+    //endregion
 
 
     //region 用户组操作
@@ -271,6 +275,7 @@ public class BackstageController {
  * 创建用户组接口参数
  */
 @Data
+@EqualsAndHashCode(callSuper=false)
 class CreateUserGroupParam extends UsergroupBean {
     private List<UserBean> userList;
 }
