@@ -46,7 +46,9 @@ class PageContent extends React.Component {
             queryLoading: false,
             sqlValue: '',
             selectedSql: '',
-            historySql: []
+            historySql: [],
+            beforeSql: '',
+            rearSql: ''
         }
     }
 
@@ -86,11 +88,11 @@ class PageContent extends React.Component {
 
             }
             else if('tableName' === data.type) {
-                let sql = this.state.sql + ' ' + data.selectTable;
+                let sql = this.state.beforeSql + ' ' + data.selectTable + ' ' +this.state.rearSql;
                 this.setState({sql: sql})
             }
             else if('column' === data.type) {
-                let sql = this.state.sql + ' ' + data.selectColumn;
+                let sql = this.state.beforeSql + ' ' + data.selectColumn + ' ' +this.state.rearSql;
                 this.setState({sql: sql})
             }
             else if('sp' === data.type){
@@ -278,7 +280,37 @@ class PageContent extends React.Component {
             sql: this.state.sql+ ' ' + e.target.value
         })
     }
+
+    saveCursorValue(dom) {
+        let totalLine = dom.lineCount();
+        let curLine = dom.getCursor();
+        let beforeCount = 0;
+        let rearCount = 0;
+        for(var i=0;i<totalLine;i++) {
+            var lineText = dom.getLine(i);
+            if(curLine.line > i){
+                beforeCount += lineText.length;
+            }
+            else if(curLine.line < i){
+                rearCount += lineText.length;
+            }
+            else{
+                beforeCount += curLine.ch;
+                rearCount += lineText.length-curLine.ch;
+            }
+        }
+        let beforeSql = dom.getValue().substring(0,beforeCount+1);
+        let rearSql = dom.getValue().substring(beforeCount+1);
+
+        console.log(beforeSql)
+        console.log(rearSql)
+        this.setState({
+            beforeSql: beforeSql,
+            rearSql: rearSql
+        })
+    }
     mouseSelected(dom) {
+        this.saveCursorValue(dom)
         let sqlCursor = dom.getCursor()
         console.log(sqlCursor)
         let sql = dom.getValue()

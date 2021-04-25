@@ -180,32 +180,49 @@ public class DbOperationMysqlDruid implements DbOperation {
         List<Map<String, Object>> listData = new ArrayList<>();
         Connection conn = sqlDs.getConnection();
         Statement st = conn.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE,ResultSet.CONCUR_READ_ONLY);
-        ResultSet rs = st.executeQuery(String.format("%s;", sql));
-        // 获得结果集结构信息,元数据
-        java.sql.ResultSetMetaData md = rs.getMetaData();
-        // 获得列数
-        int columnCount = md.getColumnCount();
-        rs.last();
-        result[0] = rs.getRow();
-        rs.beforeFirst();
-        int dataCount = 1;
-        while (rs.next()){
-            if(dataCount>limit){
-                break;
+
+        ResultSet rs = null;
+        try{
+            // 尝试分组执行SQL
+//            String[] sqlArray = sql.split(";");
+//            for(int i=0;i<sqlArray.length;i++){
+//                st.addBatch(String.format("%s;",sqlArray[i]));
+//            }
+//            rs = st.executeBatch();
+            rs = st.executeQuery(String.format("%s;", sql));
+            // 获得结果集结构信息,元数据
+            java.sql.ResultSetMetaData md = rs.getMetaData();
+            // 获得列数
+            int columnCount = md.getColumnCount();
+            rs.last();
+            result[0] = rs.getRow();
+            rs.beforeFirst();
+            int dataCount = 1;
+            while (rs.next()){
+                if(dataCount>limit){
+                    break;
+                }
+                dataCount++;
+                Map<String, Object> rowData = new LinkedHashMap<String, Object>();
+                for(int i=1;i<=columnCount;i++){
+                    rowData.put(md.getColumnLabel(i),md.getColumnType(i) == 93
+                            ? (rs.getObject(i)==null?"NULL":rs.getDate(i) + " " + rs.getTime(i))
+                            : rs.getObject(i));
+                }
+                listData.add(rowData);
             }
-            dataCount++;
-            Map<String, Object> rowData = new LinkedHashMap<String, Object>();
-            for(int i=1;i<=columnCount;i++){
-                rowData.put(md.getColumnLabel(i),md.getColumnType(i) == 93
-                        ? (rs.getObject(i)==null?"NULL":rs.getDate(i) + " " + rs.getTime(i))
-                        : rs.getObject(i));
-            }
-            listData.add(rowData);
+
+            result[1] = listData.size();
+            result[2] = listData;
+        }
+        catch (SQLException e){
+            throw e;
+        }
+        finally {
+            closeResource(rs,st,conn);
         }
 
-        result[1] = listData.size();
-        result[2] = listData;
-        closeResource(rs,st,conn);
+
         return result;
     }
 

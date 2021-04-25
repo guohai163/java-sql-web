@@ -215,11 +215,16 @@ public class BaseDataServiceImpl implements BaseDataService{
         DbOperation operation = createDbOperation(serverCode);
         if(null != operation){
             try{
-                baseConfigDao.saveQueryLog(user.getUserName(),dbName,sql, userIp,new Date());
+                QueryLogBean queryLog = new QueryLogBean(userIp, user.getUserName(), dbName, sql, new Date());
+                baseConfigDao.saveQueryLog(queryLog);
+                LOG.info(sql);
+                Long startTime = System.currentTimeMillis();
                 Object[] result = operation.queryDatabaseBySql(dbName, sql, limit);
                 String returnResult = Integer.parseInt(result[0].toString())>Integer.parseInt(result[1].toString())?
                         String.format("实际数据条数为%s，因程序限制只显示%s条数据",result[0].toString(),result[1].toString()):
                         "";
+                Long endTime = System.currentTimeMillis()-startTime;
+                baseConfigDao.updateQueryLogTime(queryLog.getCode(), endTime.intValue() );
                 return new Result<>(true, returnResult, result[2]);
             } catch (Exception e) {
                 e.printStackTrace();
