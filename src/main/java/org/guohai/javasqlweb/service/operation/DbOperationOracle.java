@@ -60,6 +60,31 @@ public class DbOperationOracle implements DbOperation {
     }
 
     /**
+     * 取回视图列表
+     *
+     * @param dbName
+     * @return
+     * @throws SQLException
+     */
+    @Override
+    public List<ViewNameBean> getViewsList(String dbName) throws SQLException {
+        return null;
+    }
+
+    /**
+     * 获取视图详细信息
+     *
+     * @param dbName
+     * @param viewName
+     * @return
+     * @throws SQLException
+     */
+    @Override
+    public ViewNameBean getView(String dbName, String viewName) throws SQLException {
+        return null;
+    }
+
+    /**
      * 获取所有列名
      *
      * @param dbName

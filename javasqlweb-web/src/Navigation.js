@@ -36,7 +36,8 @@ class Navigation extends React.Component {
             filterSpList: [],
             passVisible: false,
             inputData: {},
-            dbGroup: []
+            dbGroup: [],
+            viewList: []
             
         }
         this.serverChange = this.serverChange.bind(this);
@@ -98,7 +99,8 @@ class Navigation extends React.Component {
             selectDatabase: dbName,
             tableLoading: true,
             tableList: [],
-            spList: []
+            spList: [],
+            viewList: []
         })
         const selectData = {
             selectServer: this.state.selectServer,
@@ -177,6 +179,51 @@ class Navigation extends React.Component {
         })
         
     }
+    getViewsList(dbName){
+        const requestKey = '/database/views/'+this.state.selectServer+'/'+dbName
+        const viewsData = cache.get(requestKey)
+        if(null === viewsData) {
+            const client = new FetchHttpClient(config.serverDomain);
+            client.addMiddleware(json());
+            client.get(requestKey,{headers:{'User-Token': this.state.token}}).then(response => {
+                console.log(response)
+                if(response.jsonData.status) {
+                    if(0 === response.jsonData.data.length){
+                        confirm({
+                            title:'提示',
+                            content: '该库无视图',
+                            onOk(){
+                            },
+                            onCancel(){
+                            }
+                        });
+                    }
+                    this.setState({
+                        viewList: response.jsonData.data
+                    })
+                    cache.set(requestKey, response.jsonData.data, CACHE_TTL)
+                }
+                else{
+                    this.setState({viewList:[]})
+                }
+            })
+        }
+        else{
+            if(0 === viewsData.length){
+                confirm({
+                    title:'提示',
+                    content: '该库无视图',
+                    onOk(){
+                    },
+                    onCancel(){
+                    }
+                });
+            }
+            this.setState({
+                viewList: viewsData
+            })
+        }
+    }
     getSpList(dbName) {
         const requestKey = '/database/storedprocedures/'+this.state.selectServer+'/'+dbName
         const spData = cache.get(requestKey)
@@ -225,6 +272,16 @@ class Navigation extends React.Component {
         }
 
     }
+    viewChange(viewName, event){
+        const selectData = {
+            selectServer: this.state.selectServer,
+            selectDatabase: this.state.selectDatabase,
+            viewName: viewName,
+            type: 'view'
+        }
+        Pubsub.publish('dataSelect', selectData);
+    }
+
     spChange(spName,event) {
         const selectData = {selectServer: this.state.selectServer,
             selectDatabase: this.state.selectDatabase,
@@ -363,7 +420,7 @@ class Navigation extends React.Component {
         })
     }
     render(){
-        const {deskHeight, columntData, spList, passVisible} = this.state;
+        const {deskHeight, columntData, spList, passVisible, viewList} = this.state;
         return (
             <div id='navigation'>
                 <div id='navigation_resizer'></div>
@@ -444,10 +501,10 @@ class Navigation extends React.Component {
                                                     </div>
                                                     </li>
                                                 )}
-                                                <li className="view">
+                                                <li className="view" key="procedure">
                                                     <a href="#" onClick={this.getSpList.bind(this,db.dbName)}>
                                                     <img src={dot} className={spList.length === 0?'icon ic_b_plus':'icon ic_b_minus'}></img>
-                                                    <img src={dot} title="视图" alt="视图" className="icon ic_b_routines" />
+                                                    <img src={dot} title="存储过程" alt="存储过程" className="icon ic_b_routines" />
                                                     存储过程</a>
                                                     <div className={spList.length === 0?'hide':'list_container'}>
                                                         <ul>
@@ -461,7 +518,23 @@ class Navigation extends React.Component {
                                                         </ul>
                                                     </div>
                                                 </li>
-
+                                                <li className="view" key="views">
+                                                    <a href="#" onClick={this.getViewsList.bind(this,db.dbName)}>
+                                                    <img src={dot} className={spList.length === 0?'icon ic_b_plus':'icon ic_b_minus'}></img>
+                                                    <img src={dot} title="视图" alt="视图" className="icon ic_b_views" />
+                                                    视图</a>
+                                                    <div className={viewList.length === 0?'hide':'list_container'}>
+                                                        <ul>
+                                                        {viewList.map( sp =>
+                                                                <li className="view">
+                                                                <div className="block"><a href="#"><img src={dot} title="视图" alt="视图" className="icon ic_b_views" /></a></div>
+                                                                <a className="hover_show_full" href="#" title="" onClick={this.viewChange.bind(this,sp.viewName)}> {sp.viewName}</a>
+                                                                <div className="clearfloat"></div>
+                                                                </li>
+                                                        )}
+                                                        </ul>
+                                                    </div>
+                                                </li>
                                             </ul>
                                         </div>
                                     </li>

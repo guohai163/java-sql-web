@@ -95,6 +95,40 @@ public class DbOperationMysqlDruid implements DbOperation {
     }
 
     /**
+     * 取回视图列表
+     *
+     * @param dbName
+     * @return
+     * @throws SQLException
+     */
+    @Override
+    public List<ViewNameBean> getViewsList(String dbName) throws SQLException {
+        List<ViewNameBean> listView = new ArrayList<>();
+        Connection conn = sqlDs.getConnection();
+        Statement st = conn.createStatement();
+        ResultSet rs = st.executeQuery(String.format(
+                "SELECT TABLE_NAME,VIEW_DEFINITION FROM information_schema.VIEWS WHERE TABLE_SCHEMA='%s'", dbName));
+        while (rs.next()){
+            listView.add(new ViewNameBean(rs.getString("TABLE_NAME"), rs.getString("VIEW_DEFINITION")));
+        }
+        closeResource(rs,st,conn);
+        return listView;
+    }
+
+    /**
+     * 获取视图详细信息
+     *
+     * @param dbName
+     * @param viewName
+     * @return
+     * @throws SQLException
+     */
+    @Override
+    public ViewNameBean getView(String dbName, String viewName) throws SQLException {
+        return null;
+    }
+
+    /**
      * 获取所有列名
      *
      * @param dbName

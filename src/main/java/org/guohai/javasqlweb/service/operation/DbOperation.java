@@ -28,6 +28,22 @@ public interface DbOperation {
     List<TablesNameBean> getTableList(String dbName) throws SQLException;
 
     /**
+     * 取回视图列表
+     * @param dbName
+     * @return
+     * @throws SQLException
+     */
+    List<ViewNameBean> getViewsList(String dbName) throws  SQLException;
+
+    /**
+     * 获取视图详细信息
+     * @param dbName
+     * @param viewName
+     * @return
+     * @throws SQLException
+     */
+    ViewNameBean getView(String dbName, String viewName) throws  SQLException;
+    /**
      * 获取所有列名
      * @param dbName
      * @param tableName

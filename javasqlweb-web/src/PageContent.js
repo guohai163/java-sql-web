@@ -112,6 +112,21 @@ class PageContent extends React.Component {
                     })
                 
             }
+            else if('view' === data.type){
+                this.setState({
+                    selectServer: data.selectServer,
+                    selectDatabase: data.selectDatabase,
+                })
+                const client = new FetchHttpClient(config.serverDomain);
+                client.addMiddleware(json());
+                client.get('/database/views/'+data.selectServer+'/'+data.selectDatabase+'/'+data.viewName,
+                            {headers:{'User-Token': this.state.token}})
+                    .then(response => {
+                        this.setState({
+                            sql: response.jsonData.data.viewData
+                        })
+                    })
+            }
             else if('database' === data.type){
                 const client = new FetchHttpClient(config.serverDomain);
                 client.addMiddleware(json());

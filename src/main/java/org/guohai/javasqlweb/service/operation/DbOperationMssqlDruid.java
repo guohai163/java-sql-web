@@ -94,6 +94,49 @@ public class DbOperationMssqlDruid implements DbOperation {
     }
 
     /**
+     * 取回视图列表
+     *
+     * @param dbName
+     * @return
+     * @throws SQLException
+     */
+    @Override
+    public List<ViewNameBean> getViewsList(String dbName) throws SQLException {
+        List<ViewNameBean> listTnb = new ArrayList<>();
+        Connection conn = sqlDs.getConnection();
+        Statement st = conn.createStatement();
+        ResultSet rs = st.executeQuery(String.format("use [%s];" +
+                "SELECT name FROM sysobjects WHERE xtype = 'V' ORDER BY name;", dbName));
+        while (rs.next()){
+            listTnb.add(new ViewNameBean(rs.getObject("name").toString()));
+        }
+        closeResource(rs,st,conn);
+        return listTnb;
+    }
+
+    /**
+     * 获取视图详细信息
+     *
+     * @param dbName
+     * @param viewName
+     * @return
+     * @throws SQLException
+     */
+    @Override
+    public ViewNameBean getView(String dbName, String viewName) throws SQLException {
+        ViewNameBean viewBean = null;
+        Connection conn = sqlDs.getConnection();
+        Statement st = conn.createStatement();
+        ResultSet rs = st.executeQuery(String.format("use [%s];" +
+                "select definition from sys.sql_modules WHERE object_id = object_id('%s')", dbName, viewName));
+        while (rs.next()){
+            viewBean = new ViewNameBean(viewName, rs.getString("definition"));
+        }
+        closeResource(rs,st,conn);
+        return viewBean;
+    }
+
+    /**
      * 获取所有列名
      *
      * @param dbName

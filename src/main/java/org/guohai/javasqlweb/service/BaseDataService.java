@@ -2,6 +2,7 @@ package org.guohai.javasqlweb.service;
 
 import org.guohai.javasqlweb.beans.*;
 
+import javax.swing.text.View;
 import java.util.List;
 
 /**
@@ -55,6 +56,23 @@ public interface BaseDataService {
      * @return
      */
     Result<List<TableIndexesBean>> getTableIndexes(Integer serverCode, String dbName, String tableName);
+
+    /**
+     * 获取指定库的视图列表
+     * @param serverCode
+     * @param dbName
+     * @return
+     */
+    Result<List<ViewNameBean>> getViewList(Integer serverCode, String dbName);
+
+    /**
+     * 获取指定视图的创建语句
+     * @param serverCode
+     * @param dbName
+     * @param viewName
+     * @return
+     */
+    Result<ViewNameBean> getViewByName(Integer serverCode, String dbName, String viewName);
 
     /**
      * 获取指定库的存储过程列表,只含名字

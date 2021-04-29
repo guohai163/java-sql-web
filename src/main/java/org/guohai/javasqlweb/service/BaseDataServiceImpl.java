@@ -153,6 +153,51 @@ public class BaseDataServiceImpl implements BaseDataService{
     }
 
     /**
+     * 获取指定库的视图列表
+     *
+     * @param serverCode
+     * @param dbName
+     * @return
+     */
+    @Override
+    public Result<List<ViewNameBean>> getViewList(Integer serverCode, String dbName) {
+        DbOperation operation = createDbOperation(serverCode);
+        if(null != operation){
+            try{
+                return new Result<>(true,"", operation.getViewsList(dbName));
+            } catch (Exception e) {
+                e.printStackTrace();
+                return new Result<>(false,"",null);
+            }
+        }else{
+            return new Result<>(false,"",null);
+        }
+    }
+
+    /**
+     * 获取指定视图的创建语句
+     *
+     * @param serverCode
+     * @param dbName
+     * @param viewName
+     * @return
+     */
+    @Override
+    public Result<ViewNameBean> getViewByName(Integer serverCode, String dbName, String viewName) {
+        DbOperation operation = createDbOperation(serverCode);
+        if(null != operation){
+            try{
+                return new Result<>(true,"", operation.getView(dbName, viewName));
+            } catch (Exception e) {
+                e.printStackTrace();
+                return new Result<>(false,"",null);
+            }
+        }else{
+            return new Result<>(false,"",null);
+        }
+    }
+
+    /**
      * 获取指定库的存储过程列表,只含名字
      *
      * @param serverCode

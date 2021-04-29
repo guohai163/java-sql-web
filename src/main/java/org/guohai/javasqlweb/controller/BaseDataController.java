@@ -96,6 +96,35 @@ public class BaseDataController {
     }
 
     /**
+     * 获取指定库的视图列表
+     * @param serverCode
+     * @param dbName
+     * @return
+     */
+    @ResponseBody
+    @RequestMapping(value = "/views/{serverCode}/{dbName}")
+    public Result<List<ViewNameBean>> getViewList(@PathVariable("serverCode") String serverCode,
+                                                  @PathVariable("dbName") String dbName){
+        return baseDataService.getViewList(Integer.parseInt(serverCode), dbName);
+    }
+
+    /**
+     * 获取指定库的视图
+     * @param serverCode
+     * @param dbName
+     * @param viewName
+     * @return
+     */
+    @ResponseBody
+    @RequestMapping(value = "/views/{serverCode}/{dbName}/{viewName}")
+    public Result<ViewNameBean> getView(@PathVariable("serverCode") String serverCode,
+                                        @PathVariable("dbName") String dbName,
+                                        @PathVariable("viewName") String viewName){
+        return baseDataService.getViewByName(Integer.parseInt(serverCode), dbName, viewName);
+    }
+
+
+    /**
      * 获取存储过程列表
      * @param serverCode
      * @param dbName
