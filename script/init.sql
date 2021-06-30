@@ -30,6 +30,7 @@ CREATE TABLE `db_query_log` (
   `query_name` varchar(45) NOT NULL COMMENT '查询人',
   `query_database` varchar(45) NOT NULL COMMENT '查询语句的库',
   `query_sqlscript` varchar(8000) NOT NULL COMMENT '查询脚本',
+  `query_consuming` int(11) NULL COMMENT '查询耗时',
   `query_time` datetime NOT NULL COMMENT '查询时间'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
