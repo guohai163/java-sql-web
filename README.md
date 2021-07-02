@@ -35,7 +35,7 @@
 # 首先下载数据库初始化脚本 
 mkdir -p /opt/java-sql-web/script
 cd /opt/java-sql-web/script
-curl -O https://github.com/guohai163/java-sql-web/raw/master/script/init.sql
+curl -O https://raw.githubusercontent.com/guohai163/java-sql-web/master/script/init.sql
 # 按初始化脚本编辑修改.sql文件。
 vim init.sql
 
