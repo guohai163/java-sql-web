@@ -10,6 +10,7 @@ import JavaSqlAdmin from './JavaSqlAdmin';
 import reportWebVitals from './reportWebVitals';
 import Admin from './Admin';
 import Login from './Login';
+import SqlGuid from "./sqlGuid";
 
 
 class Root extends React.Component {
@@ -20,6 +21,7 @@ class Root extends React.Component {
           <Switch>
             <Route path="/login"><Login /></Route>
             <Route path="/admin"><Admin /></Route>
+            <Route path="/guid"><SqlGuid /></Route>
             <Route path="/"><JavaSqlAdmin /></Route>
           </Switch>
 
