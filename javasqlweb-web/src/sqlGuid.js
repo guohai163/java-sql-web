@@ -7,7 +7,7 @@ import SyntaxHighlighter from 'react-syntax-highlighter';
 import { docco } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 import FetchHttpClient, { json } from 'fetch-http-client';
 import config from "./config";
-const { Header, Footer, Sider, Content  } = Layout;
+const { Header, Content  } = Layout;
 
 class SqlGuid extends React.Component {
     constructor(props) {
@@ -17,16 +17,18 @@ class SqlGuid extends React.Component {
         }
     }
     componentDidMount() {
+
         const client = new FetchHttpClient(config.serverDomain);
         client.addMiddleware(json());
         client.get('/sql/guid').then(response => {
-            console.log(response.jsonData.data)
             this.setState({
                 guidData: response.jsonData.data
             })
+
         })
     }
     render(){
+        const {guidData} = this.state;
         return(
             <Layout>
                 <Header className="header">
@@ -38,12 +40,12 @@ class SqlGuid extends React.Component {
                     <List
                         itemLayout="horizontal"
 
-                        dataSource={this.state.guidData}
+                        dataSource={guidData}
                         renderItem={item => <List.Item><List.Item.Meta
                             avatar=<Image src={sqlicon} alt="logo" width={50} />
-                            title={item.title}
+                            title={item.title + "，服务器【"+item.server+"】数据库【"+item.database+"】"}
                             description=<SyntaxHighlighter language="sql" style={docco}>
-                                {item.desc}
+                                {item.script}
                             </SyntaxHighlighter>
                         /></List.Item>}
                     />
