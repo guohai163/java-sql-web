@@ -5,30 +5,28 @@ import { Layout, Menu, Breadcrumb,List,Avatar,Image } from 'antd';
 import sqlicon from './images/sql-svgrepo-com.svg'
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { docco } from 'react-syntax-highlighter/dist/esm/styles/hljs';
-import logo from "./images/logo.svg";
+import FetchHttpClient, { json } from 'fetch-http-client';
+import config from "./config";
 const { Header, Footer, Sider, Content  } = Layout;
 
 class SqlGuid extends React.Component {
+    constructor(props) {
+        super(props)
+        this.state = {
+            guidData: []
+        }
+    }
+    componentDidMount() {
+        const client = new FetchHttpClient(config.serverDomain);
+        client.addMiddleware(json());
+        client.get('/sql/guid').then(response => {
+            console.log(response.jsonData.data)
+            this.setState({
+                guidData: response.jsonData.data
+            })
+        })
+    }
     render(){
-        const data = [
-            {
-                title: '查询wegame账号realid，服务器【10.14.95.14@账号】数据库【AccountDB】',
-                desc:'select top 10 * from wegame_user_tb a inner join userid_account_rel b on a.user_id = b.user_id '
-            },
-            {
-                title: 'Ant Design Title 2',
-                desc:'aaawa'
-            },
-            {
-                title: 'Ant Design Title 3',
-                desc:'aasdfaa'
-            },
-            {
-                title: 'Ant Design Title 4',
-                desc:'aasdfaa'
-            },
-        ];
-        console.log(data);
         return(
             <Layout>
                 <Header className="header">
@@ -40,7 +38,7 @@ class SqlGuid extends React.Component {
                     <List
                         itemLayout="horizontal"
 
-                        dataSource={data}
+                        dataSource={this.state.guidData}
                         renderItem={item => <List.Item><List.Item.Meta
                             avatar=<Image src={sqlicon} alt="logo" width={50} />
                             title={item.title}

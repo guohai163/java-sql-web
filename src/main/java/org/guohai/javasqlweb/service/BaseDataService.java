@@ -121,4 +121,10 @@ public interface BaseDataService {
      * @return
      */
     Result<List<ConnectConfigBean>> getHavaPermConn(String token);
+
+    /**
+     * 获取完整的向导
+     * @return
+     */
+    Result<List<SqlGuidBean>> getAllGuid();
 }

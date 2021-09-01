@@ -3,6 +3,7 @@ package org.guohai.javasqlweb.dao;
 import org.apache.ibatis.annotations.*;
 import org.guohai.javasqlweb.beans.ConnectConfigBean;
 import org.guohai.javasqlweb.beans.QueryLogBean;
+import org.guohai.javasqlweb.beans.SqlGuidBean;
 import org.springframework.stereotype.Repository;
 
 import java.util.Date;
@@ -166,4 +167,11 @@ public interface BaseConfigDao {
             "join db_connect_config_tb c on b.db_code=c.code " +
             "where user_code=#{userCode}")
     List<String> getDbGroup(Integer userCode);
+
+    /**
+     * 获取完整的列表
+     * @return
+     */
+    @Select("select * from guid_sql_tb;")
+    List<SqlGuidBean> getSqlGuidAll();
 }

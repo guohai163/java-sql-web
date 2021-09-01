@@ -79,6 +79,18 @@ CREATE TABLE `db_permissions` (
   PRIMARY KEY (`code`));
 
 
+-- 常用SQL
+CREATE TABLE `guid_sql_tb` (
+    `code` INT NOT NULL AUTO_INCREMENT,
+    `category` VARCHAR(20) NOT NULL COMMENT '分类',
+    `title` VARCHAR(100) NOT NULL COMMENT '标题',
+    `script` VARCHAR(8000) NOT NULL COMMENT '语句',
+    `server` VARCHAR(200) NOT NULL COMMENT '服务器',
+    `database` VARCHAR(200) NOT NULL COMMENT '数据库',
+    `create_date` datetime NOT NULL COMMENT '时间',
+        PRIMARY KEY (`code`));
+
+
 INSERT INTO `user_tb` (`user_name`,`pass_word`,`token`) VALUES
 ('admin',md5(CONCAT(md5('admin'),'jsa')),'');
 

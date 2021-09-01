@@ -2,6 +2,7 @@ package org.guohai.javasqlweb.controller;
 
 import com.alibaba.druid.stat.DruidStatManagerFacade;
 import org.guohai.javasqlweb.beans.Result;
+import org.guohai.javasqlweb.beans.SqlGuidBean;
 import org.guohai.javasqlweb.service.BaseDataService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import javax.servlet.http.HttpServletResponse;
+import java.util.List;
 
 /**
  * 基础控制器
@@ -53,5 +55,11 @@ public class HomeController {
         return result;
     }
 
+    @CrossOrigin
+    @ResponseBody
+    @RequestMapping(value = "/sql/guid")
+    public Result<List<SqlGuidBean>> getAllGuid() {
+        return baseService.getAllGuid();
+    }
 
 }

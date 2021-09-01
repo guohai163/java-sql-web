@@ -336,6 +336,16 @@ public class BaseDataServiceImpl implements BaseDataService{
     }
 
     /**
+     * 获取完整的向导
+     *
+     * @return
+     */
+    @Override
+    public Result<List<SqlGuidBean>> getAllGuid() {
+        return new Result<>(true,"", baseConfigDao.getSqlGuidAll());
+    }
+
+    /**
      * 使用单例模式创建一个数据操作实例对象
      * @param serverCode
      * @return
