@@ -29,7 +29,7 @@ public class HomeController {
     @Autowired
     BaseDataService baseService;
     
-    @RequestMapping(value = {"/","/login","/admin"})
+    @RequestMapping(value = {"/","/login","/admin","/guid"})
     public String home() {
 
         return "index.html";
