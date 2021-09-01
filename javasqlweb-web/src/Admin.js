@@ -601,7 +601,7 @@ class Admin extends React.Component {
                                     <Button type="link" onClick={this.dbPermissionDeleteBtn.bind(this,record.groupCode)}>删除</Button>
                                     </Space>)}]
         let {configVisible,confirmLoading,userAddVisible, userGroupAddVisible,userList,permissionAddVisible,userGroupList,connList,dbPermissionList,
-            userGroupEditGroupCode,userGroupEdituserList} = this.state;
+            userGroupEdituserList} = this.state;
         return (
             <>
                 <Layout>

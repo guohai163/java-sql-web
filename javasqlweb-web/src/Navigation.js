@@ -303,7 +303,7 @@ class Navigation extends React.Component {
         window.setTimeout(check, 300);
         var that = this;
         function check() {
-            if (table_result != false) return;
+            if (table_result !== false) return;
             console.log('单击')
             const selectData = {selectServer: that.state.selectServer,
                 selectDatabase: that.state.selectDatabase,
@@ -431,6 +431,9 @@ class Navigation extends React.Component {
                         </div>
                         <div id="navipanellinks">
 
+                            <a title="常用SQL" href="/guid" target="_blank">
+                                <img src={dot} alt="常用SQL" className="icon ic_s_sqlguid"></img>
+                            </a>
                             <a title="刷新" onClick={this.getServerList.bind(this)}>
                                 <img src={dot} alt="刷新" className="icon ic_s_reload"></img>
                             </a>
