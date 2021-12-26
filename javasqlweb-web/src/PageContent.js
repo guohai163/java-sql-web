@@ -17,6 +17,7 @@ import 'codemirror/addon/hint/show-hint.js';
 import 'codemirror/addon/hint/sql-hint.js';
 import 'codemirror/theme/idea.css';
 import 'antd/dist/antd.css';
+import Spreadsheet from "./Spreadsheet";
 
 const { confirm } = Modal;
 const antIcon = <LoadingOutlined style={{ fontSize: 34 }} spin />;
@@ -402,6 +403,7 @@ class PageContent extends React.Component {
                             <div className="clearfloat"></div>
                     </fieldset>
                     <div className={this.state.queryLoading || this.state.queryResult.length === 0?'hide':'responsivetable'}>
+                        <Spreadsheet data={queryResult}></Spreadsheet>
                         <table className="table_results ajax pma_table">
                             <thead>
                                 {this.printTableHeader()}
