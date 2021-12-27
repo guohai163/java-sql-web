@@ -328,7 +328,7 @@ class PageContent extends React.Component {
     mouseSelected(dom) {
         this.saveCursorValue(dom)
         let sqlCursor = dom.getCursor()
-        console.log(sqlCursor)
+
         let sql = dom.getValue()
         console.log(sql)
         this.setState({
