@@ -4,51 +4,73 @@ import XSpreadsheet from "x-data-spreadsheet";
 import "x-data-spreadsheet/dist/xspreadsheet.css";
 
 export default function Spreadsheet(props) {
-    const sheetStyle = {showToolbar: false,
+    let sheetStyle = {showToolbar: false,
         showBottomBar: false,
         showContextmenu: true,
 
     };
+    const sheetEl = React.useRef(null);
+    const sheetRef = React.useRef(null);
 
-    useEffect(()=>{
-        console.log(props.data)
-        if(props.data[0] !== undefined){
+    function dataTransfer(param) {
 
+        if(param[0] !== undefined) {
 
-            const rows10 = { len: 100 };
-            const cells = {len:100};
+            const rows10 = {};
+            const cells = {};
+            let colNum=0;
             Object.keys(props.data[0]).map((col,cindex) => {
+                colNum++;
                 cells[cindex] = {text:col}
             })
+            sheetStyle = {showToolbar: false,
+                showBottomBar: false,
+                mode: 'read',
+                showContextmenu: false,
+                row:{len:param.length+2},
+                col:{len:colNum}}
+
             rows10[0] = {cells}
 
-            const sheetData = props.data.map((row, rindex)=>{
-                const cells = {len: 100};
+            props.data.map((row, rindex)=>{
+                const cells = {};
                 Object.keys(row).map((col,cindex) => {
-                    cells[cindex] = {text:row[col].toString()}
-                    // cols10[cindex] = {cindex:{text: row[col]}}
+                    console.log(cindex)
+                    console.log(row[col])
+                    cells[cindex] = {text:row[col] === null?'null':row[col].toString()}
                 })
-                console.log(cells)
                 rows10[rindex+1] = {
-
                     cells
-
-
                 }
 
             })
             console.log(rows10)
-            const sheet = new XSpreadsheet("#x-spreadsheet-demo", sheetStyle)
-                .loadData({ name: 'sheet-test', rows: rows10 })
-                .change(data=>{
-                    console.log(data)
-                });
-
+            return {name:"t",rows: rows10};
         }
+        return {};
+    }
 
-    }, props.data)
+
+
+    useEffect(()=>{
+        console.log("in useEffect")
+
+        console.log(dataTransfer(props.data))
+        const element = sheetEl.current;
+        const sheet = new XSpreadsheet("#x-spreadsheet-demo", sheetStyle)
+
+        sheet.loadData(dataTransfer(props.data))
+
+        sheetRef.current = sheet;
+        return () => {
+            element.innerHTML = "";
+        };
+
+    }, [props.dataAreaRefresh])
     return (
-        <div id="x-spreadsheet-demo" ></div>
+        <>
+            <div id="x-spreadsheet-demo" ref={sheetEl}></div>
+        </>
 
     );
 }

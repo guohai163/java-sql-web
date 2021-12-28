@@ -22,7 +22,8 @@
     "react-router-dom": "^5.2.0",
     "react-scripts": "4.0.1",
     "react-syntax-highlighter": "^15.4.4",
-    "web-vitals": "^0.2.4"
+    "web-vitals": "^0.2.4",
+    "x-data-spreadsheet": "^1.1.9"
   },
   "scripts": {
     "start": "react-scripts start",
@@ -47,8 +48,5 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
-  },
-  "devDependencies": {
-    "x-data-spreadsheet": "^1.1.9"
   }
 }

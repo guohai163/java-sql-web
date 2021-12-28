@@ -49,7 +49,8 @@ class PageContent extends React.Component {
             selectedSql: '',
             historySql: [],
             beforeSql: '',
-            rearSql: ''
+            rearSql: '',
+            dataAreaRefresh: []
         }
     }
 
@@ -207,7 +208,8 @@ class PageContent extends React.Component {
                     });
                 }
                 this.setState({
-                    queryResult: response.jsonData.data
+                    queryResult: response.jsonData.data,
+                    dataAreaRefresh: [sql]
                 })
                 // 检查数组中是否有此成员
                 let historySql = this.state.historySql;
@@ -403,16 +405,16 @@ class PageContent extends React.Component {
                             <div className="clearfloat"></div>
                     </fieldset>
                     <div className={this.state.queryLoading || this.state.queryResult.length === 0?'hide':'responsivetable'}>
-                        <Spreadsheet data={queryResult}></Spreadsheet>
-                        <table className="table_results ajax pma_table">
-                            <thead>
-                                {this.printTableHeader()}
-                                
-                            </thead>
-                            <tbody>
-                                    {this.printTableData()}
-                            </tbody>
-                        </table>
+                        <Spreadsheet data={queryResult} dataAreaRefresh={this.state.dataAreaRefresh}></Spreadsheet>
+                        {/*<table className="table_results ajax pma_table">*/}
+                        {/*    <thead>*/}
+                        {/*        {this.printTableHeader()}*/}
+                        {/*        */}
+                        {/*    </thead>*/}
+                        {/*    <tbody>*/}
+                        {/*            {this.printTableData()}*/}
+                        {/*    </tbody>*/}
+                        {/*</table>*/}
                     </div>
                     <div className={this.state.queryLoading?'query_load':'hide'}>
                         <Spin indicator={antIcon} />数据查询中...
