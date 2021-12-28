@@ -11,7 +11,11 @@ export default function Spreadsheet(props) {
     };
     const sheetEl = React.useRef(null);
     const sheetRef = React.useRef(null);
-
+    const styles = [
+            {
+                "bgcolor": "#93d051"
+            }
+            ]
     function dataTransfer(param) {
 
         if(param[0] !== undefined) {
@@ -21,22 +25,22 @@ export default function Spreadsheet(props) {
             let colNum=0;
             Object.keys(props.data[0]).map((col,cindex) => {
                 colNum++;
-                cells[cindex] = {text:col}
+                cells[cindex] = {text:col, style: 0}
             })
             sheetStyle = {showToolbar: false,
                 showBottomBar: false,
                 mode: 'read',
                 showContextmenu: false,
-                row:{len:param.length+2},
-                col:{len:colNum}}
+                row:{len:param.length+1},
+                col:{len:colNum},
+            view:{height: ()=> (param.length+4)*25}}
 
             rows10[0] = {cells}
 
             props.data.map((row, rindex)=>{
                 const cells = {};
                 Object.keys(row).map((col,cindex) => {
-                    console.log(cindex)
-                    console.log(row[col])
+
                     cells[cindex] = {text:row[col] === null?'null':row[col].toString()}
                 })
                 rows10[rindex+1] = {
@@ -44,8 +48,7 @@ export default function Spreadsheet(props) {
                 }
 
             })
-            console.log(rows10)
-            return {name:"t",rows: rows10};
+            return {name:"t",rows: rows10,styles};
         }
         return {};
     }
@@ -53,14 +56,13 @@ export default function Spreadsheet(props) {
 
 
     useEffect(()=>{
-        console.log("in useEffect")
 
-        console.log(dataTransfer(props.data))
+        const sheetData = dataTransfer(props.data)
+
         const element = sheetEl.current;
         const sheet = new XSpreadsheet("#x-spreadsheet-demo", sheetStyle)
 
-        sheet.loadData(dataTransfer(props.data))
-
+        sheet.loadData(sheetData)
         sheetRef.current = sheet;
         return () => {
             element.innerHTML = "";
