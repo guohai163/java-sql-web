@@ -26,8 +26,8 @@ mybatis:
   configuration:
     map-underscore-to-camel-case: true
 project:
-  version: 0.7.1
-  limit: 10000
+  version: 0.7.5
+  limit: 20000
   signkey: jsw
 logging:
   level:

@@ -5,7 +5,7 @@ import './PageContent.css'
 import FetchHttpClient, { json } from 'fetch-http-client';
 import config from "./config";
 import { CSVLink } from "react-csv";
-import { Modal, Spin, Empty, List } from 'antd';
+import { Modal, Spin, Empty, List, Switch } from 'antd';
 import cookie from 'react-cookies';
 import { LoadingOutlined } from '@ant-design/icons';
 
@@ -50,7 +50,8 @@ class PageContent extends React.Component {
             historySql: [],
             beforeSql: '',
             rearSql: '',
-            dataAreaRefresh: []
+            dataAreaRefresh: [],
+            dataDisplayStyle: true
         }
     }
 
@@ -352,6 +353,13 @@ class PageContent extends React.Component {
             })
         }
     }
+
+    dataStyleSwitch(checked){
+        console.log(checked)
+        this.setState({
+            dataDisplayStyle: checked
+        })
+    }
     
     render(){
         const {sql, queryResult, selectDatabase} = this.state;
@@ -398,6 +406,7 @@ class PageContent extends React.Component {
                         </fieldset>
                     </div>
                     <fieldset id="queryboxfooter" className="tblFooters">
+                        <Switch checkedChildren="新版" unCheckedChildren="旧版" defaultChecked onChange={this.dataStyleSwitch.bind(this)} />
                         <input className="btn btn-primary" type="submit" id="button_submit_query" name="SQL"
                                tabIndex="200" value="执行SQL" onClick={this.execeteSql.bind(this)} />
                                { 0 !== queryResult.length? (<CSVLink data={queryResult}>导出查询结果</CSVLink>):(<span></span>) }
@@ -405,16 +414,18 @@ class PageContent extends React.Component {
                             <div className="clearfloat"></div>
                     </fieldset>
                     <div className={this.state.queryLoading || this.state.queryResult.length === 0?'hide':'responsivetable'}>
+                        {this.state.dataDisplayStyle?
                         <Spreadsheet data={queryResult} dataAreaRefresh={this.state.dataAreaRefresh}></Spreadsheet>
-                        {/*<table className="table_results ajax pma_table">*/}
-                        {/*    <thead>*/}
-                        {/*        {this.printTableHeader()}*/}
-                        {/*        */}
-                        {/*    </thead>*/}
-                        {/*    <tbody>*/}
-                        {/*            {this.printTableData()}*/}
-                        {/*    </tbody>*/}
-                        {/*</table>*/}
+                            :
+                        <table className="table_results ajax pma_table">
+                            <thead>
+                                {this.printTableHeader()}
+
+                            </thead>
+                            <tbody>
+                                    {this.printTableData()}
+                            </tbody>
+                        </table>}
                     </div>
                     <div className={this.state.queryLoading?'query_load':'hide'}>
                         <Spin indicator={antIcon} />数据查询中...

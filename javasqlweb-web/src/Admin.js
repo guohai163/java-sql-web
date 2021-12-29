@@ -139,6 +139,31 @@ class Admin extends React.Component {
                 break;
         }
     }
+    testDbConn(){
+        const client = new FetchHttpClient(config.serverDomain);
+        client.addMiddleware(json());
+        client.post('/api/backstage/testserver',{headers: { 'Content-Type': 'application/json','User-Token': this.state.token },
+            body:JSON.stringify(this.state.inputData)})
+            .then(response => {
+                if(true === response.jsonData.status){
+                    confirm({
+                        title:'✅提示',
+                        content: '✅数据库连接成功',
+                        onOk(){},
+                        onCancel(){}
+                    });
+
+                }
+                else{
+                    confirm({
+                        title:'❌连接失败',
+                        content: response.jsonData.data,
+                        onOk(){                        },
+                        onCancel(){                        }
+                    });
+                }
+            })
+    }
     connHandleOk(){
         const client = new FetchHttpClient(config.serverDomain);
         client.addMiddleware(json());
@@ -710,6 +735,9 @@ class Admin extends React.Component {
                             </Form.Item>
                             <Form.Item label="服务器分组">
                                 <Input onChange={this.onInputChange.bind(this)} id="dbGroup" defaultValue="default" value={this.state.inputData.dbGroup}></Input>
+                            </Form.Item>
+                            <Form.Item label="测试连接">
+                                <Button type="primary" onClick={this.testDbConn.bind(this)}>连接...</Button>
                             </Form.Item>
                         </Form>
                     </Modal>
