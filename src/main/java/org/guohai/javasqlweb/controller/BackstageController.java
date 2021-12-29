@@ -121,6 +121,17 @@ public class BackstageController {
     }
 
     /**
+     * 测试服务器连接性
+     * @param server
+     * @return
+     */
+    @ResponseBody
+    @RequestMapping(value = "/testserver", method = RequestMethod.POST)
+    public Result<String> testServerConnect(@RequestBody ConnectConfigBean server){
+        return backstageService.testServerConnect(server);
+    }
+
+    /**
      * 删除服务器
      * @param code
      * @return
@@ -147,7 +158,7 @@ public class BackstageController {
 
     /**
      * 为指定用户解绑OTP
-     * @param userName
+     * @param user 用户名
      * @return
      */
     @ResponseBody

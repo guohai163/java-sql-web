@@ -1,8 +1,13 @@
 package org.guohai.javasqlweb.service;
 
 import org.guohai.javasqlweb.beans.*;
+import org.guohai.javasqlweb.controller.BackstageController;
 import org.guohai.javasqlweb.dao.BaseConfigDao;
 import org.guohai.javasqlweb.dao.UserManageDao;
+import org.guohai.javasqlweb.service.operation.DbOperation;
+import org.guohai.javasqlweb.service.operation.DbOperationFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -22,6 +27,8 @@ public class BackstageServiceImpl implements BackstageService{
 
     @Autowired
     UserManageDao userDao;
+
+    private static final Logger LOG  = LoggerFactory.getLogger(BackstageServiceImpl.class);
     /**
      * 获取查询日志
      *
@@ -43,6 +50,25 @@ public class BackstageServiceImpl implements BackstageService{
         List<ConnectConfigBean> listConn = baseConfigDao.getConnData();
 
         return new Result<>(true, "", listConn);
+    }
+
+    /**
+     * 测试数据库连接性
+     *
+     * @param server 服务器信息
+     * @return
+     */
+    @Override
+    public Result<String> testServerConnect(ConnectConfigBean server) {
+        try {
+            DbOperation dbOperation  = DbOperationFactory.createDbOperation(server);
+            dbOperation.serverHealth();
+        } catch (Exception e) {
+            LOG.error(e.getMessage());
+            e.printStackTrace();
+            return new Result<>(false,e.getMessage(),e.getMessage());
+        }
+        return new Result<>(true,"连接成功","");
     }
 
     /**

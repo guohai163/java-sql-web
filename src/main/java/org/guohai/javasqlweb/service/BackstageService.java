@@ -4,6 +4,7 @@ import org.guohai.javasqlweb.beans.ConnectConfigBean;
 import org.guohai.javasqlweb.beans.QueryLogBean;
 import org.guohai.javasqlweb.beans.Result;
 import org.guohai.javasqlweb.beans.UserBean;
+import org.springframework.web.bind.annotation.RequestBody;
 
 import java.util.List;
 import java.util.Map;
@@ -26,6 +27,12 @@ public interface BackstageService {
      */
     Result<List<ConnectConfigBean>> getConnData();
 
+    /**
+     * 测试数据库连接性
+     * @param server 服务器信息
+     * @return
+     */
+    Result<String> testServerConnect(@RequestBody ConnectConfigBean server);
     /**
      * 增加服务器
      * @param server
