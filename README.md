@@ -42,7 +42,7 @@ vim init.sql
 # 启动数据库容器,把刚下载好的init.sql文件映射到容器里的docker-entrypoint-initdb.d目录下。为了启动容器自动创建我们需要的库和表。参数MYSQL_ROOT_PASSWORD后为数据库root用户密码，请更换成更安全的
 docker run --name jswdb -v /opt/java-sql-web/script:/docker-entrypoint-initdb.d -e  MYSQL_ROOT_PASSWORD=my-secret-pw -d mariadb:10
 # 启动javasqladmin容器，如dockerhub无法连接可以使用备用的地址 docker.pkg.github.com/guohai163/java-sql-web/javasqlweb:0.5.0
-docker run --name jsw_web --link jswdb:db -p 80:8002 -e MARIADB_PORT_3306_TCP_ADDR=db -e MARIADB_ENV_MYSQL_ROOT_PASSWORD=my-secret-pw gcontainer/java-sql-web:0.6.8
+docker run --name jsw_web --link jswdb:db -p 80:8002 -e MARIADB_PORT_3306_TCP_ADDR=db -e MARIADB_ENV_MYSQL_ROOT_PASSWORD=my-secret-pw gcontainer/java-sql-web:0.7.5
 # 使用浏览器访问 
 open http://localhost
 ```
