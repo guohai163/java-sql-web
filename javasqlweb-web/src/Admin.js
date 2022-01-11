@@ -731,6 +731,7 @@ class Admin extends React.Component {
                             <Select onChange={this.onSelectChange.bind(this)} value={this.state.inputData.dbServerType} placeholder="Select a type">
                                 <Select.Option value="mssql">mssql</Select.Option>
                                 <Select.Option value="mysql">mysql</Select.Option>
+                                <Select.Option value="postgresql">postgresql</Select.Option>
                             </Select>
                             </Form.Item>
                             <Form.Item label="服务器分组">

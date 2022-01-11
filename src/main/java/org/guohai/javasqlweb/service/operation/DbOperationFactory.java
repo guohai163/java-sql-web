@@ -23,6 +23,11 @@ public class DbOperationFactory {
      */
     private static final String ORACLE = "oracle";
 
+    /**
+     *
+     */
+    private static final String POSTGRESQL = "postgresql";
+
 
     public static DbOperation createDbOperation(ConnectConfigBean conn) throws Exception {
         DbOperation operation = null;
@@ -32,6 +37,8 @@ public class DbOperationFactory {
             operation = new DbOperationMssqlDruid(conn);
         }else if(ORACLE.equals(conn.getDbServerType())) {
             operation = new DbOperationOracle(conn);
+        }else if(POSTGRESQL.equals(conn.getDbServerType())) {
+            operation = new DbOperationPostgresqlDruid(conn);
         }
         return operation;
     }
