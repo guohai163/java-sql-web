@@ -217,12 +217,7 @@ public class DbOperationMysqlDruid implements DbOperation {
 
         ResultSet rs = null;
         try{
-            // 尝试分组执行SQL
-//            String[] sqlArray = sql.split(";");
-//            for(int i=0;i<sqlArray.length;i++){
-//                st.addBatch(String.format("%s;",sqlArray[i]));
-//            }
-//            rs = st.executeBatch();
+
             rs = st.executeQuery(String.format("%s;", sql));
             // 获得结果集结构信息,元数据
             java.sql.ResultSetMetaData md = rs.getMetaData();
