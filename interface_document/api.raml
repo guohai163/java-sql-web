@@ -29,6 +29,19 @@ baseUri: http://127.0.0.1:8002
       dbname:
         type: string
         example: master
+  /tablecolumn/{serverCode}/{dbName}：
+    uriParameters:
+      serverCode:
+        type: string
+        example: "1"
+      dbName:
+        type: string
+        example: master
+    get:
+      body:
+        application/json:
+      responses:
+        200:
   /columnslist/{serverCode}/{dbName}/{tableName}:
     uriParameters:
       serverCode:

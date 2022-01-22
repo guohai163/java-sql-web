@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletRequest;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 数据基础控制器
@@ -63,6 +64,18 @@ public class BaseDataController {
     @RequestMapping(value = "/tablelist/{serverCode}/{dbName}")
     public Result<List<TablesNameBean>> getTableName(@PathVariable("serverCode") String serverCode, @PathVariable("dbName") String dbName){
         return baseDataService.getTableList(Integer.parseInt(serverCode),dbName);
+    }
+
+    /**
+     * 获取指定库的所有表列集合
+     * @param serverCode
+     * @param dbName
+     * @return
+     */
+    @ResponseBody
+    @RequestMapping(value = "/tablecolumn/{serverCode}/{dbName}")
+    public Result<Map<String, String[]>> getTableCouumn(@PathVariable("serverCode") String serverCode, @PathVariable("dbName") String dbName){
+        return baseDataService.getTableColumn(Integer.parseInt(serverCode), dbName);
     }
 
     /**

@@ -18,10 +18,6 @@ public class DbOperationFactory {
      */
     private static final String MSSQL = "mssql";
 
-    /**
-     *
-     */
-    private static final String ORACLE = "oracle";
 
     /**
      *
@@ -35,8 +31,7 @@ public class DbOperationFactory {
             operation = new DbOperationMysqlDruid(conn);
         } else if(MSSQL.equals(conn.getDbServerType())) {
             operation = new DbOperationMssqlDruid(conn);
-        }else if(ORACLE.equals(conn.getDbServerType())) {
-            operation = new DbOperationOracle(conn);
+
         }else if(POSTGRESQL.equals(conn.getDbServerType())) {
             operation = new DbOperationPostgresqlDruid(conn);
         }

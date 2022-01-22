@@ -11,7 +11,7 @@ import { LoadingOutlined } from '@ant-design/icons';
 
 import {Controlled as CodeMirror} from 'react-codemirror2';
 import 'codemirror/lib/codemirror.css';
-import 'codemirror/mode/sql/sql';
+import "codemirror/mode/sql/sql";
 import 'codemirror/addon/hint/show-hint.css';
 import 'codemirror/addon/hint/show-hint.js';
 import 'codemirror/addon/hint/sql-hint.js';
@@ -26,6 +26,12 @@ const options={
     lineNumbers: true,                     //显示行号
     mode: {name: "text/x-mysql"},          //定义mode
     extraKeys: {"Ctrl": "autocomplete"},   //自动提示配置
+    hintOptions:{
+        tables:{
+            xxx0_table_name:[],
+            xxx1_table_name:['attribute_1','attribute_2']
+        }
+    },
     theme: "idea"                  //选中的theme
 };  
 
@@ -51,7 +57,19 @@ class PageContent extends React.Component {
             beforeSql: '',
             rearSql: '',
             dataAreaRefresh: [],
-            dataDisplayStyle: true
+            dataDisplayStyle: true,
+            options: {
+                lineNumbers: true,                     //显示行号
+                mode: {name: "text/x-mysql"},          //定义mode
+                extraKeys: {"Ctrl": "autocomplete"},   //自动提示配置
+                hintOptions:{
+                    tables:{
+                        xxx0_table_name:[],
+                        xxx1_table_name:['attribute_1','attribute_2']
+                    }
+                },
+                theme: "idea"                  //选中的theme
+            }
         }
     }
 
@@ -140,6 +158,20 @@ class PageContent extends React.Component {
                         selectServerName: response.jsonData.data.dbServerName,
                         selectServerType: response.jsonData.data.dbServerType,
                         historySql: localStorage.getItem(data.selectServer+'_history_sql')===null?[]:JSON.parse(localStorage.getItem(data.selectServer+'_history_sql'))
+                    })
+                })
+                client.get('/database/tablecolumn/'+data.selectServer+'/'+data.selectDatabase,{headers:{'User-Token': this.state.token}}).then( response => {
+                    console.log(response.jsonData.data)
+                    this.setState({
+                        options: {
+                            lineNumbers: true,                     //显示行号
+                            mode: {name: "text/x-mysql"},          //定义mode
+                            extraKeys: {"Ctrl": "autocomplete"},   //自动提示配置
+                            hintOptions:{
+                                tables: response.jsonData.data
+                            },
+                            theme: "idea"                  //选中的theme
+                        }
                     })
                 })
             }
@@ -386,7 +418,7 @@ class PageContent extends React.Component {
                                     {/* <textarea value={sql} onChange={this.handleTextareaChange.bind(this)} tabIndex="100" name="sql_query" id="sqlquery" cols="40" rows="20">
 
                                     </textarea> */}
-                                    <CodeMirror ref="editor" onCursorActivity={this.mouseSelected.bind(this)} value={sql} onBeforeChange={(editor, data, value) => { this.setState({sql: value});}}  options={options} />
+                                    <CodeMirror ref="editor" onCursorActivity={this.mouseSelected.bind(this)} value={sql} onBeforeChange={(editor, data, value) => { this.setState({sql: value});}}  options={this.state.options} />
                                     * 敲入关键字首字母后可以使用Ctrl进行快速补全，选中部分SQL只会执行选中部分的语句！
                                 </div>
                                 <label>历史记录</label>

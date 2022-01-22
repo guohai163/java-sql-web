@@ -4,6 +4,7 @@ import org.guohai.javasqlweb.beans.*;
 
 import java.sql.SQLException;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 单例工厂的抽象接口
@@ -86,6 +87,14 @@ public interface DbOperation {
      * @throws SQLException 抛出异常
      */
      Object[] queryDatabaseBySql(String dbName, String sql, Integer limit) throws SQLException;
+
+    /**
+     * 返回一个数据库的所有表和列集合
+     * @param dbName
+     * @return
+     * @throws SQLException
+     */
+     Map<String, String[]> getTablesColumnsMap(String dbName) throws SQLException;
 
     /**
      * 服务器连接状态健康检查

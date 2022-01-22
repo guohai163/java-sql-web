@@ -166,6 +166,32 @@ public class DbOperationMssqlDruid implements DbOperation {
     }
 
     /**
+     * 返回一个数据库的所有表和列集合
+     *
+     * @param dbName
+     * @return
+     * @throws SQLException
+     */
+    @Override
+    public Map<String, String[]> getTablesColumnsMap(String dbName) throws SQLException {
+        Map<String, String []> tables = new HashMap<>(10);
+        Connection conn = sqlDs.getConnection();
+        Statement st = conn.createStatement();
+        ResultSet rs = st.executeQuery(String.format("use [%s];\n" +
+                "    SELECT a.name as table_name,stuff((select ','+ b.name from syscolumns b where a.id=b.id for xml path('')), 1,1,'') as column_name\n" +
+                "    FROM sysobjects a --join syscolumns b on a.id=b.id and a.xtype='U'\n" +
+                "    where a.xtype='U' group by a.name,a.id;", dbName));
+        while (rs.next()){
+            tables.put(rs.getString("table_name"), rs.getString("column_name").split(","));
+        }
+        closeResource(rs,st,conn);
+        return null;
+    }
+
+
+
+
+    /**
      * 获取所有的索引数据
      *
      * @param dbName
@@ -282,6 +308,8 @@ public class DbOperationMssqlDruid implements DbOperation {
         }
         return result;
     }
+
+
 
     /**
      * 服务器连接状态健康检查

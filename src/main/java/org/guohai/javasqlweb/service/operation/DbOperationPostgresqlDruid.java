@@ -244,6 +244,18 @@ public class DbOperationPostgresqlDruid implements DbOperation {
     }
 
     /**
+     * 返回一个数据库的所有表和列集合
+     *
+     * @param dbName
+     * @return
+     * @throws SQLException
+     */
+    @Override
+    public Map<String, String[]> getTablesColumnsMap(String dbName) throws SQLException {
+        return null;
+    }
+
+    /**
      * 服务器连接状态健康检查
      *
      * @return

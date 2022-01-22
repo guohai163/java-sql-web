@@ -10,7 +10,7 @@
     </parent>
     <groupId>org.guohai</groupId>
     <artifactId>javasqlweb</artifactId>
-    <version>0.7.5</version>
+    <version>0.7.6</version>
     <name>javasqlweb</name>
     <description>java version db query tools</description>
 

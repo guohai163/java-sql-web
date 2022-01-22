@@ -106,6 +106,8 @@ public class BaseDataServiceImpl implements BaseDataService{
         }
     }
 
+
+
     /**
      * 获取所有列名
      * @param serverCode
@@ -126,6 +128,29 @@ public class BaseDataServiceImpl implements BaseDataService{
             }
         }else{
             return new Result<>(false,"",null);
+        }
+    }
+
+    /**
+     * 或者指定库的 表列集合
+     *
+     * @param serverCode
+     * @param dbName
+     * @return
+     */
+    @Override
+    public Result<Map<String, String[]>> getTableColumn(Integer serverCode, String dbName) {
+        DbOperation operation = createDbOperation(serverCode);
+        if(null != operation){
+            try {
+                return new Result<>(true, "", operation.getTablesColumnsMap(dbName));
+            } catch (SQLException e) {
+                return new Result<>(false,"",null);
+            }
+        }
+        else{
+            return new Result<>(false,"",null);
+
         }
     }
 

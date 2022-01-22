@@ -4,6 +4,7 @@ import org.guohai.javasqlweb.beans.*;
 
 import javax.swing.text.View;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 数据操作基础服务
@@ -47,6 +48,14 @@ public interface BaseDataService {
      * @return
      */
     Result<List<ColumnsNameBean>> getColumnList(Integer serverCode, String dbName, String tableName);
+
+    /**
+     * 或者指定库的 表列集合
+     * @param serverCode
+     * @param dbName
+     * @return
+     */
+    Result<Map<String ,String[]>> getTableColumn(Integer serverCode, String dbName);
 
     /**
      * 获得指定表的所有索引
@@ -127,4 +136,6 @@ public interface BaseDataService {
      * @return
      */
     Result<List<SqlGuidBean>> getAllGuid();
+
+
 }

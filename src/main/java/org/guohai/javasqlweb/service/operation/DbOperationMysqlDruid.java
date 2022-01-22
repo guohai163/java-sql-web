@@ -153,6 +153,27 @@ public class DbOperationMysqlDruid implements DbOperation {
     }
 
     /**
+     * 返回一个数据库的所有表和列集合
+     *
+     * @param dbName
+     * @return
+     * @throws SQLException
+     */
+    @Override
+    public Map<String, String[]> getTablesColumnsMap(String dbName) throws SQLException {
+        Map<String, String[]> tables = new HashMap<>(10);
+        Connection conn = sqlDs.getConnection();
+        Statement st = conn.createStatement();
+        ResultSet rs = st.executeQuery(String.format("select TABLE_NAME,group_concat(COLUMN_NAME) as COLUMN_NAME from `information_schema`.`COLUMNS` where  TABLE_SCHEMA='%s' group by TABLE_NAME;", dbName));
+        while (rs.next()){
+            tables.put(rs.getString("TABLE_NAME"),rs.getString("COLUMN_NAME").split(","));
+        }
+        closeResource(rs,st,conn);
+        return tables;
+    }
+
+
+    /**
      * 获取所有的索引数据
      *
      * @param dbName
@@ -254,6 +275,8 @@ public class DbOperationMysqlDruid implements DbOperation {
 
         return result;
     }
+
+
 
     /**
      * 服务器连接状态健康检查
