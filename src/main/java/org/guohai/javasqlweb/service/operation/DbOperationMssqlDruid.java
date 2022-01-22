@@ -185,7 +185,7 @@ public class DbOperationMssqlDruid implements DbOperation {
             tables.put(rs.getString("table_name"), rs.getString("column_name").split(","));
         }
         closeResource(rs,st,conn);
-        return null;
+        return tables;
     }
 
 
