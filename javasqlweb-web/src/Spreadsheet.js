@@ -4,7 +4,7 @@ import XSpreadsheet from "x-data-spreadsheet";
 import "x-data-spreadsheet/dist/xspreadsheet.css";
 
 export default function Spreadsheet(props) {
-    let sheetStyle = {showToolbar: false,
+    let sheetStyle = {showToolbar: true,
         showBottomBar: false,
         showContextmenu: true,
 
@@ -33,7 +33,7 @@ export default function Spreadsheet(props) {
                 showContextmenu: false,
                 row:{len:param.length+1},
                 col:{len:colNum},
-            view:{height: ()=> (param.length+4)*25}}
+            view:{height: ()=> (param.length+4)*25,width:()=>colNum*110}}
 
             rows10[0] = {cells}
 

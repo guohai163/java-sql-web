@@ -18,22 +18,10 @@ import 'codemirror/addon/hint/sql-hint.js';
 import 'codemirror/theme/idea.css';
 import 'antd/dist/antd.css';
 import Spreadsheet from "./Spreadsheet";
+import DataDisplayFast from "./DataDisplayFast";
 
 const { confirm } = Modal;
 const antIcon = <LoadingOutlined style={{ fontSize: 34 }} spin />;
-
-const options={
-    lineNumbers: true,                     //显示行号
-    mode: {name: "text/x-mysql"},          //定义mode
-    extraKeys: {"Ctrl": "autocomplete"},   //自动提示配置
-    hintOptions:{
-        tables:{
-            xxx0_table_name:[],
-            xxx1_table_name:['attribute_1','attribute_2']
-        }
-    },
-    theme: "idea"                  //选中的theme
-};  
 
 
 class PageContent extends React.Component {
@@ -62,12 +50,6 @@ class PageContent extends React.Component {
                 lineNumbers: true,                     //显示行号
                 mode: {name: "text/x-mysql"},          //定义mode
                 extraKeys: {"Ctrl": "autocomplete"},   //自动提示配置
-                hintOptions:{
-                    tables:{
-                        xxx0_table_name:[],
-                        xxx1_table_name:['attribute_1','attribute_2']
-                    }
-                },
                 theme: "idea"                  //选中的theme
             }
         }
@@ -241,6 +223,7 @@ class PageContent extends React.Component {
                     });
                 }
                 this.setState({
+                    dataDisplayStyle: response.jsonData.data.length>2000?false:true,
                     queryResult: response.jsonData.data,
                     dataAreaRefresh: [sql]
                 })
@@ -266,66 +249,14 @@ class PageContent extends React.Component {
         })
     }
 
-    printTableHeader() {
-        if(this.state.queryResult[0] !== undefined){
-            let data = this.state.queryResult[0]
-            return (
-                <tr>
-                {
-                Object.keys(data).map(key => {
-                    return(<th>{key}</th>)
-                })
-                }
-                </tr>
-            );
-        }
-        else{
-            return(
-                <tr><th></th></tr>
-            )
-        }
-    }
 
-    static dataColumnShow(columnData) {
-        if(null == columnData){
-            return 'null'
-        }
-        switch(typeof columnData) {
-            case 'boolean':
-                return columnData?'true':'false';
-            default:
-                return columnData;
-        }
-    }
 
     handleTextareaChange(e) {
         this.setState({
             sql: e
         })
     }
-    printTableData() {
-        
-        if(this.state.queryResult[0] !== undefined){
-            let data = this.state.queryResult
 
-            return (
-                data.map( row => {
-                return(<tr key={row[0]}>{
-                    Object.keys(row).map( col => {
-                        return (<td>{PageContent.dataColumnShow(row[col])}</td>)
-                    })
-                    }</tr>)
-                }
-                )
-
-            );
-        }
-        else{
-            return(
-                <tr><td>无数据...</td></tr>
-            )
-        }
-    }
     selectColumn(e){
         this.setState({
             sql: this.state.sql+ ' ' + e.target.value
@@ -438,7 +369,7 @@ class PageContent extends React.Component {
                         </fieldset>
                     </div>
                     <fieldset id="queryboxfooter" className="tblFooters">
-                        <Switch checkedChildren="新版" unCheckedChildren="旧版" defaultChecked onChange={this.dataStyleSwitch.bind(this)} />
+                        <Switch checkedChildren="新版" unCheckedChildren="旧版" defaultChecked checked={this.state.dataDisplayStyle} onChange={this.dataStyleSwitch.bind(this)} />
                         <input className="btn btn-primary" type="submit" id="button_submit_query" name="SQL"
                                tabIndex="200" value="执行SQL" onClick={this.execeteSql.bind(this)} />
                                { 0 !== queryResult.length? (<CSVLink data={queryResult}>导出查询结果</CSVLink>):(<span></span>) }
@@ -449,15 +380,9 @@ class PageContent extends React.Component {
                         {this.state.dataDisplayStyle?
                         <Spreadsheet data={queryResult} dataAreaRefresh={this.state.dataAreaRefresh}></Spreadsheet>
                             :
-                        <table className="table_results ajax pma_table">
-                            <thead>
-                                {this.printTableHeader()}
+                            <DataDisplayFast data={queryResult} dataAreaRefresh={this.state.dataAreaRefresh}></DataDisplayFast>
 
-                            </thead>
-                            <tbody>
-                                    {this.printTableData()}
-                            </tbody>
-                        </table>}
+                            }
                     </div>
                     <div className={this.state.queryLoading?'query_load':'hide'}>
                         <Spin indicator={antIcon} />数据查询中...
