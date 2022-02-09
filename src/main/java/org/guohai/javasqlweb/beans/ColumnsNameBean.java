@@ -25,6 +25,11 @@ public class ColumnsNameBean {
     private String columnLength;
 
     /**
+     * 列备注
+     */
+    private String columnComment;
+
+    /**
      * 是否可为空
      */
     String columnIsNull;

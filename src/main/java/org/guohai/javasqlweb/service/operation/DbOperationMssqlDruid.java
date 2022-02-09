@@ -150,14 +150,16 @@ public class DbOperationMssqlDruid implements DbOperation {
         Connection conn = sqlDs.getConnection();
         Statement st = conn.createStatement();
         ResultSet rs = st.executeQuery(String.format("use [%s];" +
-                "SELECT b.name column_name,c.name column_type,b.length column_length,b.isnullable is_null_able \n" +
+                "SELECT b.name column_name,c.name column_type,b.length column_length,b.isnullable is_null_able,d.value column_comment \n" +
                 "FROM sysobjects a join syscolumns b on a.id=b.id and a.xtype='U'\n" +
                 "join systypes c on b.xtype=c.xusertype\n" +
+                "left join sys.extended_properties d on d.major_id=b.id and d.minor_id=b.colid\n" +
                 "where a.name='%s'", dbName, tableName));
         while (rs.next()){
             listCnb.add(new ColumnsNameBean(rs.getString("column_name"),
                     rs.getString("column_type"),
                     rs.getString("column_length"),
+                    rs.getString("column_comment") == null?"":rs.getString("column_comment"),
                     rs.getInt("is_null_able") == 0?"not null":"null"
                     ));
         }

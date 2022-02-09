@@ -7,7 +7,7 @@ import config from './config'
 import Pubsub from 'pubsub-js'
 import cookie from 'react-cookies'
 import { LoadingOutlined } from '@ant-design/icons';
-import { Modal, Spin, Input, Form, Select } from 'antd';
+import { Modal, Spin, Input, Form, Select, Tag } from 'antd';
 import cache from './utils';
 
 const { confirm } = Modal;
@@ -498,7 +498,7 @@ class Navigation extends React.Component {
                                                     <div className={this.state.showTableColumn === table.tableName?'list_container':'hide'}>
                                                         <ul>
                                                             {this.state.showTableColumn !== table.tableName?'':columntData.map(column =>
-                                                                <li onClick={this.sendColumnName.bind(this,column.columnName)}>{column.columnName}({column.columnType}{""===column.columnLength?"":"("+column.columnLength+")"},{column.columnIsNull})</li>
+                                                                <li onClick={this.sendColumnName.bind(this,column.columnName)}>{column.columnName}({column.columnType}{""===column.columnLength?"":"("+column.columnLength+")"},{column.columnIsNull})<br /> - <Tag color="green">{""===column.columnComment?"NULL":column.columnComment}</Tag></li>
                                                             )}
                                                         </ul>
                                                     </div>

@@ -146,6 +146,7 @@ public class DbOperationMysqlDruid implements DbOperation {
             listCnb.add(new ColumnsNameBean(rs.getString("Field"),
                     rs.getString("Type"),
                     "",
+                    rs.getString("Comment"),
                     "NO".equals(rs.getString("Null"))?"not null":"null"));
         }
         closeResource(rs,st,conn);
