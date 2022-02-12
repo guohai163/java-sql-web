@@ -27,7 +27,8 @@ const { TabPane } = Tabs;
 
 // 初始化
 const initialPanes = [
-    {title: 'MainTab', closable: false, key: 'Tab0', serverName: '', serverType: '', database: '', sql: '', queryResult: []}
+    {title: 'MainTab', closable: false, key: 'Tab0', serverName: '', serverType: '', database: '', sql: '',
+        queryResult: [], dataAreaRefresh: []}
 ]
 
 const client = new FetchHttpClient(config.serverDomain);
@@ -80,7 +81,6 @@ class PageContent extends React.Component {
                         sql = 'SELECT * FROM `'+data.selectDatabase+'`.`'+data.selectTable + '` limit 100';
                     }
                     let pane = getArray(this.state.panes, this.state.activeKey)
-                    console.log(pane)
 
                     pane.sql = sql;
                     pane.serverName = response.jsonData.data.dbServerName;
@@ -112,11 +112,17 @@ class PageContent extends React.Component {
             }
             else if('tableName' === data.type) {
                 let sql = this.state.beforeSql + ' ' + data.selectTable + ' ' +this.state.rearSql;
-                this.setState({sql: sql})
+                let pane = getArray(this.state.panes, this.state.activeKey)
+                pane.sql = sql;
+                let panes = editArray(this.state.panes, this.state.activeKey, pane);
+                this.setState({sql: sql, panes: panes})
             }
             else if('column' === data.type) {
                 let sql = this.state.beforeSql + ' ' + data.selectColumn + ' ' +this.state.rearSql;
-                this.setState({sql: sql})
+                let pane = getArray(this.state.panes, this.state.activeKey)
+                pane.sql = sql;
+                let panes = editArray(this.state.panes, this.state.activeKey, pane);
+                this.setState({sql: sql, panes: panes})
             }
             else if('sp' === data.type){
                 this.setState({
@@ -124,13 +130,18 @@ class PageContent extends React.Component {
                     selectDatabase: data.selectDatabase,
                     spName: data.spName
                 })
-                const client = new FetchHttpClient(config.serverDomain);
-                client.addMiddleware(json());
+
                 client.get('/database/storedprocedures/'+data.selectServer+'/'+data.selectDatabase+'/'+data.spName,
                             {headers:{'User-Token': this.state.token}})
                     .then(response => {
+                        let pane = getArray(this.state.panes, this.state.activeKey)
+                        pane.sql = response.jsonData.data.procedureData;
+                        pane.server = data.selectServer;
+                        pane.database = data.selectDatabase;
+                        let panes = editArray(this.state.panes, this.state.activeKey, pane);
                         this.setState({
-                            sql: response.jsonData.data.procedureData
+                            sql: response.jsonData.data.procedureData,
+                            panes: panes
                         })
                     })
                 
@@ -140,8 +151,7 @@ class PageContent extends React.Component {
                     selectServer: data.selectServer,
                     selectDatabase: data.selectDatabase,
                 })
-                const client = new FetchHttpClient(config.serverDomain);
-                client.addMiddleware(json());
+
                 client.get('/database/views/'+data.selectServer+'/'+data.selectDatabase+'/'+data.viewName,
                             {headers:{'User-Token': this.state.token}})
                     .then(response => {
@@ -151,8 +161,7 @@ class PageContent extends React.Component {
                     })
             }
             else if('database' === data.type){
-                const client = new FetchHttpClient(config.serverDomain);
-                client.addMiddleware(json());
+
                 client.get('/database/serverinfo/'+data.selectServer,{headers:{'User-Token': this.state.token}}).then( response => {
                     this.setState({
                         selectServer: data.selectServer,
@@ -178,9 +187,13 @@ class PageContent extends React.Component {
                 })
             }
             else if('server' === data.type){
-                const client = new FetchHttpClient(config.serverDomain);
-                client.addMiddleware(json());
+
                 client.get('/database/serverinfo/'+data.selectServer,{headers:{'User-Token': this.state.token}}).then( response => {
+                    let pane = getArray(this.state.panes, this.state.activeKey)
+                    pane.serverName = response.jsonData.data.dbServerName;
+                    pane.serverType = response.jsonData.data.dbServerType;
+                    pane.server = data.selectServer;
+                    let panes = editArray(this.state.panes, this.state.activeKey, pane);
                     this.setState({
                         selectServer: data.selectServer,
                         selectDatabase: '',
@@ -198,7 +211,8 @@ class PageContent extends React.Component {
 
 
     execeteSql() {
-        let sql = ''===this.state.selectedSql?this.state.sql:this.state.selectedSql;
+        let pane = getArray(this.state.panes, this.state.activeKey)
+        let sql = ''===pane.selectedSql?pane.sql:pane.selectedSql;
         if('' === sql){
             confirm({
                 title:'提示',
@@ -208,7 +222,8 @@ class PageContent extends React.Component {
             });
             return;
         }
-        if('' === this.state.selectDatabase){
+
+        if('' === pane.database){
             confirm({
                 title:'提示',
                 content: '请选择数据库后再执行',
@@ -217,12 +232,13 @@ class PageContent extends React.Component {
             });
             return;
         }
+        pane.queryResult = [];
         this.setState({
             queryLoading: true,
-            queryResult: []
+            queryResult: [],
+            panes: editArray(this.state.panes, this.state.activeKey, pane)
         });
-        const client = new FetchHttpClient(config.serverDomain);
-        client.addMiddleware(json());
+
         client.post('/database/query/'+this.state.selectServer+'/'+this.state.selectDatabase,
         {headers:{'Content-Type': 'text/plain','User-Token': this.state.token},body: sql}).then(response => {
             this.setState({queryLoading: false});
@@ -242,10 +258,14 @@ class PageContent extends React.Component {
                         onOk(){},
                     });
                 }
+                pane.dataDisplayStyle = response.jsonData.data.length>2000?false:true;
+                pane.queryResult = response.jsonData.data;
+                pane.dataAreaRefresh = [sql];
                 this.setState({
                     dataDisplayStyle: response.jsonData.data.length>2000?false:true,
                     queryResult: response.jsonData.data,
-                    dataAreaRefresh: [sql]
+                    dataAreaRefresh: [sql],
+                    panes: editArray(this.state.panes, this.state.activeKey, pane),
                 })
                 // 检查数组中是否有此成员
                 let historySql = this.state.historySql;
@@ -304,8 +324,7 @@ class PageContent extends React.Component {
         let beforeSql = dom.getValue().substring(0,beforeCount+1);
         let rearSql = dom.getValue().substring(beforeCount+1);
 
-        console.log(beforeSql)
-        console.log(rearSql)
+
         this.setState({
             beforeSql: beforeSql,
             rearSql: rearSql
@@ -316,9 +335,11 @@ class PageContent extends React.Component {
         let sqlCursor = dom.getCursor()
 
         let sql = dom.getValue()
-        console.log(sql)
+        let pane = getArray(this.state.panes, this.state.activeKey)
+        pane.selectedSql = dom.getSelection()
         this.setState({
-            selectedSql: dom.getSelection()
+            selectedSql: dom.getSelection(),
+            panes: editArray(this.state.panes, this.state.activeKey, pane)
         })
     }
     historSqlToText(sqlScript){
@@ -355,7 +376,7 @@ class PageContent extends React.Component {
         const activeKey = `Tab${this.newTabIndex++}`;
 
         const newPanes = [...panes];
-        newPanes.push({ title: 'Tab ' +activeKey, key: activeKey, sql: '' });
+        newPanes.push({ title: 'Tab ' +activeKey, key: activeKey, sql: '', dataAreaRefresh: [], queryResult: [] });
         this.setState({
             panes: newPanes,
             activeKey,
@@ -440,9 +461,9 @@ class PageContent extends React.Component {
                                 </fieldset>
                                 <div className={this.state.queryLoading || this.state.queryResult.length === 0?'hide':'responsivetable'}>
                                     {this.state.dataDisplayStyle?
-                                        <Spreadsheet data={queryResult} dataAreaRefresh={this.state.dataAreaRefresh}></Spreadsheet>
+                                        <Spreadsheet data={pane.queryResult} dataAreaRefresh={pane.dataAreaRefresh}></Spreadsheet>
                                         :
-                                        <DataDisplayFast data={queryResult} dataAreaRefresh={this.state.dataAreaRefresh}></DataDisplayFast>
+                                        <DataDisplayFast data={pane.queryResult} dataAreaRefresh={pane.dataAreaRefresh}></DataDisplayFast>
 
                                     }
                                 </div>
