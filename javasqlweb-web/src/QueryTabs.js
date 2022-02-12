@@ -11,11 +11,14 @@ class QueryTabs extends React.Component {
         activeKey: initialPanes[0].key,
         panes: initialPanes
     };
+    TabsOnChange(){
+
+    };
 
     render() {
         const {panes, activeKey} = this.state;
         return(
-            <Tabs></Tabs>
+            <Tabs type="editable-card" onChange={this.TabsOnChange}></Tabs>
         );
     }
 }

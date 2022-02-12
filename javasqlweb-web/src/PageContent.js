@@ -5,7 +5,8 @@ import './PageContent.css'
 import FetchHttpClient, { json } from 'fetch-http-client';
 import config from "./config";
 import { CSVLink } from "react-csv";
-import { Modal, Spin, Empty, List, Switch } from 'antd';
+import { Modal, Spin, Empty, List, Switch, Tabs } from 'antd';
+import {getArray, editArray} from './ArrayOperation';
 import cookie from 'react-cookies';
 import { LoadingOutlined } from '@ant-design/icons';
 
@@ -22,9 +23,18 @@ import DataDisplayFast from "./DataDisplayFast";
 
 const { confirm } = Modal;
 const antIcon = <LoadingOutlined style={{ fontSize: 34 }} spin />;
+const { TabPane } = Tabs;
 
+// 初始化
+const initialPanes = [
+    {title: 'MainTab', closable: false, key: 'Tab0', serverName: '', serverType: '', database: '', sql: '', queryResult: []}
+]
+
+const client = new FetchHttpClient(config.serverDomain);
+client.addMiddleware(json());
 
 class PageContent extends React.Component {
+    newTabIndex = 2;
     constructor(props){
         super(props)
         this.state = {
@@ -51,7 +61,9 @@ class PageContent extends React.Component {
                 mode: {name: "text/x-mysql"},          //定义mode
                 extraKeys: {"Ctrl": "autocomplete"},   //自动提示配置
                 theme: "idea"                  //选中的theme
-            }
+            },
+            activeKey: initialPanes[0].key,
+            panes: initialPanes,
         }
     }
 
@@ -59,8 +71,7 @@ class PageContent extends React.Component {
         
         Pubsub.subscribe('dataSelect', (msg, data) => {
             if('table' === data.type){
-                const client = new FetchHttpClient(config.serverDomain);
-                client.addMiddleware(json());
+
                 client.get('/database/serverinfo/'+data.selectServer,{headers:{'User-Token': this.state.token}}).then( response => {
                     let sql = '';
                     if('mssql' === response.jsonData.data.dbServerType || 'mssql_druid' === response.jsonData.data.dbServerType){
@@ -68,6 +79,14 @@ class PageContent extends React.Component {
                     }else if('mysql' === response.jsonData.data.dbServerType){
                         sql = 'SELECT * FROM `'+data.selectDatabase+'`.`'+data.selectTable + '` limit 100';
                     }
+                    let pane = getArray(this.state.panes, this.state.activeKey)
+                    console.log(pane)
+
+                    pane.sql = sql;
+                    pane.serverName = response.jsonData.data.dbServerName;
+                    pane.serverType = response.jsonData.data.dbServerType;
+                    pane.database = data.selectDatabase;
+                    let panes = editArray(this.state.panes, this.state.activeKey, pane);
                     this.setState({
                         selectServer: data.selectServer,
                         selectDatabase: data.selectDatabase,
@@ -75,6 +94,7 @@ class PageContent extends React.Component {
                         selectServerName: response.jsonData.data.dbServerName,
                         selectServerType: response.jsonData.data.dbServerType,
                         sql: sql,
+                        panes: panes,
                         historySql: localStorage.getItem(data.selectServer+'_history_sql')===null?[]:JSON.parse(localStorage.getItem(data.selectServer+'_history_sql'))
                     })
                     client.get('/database/columnslist/'+data.selectServer+'/'+data.selectDatabase+'/'+data.selectTable,
@@ -323,78 +343,120 @@ class PageContent extends React.Component {
             dataDisplayStyle: checked
         })
     }
-    
+
+    onTabsEdit =  (targetKey, action) => {
+        this[action](targetKey);
+    }
+    onTabsChange = activeKey => {
+        this.setState({ activeKey });
+    };
+    add = () => {
+        const { panes } = this.state;
+        const activeKey = `Tab${this.newTabIndex++}`;
+
+        const newPanes = [...panes];
+        newPanes.push({ title: 'Tab ' +activeKey, key: activeKey, sql: '' });
+        this.setState({
+            panes: newPanes,
+            activeKey,
+        });
+    };
+    remove = targetKey => {
+        const { panes, activeKey } = this.state;
+        let newActiveKey = activeKey;
+        let lastIndex;
+        panes.forEach((pane, i) => {
+            if (pane.key === targetKey) {
+                lastIndex = i - 1;
+            }
+        });
+        const newPanes = panes.filter(pane => pane.key !== targetKey);
+        if (newPanes.length && newActiveKey === targetKey) {
+            if (lastIndex >= 0) {
+                newActiveKey = newPanes[lastIndex].key;
+            } else {
+                newActiveKey = newPanes[0].key;
+            }
+        }
+        this.setState({
+            panes: newPanes,
+            activeKey: newActiveKey,
+        });
+    }
     render(){
-        const {sql, queryResult, selectDatabase} = this.state;
+        const {sql, queryResult, selectDatabase, panes, activeKey} = this.state;
 
         return (
             <div className="right_area">
-                <div id="menubar">
-                    <div id="serverinfo">
-                        <img src={dot}  alt="SERVERIMG" className="icon ic_s_host "/>
-                        服务器: {this.state.selectServerName} ({this.state.selectServerType}) 
-                        <span className={'' === selectDatabase?'hide':'none'}>
-                        &gt;&gt; <img src={dot} className="icon ic_s_db " alt="DBIMG"/>数据库: {this.state.selectDatabase}
-                        </span>
-                        
+                <Tabs type="editable-card" onEdit={this.onTabsEdit} onChange={this.onTabsChange} activeKey={activeKey}>
+                    {panes.map(pane=>(
+                        <TabPane tab={pane.title} key={pane.key} closable={pane.closable}>
+                            <div id="menubar">
+                                <div id="serverinfo">
+                                    <img src={dot}  alt="SERVERIMG" className="icon ic_s_host "/>
+                                    服务器: {pane.serverName} ({pane.serverType})
+                                    <span className={'' === selectDatabase?'hide':'none'}>
+                                    &gt;&gt; <img src={dot} className="icon ic_s_db " alt="DBIMG"/>数据库: {pane.database}
+                                    </span>
 
-                    </div>
-                </div>
-                <div className='page_content'>
-                    <div id="queryboxContainer">
-                        <fieldset id="queryboxf">
-                            <div id="queryfieldscontainer">
-                                <div id="sqlquerycontainer">
-                                   
-                                    {/* <textarea value={sql} onChange={this.handleTextareaChange.bind(this)} tabIndex="100" name="sql_query" id="sqlquery" cols="40" rows="20">
-
-                                    </textarea> */}
-                                    <CodeMirror ref="editor" onCursorActivity={this.mouseSelected.bind(this)} value={sql} onBeforeChange={(editor, data, value) => { this.setState({sql: value});}}  options={this.state.options} />
-                                    * 敲入关键字首字母后可以使用Ctrl进行快速补全，选中部分SQL只会执行选中部分的语句！
-                                </div>
-                                <label>历史记录</label>
-                                <div id="tablefieldscontainer">
-                                    {/* <select id="tablefields" name="dummy" size="13" multiple="multiple" onChange={this.selectColumn.bind(this)}>
-                                        {this.state.tableColumns.map( column =>
-                                            <option value={column.columnName} title="">{column.columnName} - {column.columnType}({column.columnLength})</option>
-                                        )}
-                                    </select> */}
-                                    <List dataSource={this.state.historySql} renderItem={item => (
-                                        <List.Item key={item}><a key={item} onClick={this.historSqlToText.bind(this, item)}>{item.length>60?item.substring(0,60)+'...':item}</a><button className="btn_right" onClick={this.deleteHistorySql.bind(this, item)}>删除</button></List.Item>
-                                    )}></List>
 
                                 </div>
-                                <div className="clearfloat"></div>
                             </div>
-                        </fieldset>
-                    </div>
-                    <fieldset id="queryboxfooter" className="tblFooters">
-                        <Switch checkedChildren="新版" unCheckedChildren="旧版" defaultChecked checked={this.state.dataDisplayStyle} onChange={this.dataStyleSwitch.bind(this)} />
-                        <input className="btn btn-primary" type="submit" id="button_submit_query" name="SQL"
-                               tabIndex="200" value="执行SQL" onClick={this.execeteSql.bind(this)} />
-                               { 0 !== queryResult.length? (<CSVLink data={queryResult}>导出查询结果</CSVLink>):(<span></span>) }
-                               
-                            <div className="clearfloat"></div>
-                    </fieldset>
-                    <div className={this.state.queryLoading || this.state.queryResult.length === 0?'hide':'responsivetable'}>
-                        {this.state.dataDisplayStyle?
-                        <Spreadsheet data={queryResult} dataAreaRefresh={this.state.dataAreaRefresh}></Spreadsheet>
-                            :
-                            <DataDisplayFast data={queryResult} dataAreaRefresh={this.state.dataAreaRefresh}></DataDisplayFast>
+                            <div className='page_content'>
+                                <div id="queryboxContainer">
+                                    <fieldset id="queryboxf">
+                                        <div id="queryfieldscontainer">
+                                            <div id="sqlquerycontainer">
 
-                            }
-                    </div>
-                    <div className={this.state.queryLoading?'query_load':'hide'}>
-                        <Spin indicator={antIcon} />数据查询中...
-                    </div>
-                    <div className={!this.state.queryLoading && 0 === this.state.queryResult.length ?'query_load':'hide'}> 
-                        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} />
-                    </div>
-                </div>
-                
+                                                {/* <textarea value={sql} onChange={this.handleTextareaChange.bind(this)} tabIndex="100" name="sql_query" id="sqlquery" cols="40" rows="20">
+
+                                                </textarea> */}
+                                                <CodeMirror ref="editor" onCursorActivity={this.mouseSelected.bind(this)} value={pane.sql} onBeforeChange={(editor, data, value) => {let panes = editArray(this.state.panes, activeKey,getArray(this.state.panes, activeKey).sql=value);  this.setState({sql: value,panes: panes});}}  options={this.state.options} />
+                                                * 敲入关键字首字母后可以使用Ctrl进行快速补全，选中部分SQL只会执行选中部分的语句！
+                                            </div>
+                                            <label>历史记录</label>
+                                            <div id="tablefieldscontainer">
+                                                {/* <select id="tablefields" name="dummy" size="13" multiple="multiple" onChange={this.selectColumn.bind(this)}>
+                                                    {this.state.tableColumns.map( column =>
+                                                        <option value={column.columnName} title="">{column.columnName} - {column.columnType}({column.columnLength})</option>
+                                                    )}
+                                                </select> */}
+                                                <List dataSource={this.state.historySql} renderItem={item => (
+                                                    <List.Item key={item}><a key={item} onClick={this.historSqlToText.bind(this, item)}>{item.length>60?item.substring(0,60)+'...':item}</a><button className="btn_right" onClick={this.deleteHistorySql.bind(this, item)}>删除</button></List.Item>
+                                                )}></List>
+
+                                            </div>
+                                            <div className="clearfloat"></div>
+                                        </div>
+                                    </fieldset>
+                                </div>
+                                <fieldset id="queryboxfooter" className="tblFooters">
+                                    <Switch checkedChildren="新版" unCheckedChildren="旧版" defaultChecked checked={this.state.dataDisplayStyle} onChange={this.dataStyleSwitch.bind(this)} />
+                                    <input className="btn btn-primary" type="submit" id="button_submit_query" name="SQL"
+                                           tabIndex="200" value="执行SQL" onClick={this.execeteSql.bind(this)} />
+                                    { 0 !== queryResult.length? (<CSVLink data={queryResult}>导出查询结果</CSVLink>):(<span></span>) }
+
+                                    <div className="clearfloat"></div>
+                                </fieldset>
+                                <div className={this.state.queryLoading || this.state.queryResult.length === 0?'hide':'responsivetable'}>
+                                    {this.state.dataDisplayStyle?
+                                        <Spreadsheet data={queryResult} dataAreaRefresh={this.state.dataAreaRefresh}></Spreadsheet>
+                                        :
+                                        <DataDisplayFast data={queryResult} dataAreaRefresh={this.state.dataAreaRefresh}></DataDisplayFast>
+
+                                    }
+                                </div>
+                                <div className={this.state.queryLoading?'query_load':'hide'}>
+                                    <Spin indicator={antIcon} />数据查询中...
+                                </div>
+                                <div className={!this.state.queryLoading && 0 === this.state.queryResult.length ?'query_load':'hide'}>
+                                    <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} />
+                                </div>
+                            </div>
+                        </TabPane>
+                    ))}
+                </Tabs>
             </div>
-
-            
         )
     }
 }
