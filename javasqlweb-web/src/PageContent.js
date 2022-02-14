@@ -276,7 +276,7 @@ class PageContent extends React.Component {
                 }
                 pane.dataDisplayStyle = response.jsonData.data.length>2000?false:true;
                 // TODO: 先临时只使用旧版
-                pane.dataDisplayStyle = false;
+                // pane.dataDisplayStyle = false;
                 pane.queryResult = response.jsonData.data;
                 pane.dataAreaRefresh = [sql];
                 this.setState({
@@ -481,7 +481,7 @@ class PageContent extends React.Component {
                                 </fieldset>
                                 <div className={this.state.queryLoading || this.state.queryResult.length === 0?'hide':'responsivetable'}>
                                     {pane.dataDisplayStyle?
-                                        <Spreadsheet data={pane.queryResult} dataAreaRefresh={pane.dataAreaRefresh}></Spreadsheet>
+                                        <Spreadsheet data={pane.queryResult} dataAreaRefresh={pane.dataAreaRefresh} dataId={pane.key}></Spreadsheet>
                                         :
                                         <DataDisplayFast data={pane.queryResult} dataAreaRefresh={pane.dataAreaRefresh}></DataDisplayFast>
 
