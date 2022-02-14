@@ -377,9 +377,11 @@ class PageContent extends React.Component {
     }
 
     dataStyleSwitch(checked){
-        console.log(checked)
+        let pane = getArray(this.state.panes, this.state.activeKey)
+        pane.dataDisplayStyle = checked;
         this.setState({
-            dataDisplayStyle: checked
+            dataDisplayStyle: checked,
+            panes: editArray(this.state.panes, this.state.activeKey, pane)
         })
     }
 
@@ -450,7 +452,7 @@ class PageContent extends React.Component {
                                                 {/* <textarea value={sql} onChange={this.handleTextareaChange.bind(this)} tabIndex="100" name="sql_query" id="sqlquery" cols="40" rows="20">
 
                                                 </textarea> */}
-                                                <CodeMirror ref="editor" onCursorActivity={this.mouseSelected.bind(this)} value={pane.sql} onBeforeChange={(editor, data, value) => {let panes = editArray(this.state.panes, activeKey,getArray(this.state.panes, activeKey).sql=value);  this.setState({sql: value,panes: panes});}}  options={this.state.options} />
+                                                <CodeMirror ref="editor" onCursorActivity={this.mouseSelected.bind(this)} value={pane.sql} onBeforeChange={(editor, data, value) => {let pane = getArray(this.state.panes, this.state.activeKey); pane.sql = value; console.log(pane);  this.setState({sql: value,panes: editArray(this.state.panes, this.state.activeKey, pane)});}}  options={this.state.options} />
                                                 * 敲入关键字首字母后可以使用Ctrl进行快速补全，选中部分SQL只会执行选中部分的语句！
                                             </div>
                                             <label>历史记录</label>
