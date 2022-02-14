@@ -83,6 +83,7 @@ class PageContent extends React.Component {
                     let pane = getArray(this.state.panes, this.state.activeKey)
 
                     pane.sql = sql;
+                    pane.server = data.selectServer;
                     pane.serverName = response.jsonData.data.dbServerName;
                     pane.serverType = response.jsonData.data.dbServerType;
                     pane.database = data.selectDatabase;
@@ -97,16 +98,16 @@ class PageContent extends React.Component {
                         panes: panes,
                         historySql: localStorage.getItem(data.selectServer+'_history_sql')===null?[]:JSON.parse(localStorage.getItem(data.selectServer+'_history_sql'))
                     })
-                    client.get('/database/columnslist/'+data.selectServer+'/'+data.selectDatabase+'/'+data.selectTable,
-                                {headers:{'User-Token': this.state.token}})
-                        .then(response => {
-                            if(response.jsonData.status) {
-                                this.setState({
-                                    tableColumns: response.jsonData.data
-        
-                                })
-                            }
-                        })
+                    // client.get('/database/columnslist/'+data.selectServer+'/'+data.selectDatabase+'/'+data.selectTable,
+                    //             {headers:{'User-Token': this.state.token}})
+                    //     .then(response => {
+                    //         if(response.jsonData.status) {
+                    //             this.setState({
+                    //                 tableColumns: response.jsonData.data
+                    //
+                    //             })
+                    //         }
+                    //     })
                 })
 
             }
@@ -147,27 +148,42 @@ class PageContent extends React.Component {
                 
             }
             else if('view' === data.type){
+                let pane = getArray(this.state.panes, this.state.activeKey)
+
+                pane.server = data.selectServer;
+                pane.database = data.selectDatabase;
+                let panes = editArray(this.state.panes, this.state.activeKey, pane);
                 this.setState({
                     selectServer: data.selectServer,
                     selectDatabase: data.selectDatabase,
+                    panes: panes,
                 })
 
                 client.get('/database/views/'+data.selectServer+'/'+data.selectDatabase+'/'+data.viewName,
                             {headers:{'User-Token': this.state.token}})
                     .then(response => {
+                        pane.sql = response.jsonData.data.viewData;
                         this.setState({
-                            sql: response.jsonData.data.viewData
+                            sql: response.jsonData.data.viewData,
+                            panes: editArray(this.state.panes, this.state.activeKey, pane),
                         })
                     })
             }
             else if('database' === data.type){
 
                 client.get('/database/serverinfo/'+data.selectServer,{headers:{'User-Token': this.state.token}}).then( response => {
+                    let pane = getArray(this.state.panes, this.state.activeKey)
+                    pane.server = data.selectServer;
+                    pane.database = data.selectDatabase;
+                    pane.serverName = data.selectServerName;
+                    pane.serverType = data.selectServerType;
+
                     this.setState({
                         selectServer: data.selectServer,
                         selectDatabase: data.selectDatabase,
                         selectServerName: response.jsonData.data.dbServerName,
                         selectServerType: response.jsonData.data.dbServerType,
+                        panes: editArray(this.state.panes, this.state.activeKey, pane),
                         historySql: localStorage.getItem(data.selectServer+'_history_sql')===null?[]:JSON.parse(localStorage.getItem(data.selectServer+'_history_sql'))
                     })
                 })
@@ -239,7 +255,7 @@ class PageContent extends React.Component {
             panes: editArray(this.state.panes, this.state.activeKey, pane)
         });
 
-        client.post('/database/query/'+this.state.selectServer+'/'+this.state.selectDatabase,
+        client.post('/database/query/'+pane.server+'/'+pane.database,
         {headers:{'Content-Type': 'text/plain','User-Token': this.state.token},body: sql}).then(response => {
             this.setState({queryLoading: false});
             if(response.jsonData.status){
@@ -259,6 +275,8 @@ class PageContent extends React.Component {
                     });
                 }
                 pane.dataDisplayStyle = response.jsonData.data.length>2000?false:true;
+                // TODO: 先临时只使用旧版
+                pane.dataDisplayStyle = false;
                 pane.queryResult = response.jsonData.data;
                 pane.dataAreaRefresh = [sql];
                 this.setState({
@@ -416,7 +434,7 @@ class PageContent extends React.Component {
                                 <div id="serverinfo">
                                     <img src={dot}  alt="SERVERIMG" className="icon ic_s_host "/>
                                     服务器: {pane.serverName} ({pane.serverType})
-                                    <span className={'' === selectDatabase?'hide':'none'}>
+                                    <span className={'' === pane.database?'hide':'none'}>
                                     &gt;&gt; <img src={dot} className="icon ic_s_db " alt="DBIMG"/>数据库: {pane.database}
                                     </span>
 
@@ -460,7 +478,7 @@ class PageContent extends React.Component {
                                     <div className="clearfloat"></div>
                                 </fieldset>
                                 <div className={this.state.queryLoading || this.state.queryResult.length === 0?'hide':'responsivetable'}>
-                                    {this.state.dataDisplayStyle?
+                                    {pane.dataDisplayStyle?
                                         <Spreadsheet data={pane.queryResult} dataAreaRefresh={pane.dataAreaRefresh}></Spreadsheet>
                                         :
                                         <DataDisplayFast data={pane.queryResult} dataAreaRefresh={pane.dataAreaRefresh}></DataDisplayFast>
