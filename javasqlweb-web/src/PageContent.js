@@ -65,6 +65,7 @@ class PageContent extends React.Component {
             },
             activeKey: initialPanes[0].key,
             panes: initialPanes,
+            deskHeight: document.body.clientHeight-460,
         }
     }
 
@@ -425,8 +426,8 @@ class PageContent extends React.Component {
         });
     }
     render(){
-        const {sql, queryResult, selectDatabase, panes, activeKey} = this.state;
-
+        const {sql, queryResult, selectDatabase, panes, activeKey, deskHeight} = this.state;
+        console.log("deskHeight:"+deskHeight);
         return (
             <div className="right_area">
                 <Tabs type="editable-card" onEdit={this.onTabsEdit} onChange={this.onTabsChange} activeKey={activeKey}>
@@ -480,12 +481,17 @@ class PageContent extends React.Component {
                                     <div className="clearfloat"></div>
                                 </fieldset>
                                 <div className={this.state.queryLoading || this.state.queryResult.length === 0?'hide':'responsivetable'}>
-                                    {pane.dataDisplayStyle?
-                                        <Spreadsheet data={pane.queryResult} dataAreaRefresh={pane.dataAreaRefresh} dataId={pane.key}></Spreadsheet>
-                                        :
-                                        <DataDisplayFast data={pane.queryResult} dataAreaRefresh={pane.dataAreaRefresh}></DataDisplayFast>
+                                    <div className="container-wrap" style={{height: deskHeight}}>
+                                        {/*<div className="container">*/}
+                                            {pane.dataDisplayStyle?
+                                                <Spreadsheet data={pane.queryResult} dataAreaRefresh={pane.dataAreaRefresh} dataId={pane.key}></Spreadsheet>
+                                                :
+                                                <DataDisplayFast data={pane.queryResult} dataAreaRefresh={pane.dataAreaRefresh}></DataDisplayFast>
 
-                                    }
+                                            }
+                                        {/*</div>*/}
+                                    </div>
+
                                 </div>
                                 <div className={this.state.queryLoading?'query_load':'hide'}>
                                     <Spin indicator={antIcon} />数据查询中...

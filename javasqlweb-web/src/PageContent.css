@@ -115,3 +115,18 @@ td {
 .btn_right {
     float: right;
 }
+
+.container-wrap {
+
+    overflow: scroll; /* 1 */
+
+
+}
+
+
+.container > div {
+    display: inline-block;
+
+    text-align: center;
+    line-height: 50px;
+}
