@@ -329,17 +329,24 @@ class Navigation extends React.Component {
         Pubsub.publish('dataSelect', selectData);
     }
     showTableColumn(tableName, event){
-        this.setState({showTableColumn:tableName})
-        const client = new FetchHttpClient(config.serverDomain);
-        client.addMiddleware(json());
-        client.get('/database/columnslist/'+this.state.selectServer+'/'+this.state.selectDatabase+'/'+tableName,{headers:{'User-Token': this.state.token}})
-            .then(response => {
+        console.log(tableName)
+        if(this.state.showTableColumn !== tableName){
+            this.setState({showTableColumn:tableName})
+            const client = new FetchHttpClient(config.serverDomain);
+            client.addMiddleware(json());
+            client.get('/database/columnslist/'+this.state.selectServer+'/'+this.state.selectDatabase+'/'+tableName,{headers:{'User-Token': this.state.token}})
+                .then(response => {
                     if(response.jsonData.status){
                         this.setState({
                             columntData: response.jsonData.data
                         })
                     }
-            })
+                })
+        }
+        else{
+            this.setState({showTableColumn: ''});
+        }
+
     }
     logout(){
         const client = new FetchHttpClient(config.serverDomain);
