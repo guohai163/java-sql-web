@@ -4,6 +4,7 @@ import com.alibaba.druid.pool.DruidDataSourceFactory;
 import org.guohai.javasqlweb.beans.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -236,7 +237,7 @@ public class DbOperationMysqlDruid implements DbOperation {
         List<Map<String, Object>> listData = new ArrayList<>();
         Connection conn = sqlDs.getConnection();
         Statement st = conn.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE,ResultSet.CONCUR_READ_ONLY);
-
+        st.setMaxRows(limit);
         ResultSet rs = null;
         try{
 
