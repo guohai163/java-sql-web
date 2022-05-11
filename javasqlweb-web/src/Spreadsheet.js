@@ -11,6 +11,7 @@ export default function Spreadsheet(props) {
     };
     const sheetEl = React.useRef(null);
     const sheetRef = React.useRef(null);
+    let sheetId = "x-spreadsheet-"+props.dataId;
     const styles = [
             {
                 "bgcolor": "#93d051"
@@ -60,8 +61,10 @@ export default function Spreadsheet(props) {
         const sheetData = dataTransfer(props.data)
 
         const element = sheetEl.current;
-        const sheet = new XSpreadsheet("#x-spreadsheet-demo", sheetStyle)
-
+        // sheetId = "x-spreadsheet-"+props.dataId;
+        // console.log(sheetId)
+        const sheet = new XSpreadsheet("#"+sheetId, sheetStyle)
+        //
         sheet.loadData(sheetData)
         sheetRef.current = sheet;
         return () => {
@@ -71,7 +74,8 @@ export default function Spreadsheet(props) {
     }, [props.dataAreaRefresh])
     return (
         <>
-            <div id="x-spreadsheet-demo" ref={sheetEl}></div>
+
+            <div id={sheetId} ref={sheetEl}></div>
         </>
 
     );

@@ -37,6 +37,7 @@ export default function DataDisplayFast(props) {
     }
 
     function printTableData(){
+        console.log("in print tableData"+ props.data.length)
         if(props.data !== undefined){
             let data = props.data
 
