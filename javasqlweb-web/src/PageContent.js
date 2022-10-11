@@ -362,8 +362,15 @@ class PageContent extends React.Component {
         })
     }
     historSqlToText(sqlScript){
+        console.log(sqlScript)
+
+        let pane = getArray(this.state.panes, this.state.activeKey)
+        pane.sql = sqlScript;
+        let panes = editArray(this.state.panes, this.state.activeKey, pane);
+
         this.setState({
-            sql: sqlScript
+            sql: sqlScript,
+            panes: panes
         })
     }
     deleteHistorySql(sql) {

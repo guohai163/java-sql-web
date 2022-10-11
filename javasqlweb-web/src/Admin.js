@@ -106,6 +106,7 @@ class Admin extends React.Component {
             case '6':
                 client.get('/api/backstage/usergroups',{headers:{'Content-Type': 'text/plain','User-Token': this.state.token}})
                     .then(response => {
+
                         this.setState({
                             userGroupList: response.jsonData.data
                         })
@@ -352,7 +353,7 @@ class Admin extends React.Component {
     }
     onUserGroupFromUserChange(value){
         let data = this.state.inputData;
-        data['userList'] = value.map((x) => { return {'code':x}});
+        data['userList'] = value.map((x) => { return {'code':x.split(':')[0]}});
         this.setState({
             inputData: data,
             userGroupEdituserList: value
@@ -593,7 +594,7 @@ class Admin extends React.Component {
                                 {title:'用户名', dataIndex:'dbServerUsername'},
                                 {title:'服务器类型', dataIndex:'dbServerType'},
                                 {title:'服务器分组', dataIndex:'dbGroup'},
-                                {title:'创建时间', dataIndex:'createTime'},
+                                // {title:'创建时间', dataIndex:'createTime'},
                                 {title:'操作', render: (text, record) => (<Space size="middle">
                                     <Button type="link" onClick={this.showEditServerBtn.bind(this,record.code)}>编辑</Button>
                                     <Button type="link" onClick={this.serverDeleteBtn.bind(this,record.code)}>删除</Button>
@@ -757,29 +758,31 @@ class Admin extends React.Component {
                             onOk={this.userGroupHandleOk.bind(this)}
                             confirmLoading={confirmLoading}
                             onCancel={this.connHandleCancel.bind(this)}
-                        >
-                        <Form size="small" labelCol={{ span: 7 }}>
-                        <Form.Item label="组名">
-                            <Input onChange={this.onInputChange.bind(this)} id="groupName" value={this.state.inputData.groupName}/>
-                        </Form.Item>
-                        <Form.Item label="备注">
-                            <Input onChange={this.onInputChange.bind(this)} id="comment" value={this.state.inputData.comment}/>
-                        </Form.Item>
-                        <Form.Item label="用户">
-                            <Select mode="multiple" placeholder="选择进入该组用户" onChange={this.onUserGroupFromUserChange.bind(this)} value={userGroupEdituserList}>
-                            {userList.map( row => {
-                                return(<Option value={row.code} label={row.userName}>
-                                        <div className="demo-option-label-item">
-                                        👤 {row.userName} ({row.code})
-                                        </div>
-                                        </Option>)
-                            })}
-                            
-                            </Select>
-                        </Form.Item>
-                        </Form>
+                            >
+                            <Form size="small" labelCol={{ span: 7 }}>
+                            <Form.Item label="组名">
+                                <Input onChange={this.onInputChange.bind(this)} id="groupName" value={this.state.inputData.groupName}/>
+                            </Form.Item>
+                            <Form.Item label="备注">
+                                <Input onChange={this.onInputChange.bind(this)} id="comment" value={this.state.inputData.comment}/>
+                            </Form.Item>
+                            <Form.Item label="用户">
+                                <Select mode="multiple" placeholder="选择进入该组用户" onChange={this.onUserGroupFromUserChange.bind(this)} value={userGroupEdituserList}>
+                                {userList.map( row => {
+                                    return(<Option value={row.code+':'+row.userName} label={row.userName}>
+                                            <div className="demo-option-label-item">
+                                            👤 {row.userName} ({row.code})
+                                            </div>
+                                            </Option>)
+                                })}
+
+                                </Select>
+                            </Form.Item>
+                            </Form>
                         </Modal>
-                        <Table columns={userGroupListColumns} dataSource={this.state.userGroupList} pagination={{ pageSize: 25 }} size="small" />
+
+                        <Table className="font_eng" columns={userGroupListColumns} dataSource={this.state.userGroupList} pagination={{ pageSize: 25 }} size="small" />
+
                     </div>
                     
                     <div className={this.state.menuSelect === '7' ?'right_content':'hide'}>

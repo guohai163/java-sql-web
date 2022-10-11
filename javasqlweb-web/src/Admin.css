@@ -4,7 +4,7 @@
     width: 185px;
 }
 .ant-layout-footer{
-    padding-right: 5px 50px;
+    padding-right: 5px;
     text-align: right;
     font-size: 12px;
     height: 5vh;
@@ -15,8 +15,10 @@
     z-index: 1;
     width: 100%;
 
-    font: #fff;
+    color: #fff;
 }
+
+
 .ant-layout-content{
     margin-top: 5vh;
     
@@ -36,4 +38,10 @@
 }
 .right_content {
     padding: 10px;
+}
+
+.font_eng {
+    word-wrap: break-word;
+    white-space: normal;
+    word-break: break-all;
 }
