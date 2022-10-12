@@ -1,8 +1,6 @@
 package org.guohai.javasqlweb.controller;
 
-import com.alibaba.druid.stat.DruidStatManagerFacade;
-import io.swagger.annotations.Api;
-import io.swagger.annotations.ApiOperation;
+
 import org.guohai.javasqlweb.beans.Result;
 import org.guohai.javasqlweb.beans.SqlGuidBean;
 import org.guohai.javasqlweb.service.BaseDataService;
@@ -23,7 +21,6 @@ import java.util.List;
  * 基础控制器
  * @author guohai
  */
-@Api(tags = "基础控制器")
 @Controller
 public class HomeController {
 
@@ -35,7 +32,6 @@ public class HomeController {
     @Autowired
     BaseDataService baseService;
 
-    @ApiOperation(value = "给前端使用")
     @RequestMapping(value = {"/","/login","/admin","/guid"}, method = RequestMethod.GET)
     public String home() {
 
@@ -43,7 +39,6 @@ public class HomeController {
     }
 
 
-    @ApiOperation(value = "获取版本")
     @CrossOrigin
     @ResponseBody
     @RequestMapping(value = "/version", method = RequestMethod.GET)
@@ -51,7 +46,6 @@ public class HomeController {
         return new Result<>(true,"", version) ;
     }
 
-    @ApiOperation(value = "健康检测")
     @CrossOrigin
     @ResponseBody
     @RequestMapping(value = "/health", method = RequestMethod.GET)

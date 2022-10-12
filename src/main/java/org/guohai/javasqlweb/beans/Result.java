@@ -1,6 +1,5 @@
 package org.guohai.javasqlweb.beans;
 
-import io.swagger.annotations.ApiModel;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -13,7 +12,6 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@ApiModel("返回前端用的标准集")
 public class Result<T> {
 
     /**
