@@ -187,42 +187,54 @@ public class DbOperationMysqlDruid implements DbOperation {
     /**
      * 获取指定库的所有存储过程列表
      *
-     * @param dbName
-     * @return
+     * @param dbName 数据库db
+     * @return 存储过程名
      * @throws SQLException
      */
     @Override
     public List<StoredProceduresBean> getStoredProceduresList(String dbName) throws SQLException {
         List<StoredProceduresBean> listSp = new ArrayList<>();
-        Connection conn = sqlDs.getConnection();
-        Statement st = conn.createStatement();
-        ResultSet rs = st.executeQuery(String.format(
-                "SELECT SPECIFIC_NAME FROM information_schema.Routines WHERE ROUTINE_SCHEMA='%s'", dbName));
-        while (rs.next()){
-            listSp.add(new StoredProceduresBean(rs.getString("SPECIFIC_NAME")));
+        Connection conn = null;
+        Statement st = null;
+        ResultSet rs = null;
+        try {
+            conn = sqlDs.getConnection();
+            st = conn.createStatement();
+            rs = st.executeQuery(String.format(
+                    "SELECT SPECIFIC_NAME FROM information_schema.Routines WHERE ROUTINE_SCHEMA='%s'", dbName));
+            while (rs.next()) {
+                listSp.add(new StoredProceduresBean(rs.getString("SPECIFIC_NAME")));
+            }
+        } finally {
+            closeResource(rs, st, conn);
         }
-        closeResource(rs,st,conn);
         return listSp;
     }
 
     /**
      * 获取指定存储过程内容
      *
-     * @param dbName
-     * @param spName
-     * @return
+     * @param dbName 数据库db
+     * @param spName 存储过程名
+     * @return StoredProceduresBean 存储过程内容
      * @throws SQLException
      */
     @Override
     public StoredProceduresBean getStoredProcedure(String dbName, String spName) throws SQLException {
         StoredProceduresBean spBean = null;
-        Connection conn = sqlDs.getConnection();
-        Statement st = conn.createStatement();
-        ResultSet rs = st.executeQuery(String.format("SHOW CREATE PROCEDURE %s.%s;", dbName, spName));
-        while (rs.next()){
-            spBean = new StoredProceduresBean(spName, rs.getString("Create Procedure"));
+        Connection conn = null;
+        Statement st = null;
+        ResultSet rs = null;
+        try {
+            conn = sqlDs.getConnection();
+            st = conn.createStatement();
+            rs = st.executeQuery(String.format("SHOW CREATE PROCEDURE %s.%s;", dbName, spName));
+            while (rs.next()) {
+                spBean = new StoredProceduresBean(spName, rs.getString("Create Procedure"));
+            }
+        } finally {
+            closeResource(rs, st, conn);
         }
-        closeResource(rs,st,conn);
         return spBean;
     }
 
