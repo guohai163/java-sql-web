@@ -199,7 +199,7 @@ public class DbOperationMysqlDruid implements DbOperation {
         ResultSet rs = st.executeQuery(String.format(
                 "SELECT SPECIFIC_NAME FROM information_schema.Routines WHERE ROUTINE_SCHEMA='%s'", dbName));
         while (rs.next()){
-            listSp.add(new StoredProceduresBean(rs.getString("name")));
+            listSp.add(new StoredProceduresBean(rs.getString("SPECIFIC_NAME")));
         }
         closeResource(rs,st,conn);
         return listSp;
@@ -215,7 +215,15 @@ public class DbOperationMysqlDruid implements DbOperation {
      */
     @Override
     public StoredProceduresBean getStoredProcedure(String dbName, String spName) throws SQLException {
-        return null;
+        StoredProceduresBean spBean = null;
+        Connection conn = sqlDs.getConnection();
+        Statement st = conn.createStatement();
+        ResultSet rs = st.executeQuery(String.format("SHOW CREATE PROCEDURE %s.%s;", dbName, spName));
+        while (rs.next()){
+            spBean = new StoredProceduresBean(spName, rs.getString("Create Procedure"));
+        }
+        closeResource(rs,st,conn);
+        return spBean;
     }
 
     /**
