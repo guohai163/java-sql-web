@@ -275,6 +275,7 @@ public class DbOperationMssqlDruid implements DbOperation {
         List<Map<String, Object>> listData = new ArrayList<>();
         Connection conn = sqlDs.getConnection();
         Statement st = conn.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE,ResultSet.CONCUR_READ_ONLY);
+        st.setMaxRows(limit);
         ResultSet rs = null;
         try{
             rs = st.executeQuery(String.format("use [%s];" +

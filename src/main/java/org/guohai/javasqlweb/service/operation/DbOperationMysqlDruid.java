@@ -4,6 +4,7 @@ import com.alibaba.druid.pool.DruidDataSourceFactory;
 import org.guohai.javasqlweb.beans.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 
 import javax.sql.DataSource;
 import java.sql.*;
@@ -259,7 +260,7 @@ public class DbOperationMysqlDruid implements DbOperation {
             st = conn.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE,ResultSet.CONCUR_READ_ONLY);
             //选择一个数据库
             st.execute("use ".concat(dbName));
-
+            st.setMaxRows(limit);
             //按【;】拆分SQL执行，默认最后一条为查询语句，为了方便使用SET @变量 = XXX
             sql = sql.replace("\n","");
             sql = sql.replace("\r","");
