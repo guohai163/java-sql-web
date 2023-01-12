@@ -262,8 +262,8 @@ public class DbOperationMysqlDruid implements DbOperation {
             st.execute("use ".concat(dbName));
             st.setMaxRows(limit);
             //按【;】拆分SQL执行，默认最后一条为查询语句，为了方便使用SET @变量 = XXX
-            sql = sql.replace("\n","");
-            sql = sql.replace("\r","");
+            sql = sql.replace("\n"," ");
+            sql = sql.replace("\r"," ");
             String[] splitSql = sql.split(";");
             for (int i = 0; i < splitSql.length - 1; i++) {
                 st.execute(String.format("%s;", splitSql[i]));
