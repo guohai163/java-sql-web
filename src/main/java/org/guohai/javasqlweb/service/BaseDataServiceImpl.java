@@ -43,6 +43,9 @@ public class BaseDataServiceImpl implements BaseDataService{
      */
     private static Map<Integer, DbOperation> operationMap = new HashMap<>();
 
+    /**
+     * sql最大保存长度
+     */
     private static final Integer SAVE_SQL_LENGTH_LIMIT = 8000;
 
     @Override

@@ -259,6 +259,7 @@ public class DbOperationMysqlDruid implements DbOperation {
             st = conn.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE,ResultSet.CONCUR_READ_ONLY);
             //选择一个数据库
             st.execute("use ".concat(dbName));
+            //为了判断是否超过返回条数限制
             st.setMaxRows(limit + 1);
             //按【;】拆分SQL执行，默认最后一条为查询语句，为了方便使用SET @变量 = XXX
             sql = sql.replace("\n"," ");
