@@ -43,6 +43,8 @@ public class BaseDataServiceImpl implements BaseDataService{
      */
     private static Map<Integer, DbOperation> operationMap = new HashMap<>();
 
+    private static final Integer SAVE_SQL_LENGTH_LIMIT = 8000;
+
     @Override
     public Result<List<ConnectConfigBean>> getAllDataConnect() {
         return new Result<>(true,"", baseConfigDao.getAllConnectConfig());
@@ -285,13 +287,15 @@ public class BaseDataServiceImpl implements BaseDataService{
         DbOperation operation = createDbOperation(serverCode);
         if(null != operation){
             try{
-                QueryLogBean queryLog = new QueryLogBean(userIp, user.getUserName(), dbName, sql, new Date());
+                //如果sql超过长度限制，截取后保存sql
+                String saveSql = sql.length() > SAVE_SQL_LENGTH_LIMIT ? sql.substring(0, SAVE_SQL_LENGTH_LIMIT) : sql;
+                QueryLogBean queryLog = new QueryLogBean(userIp, user.getUserName(), dbName, saveSql, new Date());
                 baseConfigDao.saveQueryLog(queryLog);
                 LOG.info(sql);
                 Long startTime = System.currentTimeMillis();
                 Object[] result = operation.queryDatabaseBySql(dbName, sql, limit);
                 String returnResult = Integer.parseInt(result[0].toString())>Integer.parseInt(result[1].toString())?
-                        String.format("实际数据条数为%s，因程序限制只显示%s条数据",result[0].toString(),result[1].toString()):
+                        String.format("因程序限制只显示%s条数据",result[1].toString()):
                         "";
                 Long endTime = System.currentTimeMillis()-startTime;
                 baseConfigDao.updateQueryLogTime(queryLog.getCode(), endTime.intValue() );
