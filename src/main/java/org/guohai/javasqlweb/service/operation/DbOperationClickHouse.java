@@ -2,25 +2,14 @@ package org.guohai.javasqlweb.service.operation;
 
 import com.alibaba.druid.pool.DruidDataSourceFactory;
 import org.guohai.javasqlweb.beans.*;
-import org.guohai.javasqlweb.service.BaseDataServiceImpl;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
-import java.sql.Connection;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
+import java.sql.*;
 import java.util.*;
 
 import static org.guohai.javasqlweb.util.Utils.closeResource;
 
-public class DbOperationPostgresqlDruid implements DbOperation {
-
-    /**
-     * 日志
-     */
-    private static final Logger LOG  = LoggerFactory.getLogger(DbOperationPostgresqlDruid.class);
+public class DbOperationClickHouse implements DbOperation{
 
     /**
      * 数据源
@@ -28,25 +17,24 @@ public class DbOperationPostgresqlDruid implements DbOperation {
     private DataSource sqlDs;
 
     /**
-     * 保存每个库的连接
-     * 因为postgres数据库的特殊性无法在一个连接里访问多个库，所以 得制造多份连接。
-     */
-    private Map<String, DataSource> postgresMap = new HashMap<>();
-    /**
-     * 保存连接资源
-     */
-    private ConnectConfigBean connect;
-    /**
      * 构造方法
      * @param conn
      * @throws Exception
      */
-    DbOperationPostgresqlDruid(ConnectConfigBean conn) throws Exception {
+    DbOperationClickHouse(ConnectConfigBean conn) throws Exception {
 
-        connect = conn;
-        sqlDs = DruidDataSourceFactory.createDataSource(getDbConfigMap("postgres"));
+        Map dbConfig = new HashMap();
+        dbConfig.put("url",String.format("jdbc:clickhouse://%s:%s",
+                conn.getDbServerHost(),conn.getDbServerPort()));
+        dbConfig.put("username",conn.getDbServerUsername());
+        dbConfig.put("password",conn.getDbServerPassword());
+        dbConfig.put("initialSize","2");
+        dbConfig.put("minIdle","1");
+        dbConfig.put("maxWait","10000");
+        dbConfig.put("maxActive","20");
+        dbConfig.put("validationQuery","select now()");
+        sqlDs = DruidDataSourceFactory.createDataSource(dbConfig);
     }
-
 
 
     /**
@@ -61,27 +49,9 @@ public class DbOperationPostgresqlDruid implements DbOperation {
         List<DatabaseNameBean> listDnb = new ArrayList<>();
         Connection conn = sqlDs.getConnection();
         Statement st = conn.createStatement();
-        ResultSet rs = st.executeQuery("SELECT datname FROM pg_database;");
+        ResultSet rs = st.executeQuery("SHOW DATABASES;");
         while (rs.next()){
-
-            String dbName = rs.getString("datname");
-            if("template0".equals(dbName) || "template1".equals(dbName)){
-                continue;
-            }
-            listDnb.add(new DatabaseNameBean(dbName));
-            // 创建库的连接
-            DataSource sqlDS = postgresMap.get(dbName);
-            if(null == sqlDS) {
-                synchronized (BaseDataServiceImpl.class) {
-                    if (null == postgresMap.get(dbName)) {
-                        try {
-                            postgresMap.put(dbName,DruidDataSourceFactory.createDataSource(getDbConfigMap(dbName)));
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                        }
-                    }
-                }
-            }
+            listDnb.add(new DatabaseNameBean(rs.getString("name")));
         }
         closeResource(rs,st,conn);
         return listDnb;
@@ -97,15 +67,13 @@ public class DbOperationPostgresqlDruid implements DbOperation {
     @Override
     public List<TablesNameBean> getTableList(String dbName) throws SQLException {
         List<TablesNameBean> listTnb = new ArrayList<>();
-        Connection conn = postgresMap.get(dbName).getConnection();
+        Connection conn = sqlDs.getConnection();
         Statement st = conn.createStatement();
         ResultSet rs = st.executeQuery(String.format(
-                "select relname as TABLE_NAME, reltuples as rowCounts from pg_class\n" +
-                        "where relkind = 'r' and relnamespace = (select oid from pg_namespace where nspname='public')\n" +
-                        "order by rowCounts desc;", dbName));
+                "SELECT name,total_rows FROM system.tables where database='%s' ORDER BY name DESC; ", dbName));
         while (rs.next()){
-            listTnb.add(new TablesNameBean(rs.getString("TABLE_NAME"),
-                    rs.getLong("rowCounts")));
+            listTnb.add(new TablesNameBean(rs.getString("name"),
+                    rs.getLong("total_rows")));
         }
         closeResource(rs,st,conn);
         return listTnb;
@@ -146,7 +114,19 @@ public class DbOperationPostgresqlDruid implements DbOperation {
      */
     @Override
     public List<ColumnsNameBean> getColumnsList(String dbName, String tableName) throws SQLException {
-        return null;
+        List<ColumnsNameBean> listCnb = new ArrayList<>();
+        Connection conn = sqlDs.getConnection();
+        Statement st = conn.createStatement();
+        ResultSet rs = st.executeQuery(String.format("SELECT name,type,comment FROM system.columns where database='%s' and table='%s' limit 100;", dbName, tableName));
+        while (rs.next()){
+            listCnb.add(new ColumnsNameBean(rs.getString("Field"),
+                    rs.getString("Type"),
+                    "",
+                    rs.getString("Comment"),
+                    "NO".equals(rs.getString("Null"))?"not null":"null"));
+        }
+        closeResource(rs,st,conn);
+        return listCnb;
     }
 
     /**
@@ -200,42 +180,50 @@ public class DbOperationPostgresqlDruid implements DbOperation {
     public Object[] queryDatabaseBySql(String dbName, String sql, Integer limit) throws SQLException {
         Object[] result = new Object[3];
         List<Map<String, Object>> listData = new ArrayList<>();
-        Connection conn = postgresMap.get(dbName).getConnection();
-        Statement st = conn.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE,ResultSet.CONCUR_READ_ONLY);
-
+        Connection conn = null;
+        Statement st = null;
         ResultSet rs = null;
         try{
+            conn = sqlDs.getConnection();
+            st = conn.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE,ResultSet.CONCUR_READ_ONLY);
+            //选择一个数据库
+//            st.execute("use ".concat(dbName));
+            //为了判断是否超过返回条数限制
+            st.setMaxRows(limit + 1);
+            //按【;】拆分SQL执行，默认最后一条为查询语句，为了方便使用SET @变量 = XXX
+            sql = sql.replace("\n"," ");
+            sql = sql.replace("\r"," ");
 
-            rs = st.executeQuery(String.format("%s;", sql));
+            //执行sql
+            rs = st.executeQuery(String.format("use %s;" +
+                    "%s;", dbName, sql));
             // 获得结果集结构信息,元数据
             java.sql.ResultSetMetaData md = rs.getMetaData();
             // 获得列数
             int columnCount = md.getColumnCount();
-            rs.last();
-            result[0] = rs.getRow();
-            rs.beforeFirst();
             int dataCount = 1;
+            result[0] = 0;
             while (rs.next()){
                 if(dataCount>limit){
+                    result[0] = dataCount;
                     break;
                 }
                 dataCount++;
-                Map<String, Object> rowData = new LinkedHashMap<String, Object>();
+                Map<String, Object> rowData = new LinkedHashMap<>();
                 for(int i=1;i<=columnCount;i++){
-                    rowData.put(md.getColumnLabel(i),md.getColumnType(i) == 93
-                            ? (rs.getObject(i)==null?"NULL":rs.getDate(i) + " " + rs.getTime(i))
-                            : rs.getObject(i));
+                    Object object = rs.getObject(i);
+                    //时间类型特殊处理
+                    if (md.getColumnType(i) == Types.TIMESTAMP) {
+                        object = object == null ? "NULL" : String.valueOf(rs.getTimestamp(i));
+                    }
+                    rowData.put(md.getColumnLabel(i), object);
                 }
                 listData.add(rowData);
             }
 
             result[1] = listData.size();
             result[2] = listData;
-        }
-        catch (SQLException e){
-            throw e;
-        }
-        finally {
+        } finally {
             closeResource(rs,st,conn);
         }
 
@@ -263,31 +251,6 @@ public class DbOperationPostgresqlDruid implements DbOperation {
      */
     @Override
     public Boolean serverHealth() throws SQLException {
-        Connection conn = sqlDs.getConnection();
-        Statement st = conn.createStatement();
-        ResultSet rs = st.executeQuery("SELECT now();");
-        closeResource(rs,st,conn);
-        return true;
+        return null;
     }
-
-
-    /**
-     * 通过库名制造一个连接串
-     * @param dbName
-     * @return
-     */
-    private Map getDbConfigMap(String dbName){
-        Map dbConfig = new HashMap(8);
-        dbConfig.put("url",String.format("jdbc:postgresql://%s:%s/%s",
-                connect.getDbServerHost(),connect.getDbServerPort(),dbName));
-        dbConfig.put("username",connect.getDbServerUsername());
-        dbConfig.put("password",connect.getDbServerPassword());
-        dbConfig.put("initialSize","2");
-        dbConfig.put("minIdle","1");
-        dbConfig.put("maxWait","10000");
-        dbConfig.put("maxActive","20");
-        dbConfig.put("validationQuery","select now()");
-        return dbConfig;
-    }
-
 }

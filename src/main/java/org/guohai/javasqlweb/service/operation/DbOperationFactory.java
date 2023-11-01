@@ -24,6 +24,8 @@ public class DbOperationFactory {
      */
     private static final String POSTGRESQL = "postgresql";
 
+    private static final String CLICKHOUCE = "clickhouce";
+
 
     public static DbOperation createDbOperation(ConnectConfigBean conn) throws Exception {
         DbOperation operation = null;
@@ -34,6 +36,8 @@ public class DbOperationFactory {
 
         }else if(POSTGRESQL.equals(conn.getDbServerType())) {
             operation = new DbOperationPostgresqlDruid(conn);
+        } else if (CLICKHOUCE.equals(conn.getDbServerType())) {
+            operation = new DbOperationClickHouse(conn);
         }
         return operation;
     }

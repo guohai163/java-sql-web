@@ -19,5 +19,5 @@ public class TablesNameBean {
     /**
      * 表大小
      */
-    private Integer tableRows;
+    private Long tableRows;
 }

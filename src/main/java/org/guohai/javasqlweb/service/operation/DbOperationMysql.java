@@ -98,7 +98,7 @@ public class DbOperationMysql implements DbOperation {
                         "FROM `information_schema`.`tables` WHERE TABLE_SCHEMA = '%s' ORDER BY table_rows DESC;", dbName));
         while (rs.next()){
             listTnb.add(new TablesNameBean(rs.getObject("table_name").toString(),
-                    rs.getInt("table_rows")));
+                    rs.getLong("table_rows")));
         }
         // 关闭rs和statement
         if (rs != null) {

@@ -87,7 +87,7 @@ public class DbOperationMssqlDruid implements DbOperation {
                 "WHERE xtype = 'u' and indid in (0,1) ORDER BY a.name;", dbName));
         while (rs.next()){
             listTnb.add(new TablesNameBean(rs.getObject("name").toString(),
-                    rs.getInt("rows")));
+                    rs.getLong("rows")));
         }
         closeResource(rs,st,conn);
         return listTnb;

@@ -86,7 +86,7 @@ public class DbOperationMysqlDruid implements DbOperation {
                 "FROM `information_schema`.`tables` WHERE TABLE_SCHEMA = '%s' ORDER BY table_name DESC;", dbName));
         while (rs.next()){
             listTnb.add(new TablesNameBean(rs.getString("table_name"),
-                    rs.getInt("table_rows")));
+                    rs.getLong("table_rows")));
         }
         closeResource(rs,st,conn);
         return listTnb;
