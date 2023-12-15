@@ -182,7 +182,18 @@ public class DbOperationMysqlDruid implements DbOperation {
      */
     @Override
     public List<TableIndexesBean> getIndexesList(String dbName, String tableName) throws SQLException {
-        return null;
+        List<TableIndexesBean> listTib = new ArrayList<>();
+        Connection conn = sqlDs.getConnection();
+        Statement st = conn.createStatement();
+        ResultSet rs = st.executeQuery(String.format(
+                "SHOW INDEX FROM %s.%s", dbName, tableName));
+        while (rs.next()){
+            listTib.add(new TableIndexesBean(rs.getObject("Key_name").toString(),
+                    rs.getObject("Comment").toString(),
+                    rs.getObject("Column_name").toString()));
+        }
+        closeResource(rs,st,conn);
+        return listTib;
     }
 
     /**

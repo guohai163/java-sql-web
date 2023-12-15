@@ -11,9 +11,18 @@ import lombok.Data;
 @AllArgsConstructor
 public class TableIndexesBean {
 
+    /**
+     * 索引名
+     */
     private String indexName;
 
+    /**
+     * 索引描述
+     */
     private String indexDescription;
 
+    /**
+     * 索引KEY
+     */
     private String indexKeys;
 }

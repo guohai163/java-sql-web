@@ -30,6 +30,7 @@ class Navigation extends React.Component {
             deskHeight: 0,
             showTableColumn: '',
             columntData: [],
+            indexData: [],
             token: cookie.load('token'),
             tableLoading: false,
             filterTableList: [],
@@ -298,6 +299,8 @@ class Navigation extends React.Component {
         };
         Pubsub.publish('dataSelect', selectData);
     }
+
+
     sendTableName(tableName,event) {
         table_result = false;
         window.setTimeout(check, 300);
@@ -339,6 +342,15 @@ class Navigation extends React.Component {
                     if(response.jsonData.status){
                         this.setState({
                             columntData: response.jsonData.data
+                        })
+                    }
+                })
+            client.get('/database/indexeslist/'+this.state.selectServer+'/'+this.state.selectDatabase+'/'+tableName,{headers:{'User-Token': this.state.token}})
+                .then(response => {
+                    if(response.jsonData.status){
+                        console.log(response.jsonData.data)
+                        this.setState({
+                            indexData: response.jsonData.data
                         })
                     }
                 })
@@ -427,7 +439,7 @@ class Navigation extends React.Component {
         })
     }
     render(){
-        const {deskHeight, columntData, spList, passVisible, viewList} = this.state;
+        const {deskHeight, columntData, spList, passVisible, viewList, indexData} = this.state;
         return (
             <div id='navigation'>
                 <div id='navigation_resizer'></div>
@@ -506,6 +518,9 @@ class Navigation extends React.Component {
                                                         <ul>
                                                             {this.state.showTableColumn !== table.tableName?'':columntData.map(column =>
                                                                 <li onClick={this.sendColumnName.bind(this,column.columnName)}>{column.columnName}({column.columnType}{""===column.columnLength?"":"("+column.columnLength+")"},{column.columnIsNull})<br /> - <Tag color="green">{""===column.columnComment?"NULL":column.columnComment}</Tag></li>
+                                                            )}
+                                                            {this.state.showTableColumn != table.tableName ? '' : indexData.map(indexD =>
+                                                                <li><img src={dot} title="视图" alt="视图" className="icon ic_b_views" />{indexD.indexName}[{indexD.indexKeys}]</li>
                                                             )}
                                                         </ul>
                                                     </div>
