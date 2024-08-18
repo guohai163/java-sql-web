@@ -96,6 +96,16 @@ INSERT INTO `user_tb` (`user_name`,`pass_word`,`token`) VALUES
 
 COMMIT;
 
+-- WebAuth
+
+CREATE TABLE `passkey_auths_tb` (
+    `code` INT NOT NULL AUTO_INCREMENT,
+    `user_code` INT NOT NULL COMMENT '用户编号',
+    `credential_id` VARCHAR(100) NOT NULL COMMENT 'credential_id',
+    `public_key` VARCHAR(100) NOT NULL COMMENT 'public_key',
+
+)
+
 --ALTER TABLE `javasqlweb_db`.`user_tb`
 --ADD COLUMN `auth_secret` VARCHAR(45) NULL AFTER `token`,
 --ADD COLUMN `auth_status` VARCHAR(45) NOT NULL DEFAULT 'UNBIND' AFTER `auth_secret`,
