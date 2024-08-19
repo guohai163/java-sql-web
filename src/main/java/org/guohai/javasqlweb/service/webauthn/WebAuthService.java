@@ -6,11 +6,16 @@ import com.yubico.webauthn.*;
 import com.yubico.webauthn.data.*;
 import com.yubico.webauthn.exception.AssertionFailedException;
 import com.yubico.webauthn.exception.RegistrationFailedException;
+import lombok.extern.java.Log;
+import lombok.extern.slf4j.Slf4j;
 import org.guohai.javasqlweb.beans.Result;
 import org.guohai.javasqlweb.beans.UserBean;
 import org.guohai.javasqlweb.beans.UserLoginStatus;
 
 import org.guohai.javasqlweb.dao.UserManageDao;
+import org.guohai.javasqlweb.service.BackstageServiceImpl;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -19,6 +24,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
+
 
 @Service
 public class WebAuthService {
@@ -33,7 +39,7 @@ public class WebAuthService {
             .identity(rpIdentity)
             .credentialRepository(new MyCredentialRepository())
             .build();
-
+    private static final Logger LOG  = LoggerFactory.getLogger(WebAuthService.class);
     /**
      * 管理DAO
      */
@@ -102,8 +108,11 @@ public class WebAuthService {
                     .response(pkc)
                     .build());
             //验证结果准备入库中
-
-        } catch (RegistrationFailedException e) { /* ... */ }
+            LOG.info(result.toString());
+            String inDB = "";
+        } catch (RegistrationFailedException e) {
+            LOG.error(e.toString());
+        }
         return null;
     }
 
