@@ -102,8 +102,9 @@ public class WebAuthService {
                 PublicKeyCredential.parseRegistrationResponseJson(publicKeyCredentialJson);
 
         try {
+            PublicKeyCredentialCreationOptions userPKCC = mapWebAuthnCreate.get(token);
             RegistrationResult result = rp.finishRegistration(FinishRegistrationOptions.builder()
-                    .request(mapWebAuthnCreate.get(token))  // The PublicKeyCredentialCreationOptions from startRegistration above
+                    .request(userPKCC)  // The PublicKeyCredentialCreationOptions from startRegistration above
                     // NOTE: Must be stored in server memory or otherwise protected against tampering
                     .response(pkc)
                     .build());
@@ -155,7 +156,7 @@ public class WebAuthService {
          return Optional.ofNullable(UserIdentity.builder()
                  .name(username)
                  .displayName(username)
-                 .id(new ByteArray("aaa".getBytes()))
+                 .id(new ByteArray(username.getBytes()))
                  .build());
     }
 

@@ -8,9 +8,7 @@ import org.guohai.javasqlweb.beans.Result;
 import org.guohai.javasqlweb.service.webauthn.WebAuthService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
 
@@ -19,6 +17,7 @@ import java.io.IOException;
  */
 @Controller
 @RequestMapping(value = "/webauthn")
+@CrossOrigin
 public class WebAuthController {
 
     @Autowired
@@ -43,8 +42,8 @@ public class WebAuthController {
     @ResponseBody
     @RequestMapping(value = "/register")
     public Result<String> register(@RequestHeader(value = "User-Token", required =  false) String token,
-                                   String publicKeyCredentialJson) throws IOException {
-        return webAuthService.register(token, publicKeyCredentialJson);
+                                   @RequestBody  String body) throws IOException {
+        return webAuthService.register(token, body);
     }
 
     /**
