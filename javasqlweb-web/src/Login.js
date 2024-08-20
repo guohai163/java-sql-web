@@ -84,6 +84,14 @@ class Login extends React.Component {
                 }
             })
     }
+    passkey(){
+        confirm({
+            title:'提示',
+            content: 'passkey实现中',
+            onOk(){                        },
+            onCancel(){                        }
+        });
+    }
     login() {
 
         const client = new FetchHttpClient(config.serverDomain);
@@ -182,6 +190,7 @@ class Login extends React.Component {
                     </fieldset>
                     <fieldset className="tblFooters">
                     <input className="btn btn-primary" value="Login" type="submit" id="input_go" onClick={this.login.bind(this)} />
+                        <input className="btn btn-primary" value="passkey" type="submit" id="input_go" onClick={this.passkey.bind(this)} />
                     </fieldset>
                 </div>
                 <div className={this.state.loginStep === 'BIND'?'container':'hide'}>
