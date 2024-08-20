@@ -20,12 +20,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Random;
+import java.util.*;
 
-
+/**
+ * https://blog.csdn.net/qq_31650157/article/details/128938220
+ */
 @Service
 public class WebAuthService {
 
@@ -35,10 +34,7 @@ public class WebAuthService {
             .name("Java Sql Web App")
             .build();
 
-    RelyingParty rp = RelyingParty.builder()
-            .identity(rpIdentity)
-            .credentialRepository(new MyCredentialRepository())
-            .build();
+    RelyingParty rp ;
     private static final Logger LOG  = LoggerFactory.getLogger(WebAuthService.class);
     /**
      * 管理DAO
@@ -49,6 +45,16 @@ public class WebAuthService {
 
     private Map<String, PublicKeyCredentialCreationOptions> mapWebAuthnCreate = new HashMap<>(20);
 
+
+    public WebAuthService(){
+        Set<String> setStr = new HashSet<>(2);
+        setStr.add("http://localhost");
+        rp = RelyingParty.builder()
+                .identity(rpIdentity)
+                .credentialRepository(new MyCredentialRepository())
+                .origins(setStr)
+                .build();
+    }
     /**
      * 创建CR时使用
      * @param token

@@ -7,8 +7,11 @@ import com.yubico.webauthn.data.PublicKeyCredentialDescriptor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 public class MyCredentialRepository implements CredentialRepository {
 
@@ -41,6 +44,17 @@ public class MyCredentialRepository implements CredentialRepository {
 
     @Override
     public Set<RegisteredCredential> lookupAll(ByteArray byteArray) {
-        return null;
+        List<String> listAuth = new ArrayList<>(2);
+        return listAuth.stream()
+                .map(
+                        credential ->
+                                RegisteredCredential.builder()
+                                        .credentialId(ByteArray.fromBase64(credential))
+                                        .userHandle(ByteArray.fromBase64(credential))
+                                        .publicKeyCose(ByteArray.fromBase64(credential))
+                                        .signatureCount(1)
+                                        .build()
+                ).collect(Collectors.toSet());
+
     }
 }
