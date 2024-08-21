@@ -1,5 +1,5 @@
 server:
-  port: 80
+  port: 8002
   tomcat:
     uri-encoding: UTF-8
 spring:
@@ -29,8 +29,8 @@ project:
   version: 0.9.0
   limit: 20000
   signkey: jsw
-  domain: jsw.gydev.cn
-  host: https://jsw.gydev.cn
+  domain: jsw.gyyx.cn
+  host: https://jsw.gyyx.cn
 logging:
   level:
     org:
