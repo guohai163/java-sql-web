@@ -427,7 +427,7 @@ class Navigation extends React.Component {
          })
     }
     passKeyBind(){
-        console.log("passKeyBind")
+
         // 判断浏览器是否支持passkey
         if(!webauthnJson.supported()){
             confirm({

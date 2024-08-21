@@ -7,7 +7,7 @@ import cookie from 'react-cookies'
 import QRCode from 'qrcode.react'
 import { Modal, Input, Tag } from 'antd';
 import { UserOutlined,UnlockOutlined,VerifiedOutlined,AppleOutlined,AndroidOutlined } from '@ant-design/icons';
-
+import * as webauthnJson from "@github/webauthn-json";
 import queryString from "query-string";
 
 const { confirm } = Modal;
@@ -85,12 +85,45 @@ class Login extends React.Component {
             })
     }
     passkey(){
-        confirm({
-            title:'提示',
-            content: 'passkey实现中',
-            onOk(){                        },
-            onCancel(){                        }
-        });
+        // 判断浏览器是否支持passkey
+        if(!webauthnJson.supported()){
+            confirm({
+                title:'提示',
+                content: "当前系统环境无法开启passKey功能",
+                onOk(){                        },
+                onCancel(){                        }
+            });
+            return;
+        }
+        const sessionKey = Math.random().toString(36).substring(2);
+        const client = new FetchHttpClient(config.serverDomain);
+        client.addMiddleware(json());
+        client.get('/webauthn/get',{headers: { 'Content-Type': 'application/json','Session-key':sessionKey }})
+            .then(async (response)=> {
+                    console.log(response.jsonData.data);
+                    const publicKeyCredential = await webauthnJson.get(JSON.parse(response.jsonData.data));
+                    console.log(publicKeyCredential)
+                    client.post('/webauthn/signin',{headers: { 'Content-Type': 'application/json','Session-key':sessionKey },
+                        body:JSON.stringify(publicKeyCredential)}
+                    )
+                    .then(response => {
+                            console.log(response.jsonData.data);
+                            if(response.jsonData.status){
+                                cookie.save('token', response.jsonData.data.token, {path: '/'})
+                                this.props.history.push('/');
+                            }
+                            else{
+                                confirm({
+                                    title:'提示',
+                                    content: response.jsonData.message,
+                                    onOk(){                        },
+                                    onCancel(){                        }
+                                });
+                            }
+                    }
+                    )
+                }
+            )
     }
     login() {
 

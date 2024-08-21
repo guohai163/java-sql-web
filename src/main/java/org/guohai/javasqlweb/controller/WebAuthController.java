@@ -5,6 +5,7 @@ import com.yubico.webauthn.data.PublicKeyCredential;
 import com.yubico.webauthn.data.PublicKeyCredentialRequestOptions;
 import org.guohai.javasqlweb.beans.Result;
 
+import org.guohai.javasqlweb.beans.UserBean;
 import org.guohai.javasqlweb.service.webauthn.WebAuthService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
@@ -52,18 +53,19 @@ public class WebAuthController {
      */
     @ResponseBody
     @RequestMapping(value = "/get")
-    public Result<String> get() throws JsonProcessingException {
-        return  webAuthService.get();
+    public Result<String> get(@RequestHeader(value = "Session-key", required =  false) String session) throws JsonProcessingException {
+        return  webAuthService.get(session);
     }
 
     /**
      *
-     * @param credential
+     * @param body
      * @return
      */
     @ResponseBody
     @RequestMapping(value = "/signin")
-    public Result<String> signin(PublicKeyCredential credential){
-        return null;
+    public Result<UserBean> signin(@RequestHeader(value = "Session-key", required =  false) String session,
+                                   @RequestBody  String body) throws IOException {
+        return webAuthService.signIn(body,session);
     }
 }

@@ -6,19 +6,20 @@ import com.yubico.webauthn.*;
 import com.yubico.webauthn.data.*;
 import com.yubico.webauthn.exception.AssertionFailedException;
 import com.yubico.webauthn.exception.RegistrationFailedException;
-import lombok.extern.java.Log;
-import lombok.extern.slf4j.Slf4j;
 import org.guohai.javasqlweb.beans.Result;
 import org.guohai.javasqlweb.beans.UserBean;
 import org.guohai.javasqlweb.beans.UserLoginStatus;
 
+import org.guohai.javasqlweb.beans.WebAuthnBean;
 import org.guohai.javasqlweb.dao.UserManageDao;
-import org.guohai.javasqlweb.service.BackstageServiceImpl;
+import org.guohai.javasqlweb.dao.WebAuthnDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import javax.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.util.*;
 
@@ -28,30 +29,45 @@ import java.util.*;
 @Service
 public class WebAuthService {
 
-    RelyingPartyIdentity rpIdentity = RelyingPartyIdentity.builder()
-            .id("localhost")  // Set this to a parent domain that covers all subdomains
-            // where users' credentials should be valid
-            .name("Java Sql Web App")
-            .build();
+
 
     RelyingParty rp ;
+
     private static final Logger LOG  = LoggerFactory.getLogger(WebAuthService.class);
     /**
      * 管理DAO
      */
     @Autowired
     UserManageDao userDao;
+
+    @Autowired
+    WebAuthnDao webAuthnDao;
+
+    @Autowired
+    HttpServletRequest httpServletRequest;
+
     private Random random =new Random();
 
     private Map<String, PublicKeyCredentialCreationOptions> mapWebAuthnCreate = new HashMap<>(20);
 
+    /**
+     * 登录用户
+     */
+    private Map<String, AssertionRequest> mapAssertionRequest = new HashMap<>(20);
 
-    public WebAuthService(){
+
+    public WebAuthService(@Value("${project.domain}") String domain,@Value("${project.host}")String host,MyCredentialRepository myCredentialRepository){
         Set<String> setStr = new HashSet<>(2);
-        setStr.add("http://localhost");
+        setStr.add(host);
+
+        RelyingPartyIdentity rpIdentity = RelyingPartyIdentity.builder()
+                .id(domain)  // Set this to a parent domain that covers all subdomains
+                // where users' credentials should be valid
+                .name("Java Sql Web App")
+                .build();
         rp = RelyingParty.builder()
                 .identity(rpIdentity)
-                .credentialRepository(new MyCredentialRepository())
+                .credentialRepository(myCredentialRepository)
                 .origins(setStr)
                 .build();
     }
@@ -70,20 +86,16 @@ public class WebAuthService {
             // 非登录完成状态
             return new Result<>(false,"未登录", null);
         }
+
+        UserIdentity userIdentity = UserIdentity.builder()
+                .name(user.getUserName())
+                .displayName(user.getUserName())
+                .id(new ByteArray(user.getUserName().getBytes()))
+                .build();
+
         PublicKeyCredentialCreationOptions request = rp.startRegistration(
                 StartRegistrationOptions.builder()
-                        .user(
-                                findExistingUser(user.getUserName())
-                                        .orElseGet(() -> {
-                                            byte[] userHandle = new byte[64];
-                                            random.nextBytes(userHandle);
-                                            return UserIdentity.builder()
-                                                    .name(user.getUserName())
-                                                    .displayName(user.getUserName())
-                                                    .id(new ByteArray(userHandle))
-                                                    .build();
-                                        })
-                        )
+                        .user(userIdentity)
                         .build());
 
         try {
@@ -104,6 +116,9 @@ public class WebAuthService {
      * @throws IOException
      */
     public Result<String> register(String token,String publicKeyCredentialJson) throws IOException {
+        if(publicKeyCredentialJson.isEmpty()){
+            return new Result<>(false,"请求串为空",null);
+        }
         PublicKeyCredential<AuthenticatorAttestationResponse, ClientRegistrationExtensionOutputs> pkc =
                 PublicKeyCredential.parseRegistrationResponseJson(publicKeyCredentialJson);
 
@@ -116,11 +131,24 @@ public class WebAuthService {
                     .build());
             //验证结果准备入库中
             LOG.info(result.toString());
-            String inDB = "";
+            // 验证通过了，
+
+
+                UserBean user = userDao.getUserByToken(token);
+
+                WebAuthnBean webAuthnBean = new WebAuthnBean( user.getUserName(),
+                        userPKCC.getUser().getId().getBase64(),
+                        result.getKeyId().getId().getBase64(),
+                        result.getPublicKeyCose().getBase64(),
+                        httpServletRequest.getHeader("User-Agent"),
+                        new Date());
+                return new Result<>( webAuthnDao.addPublicKey(webAuthnBean),"",null);
+
+
         } catch (RegistrationFailedException e) {
             LOG.error(e.toString());
         }
-        return null;
+        return new Result<>(false,"处理失败",null);
     }
 
 
@@ -129,41 +157,40 @@ public class WebAuthService {
      * @return
      * @throws JsonProcessingException
      */
-    public Result<String> get() throws JsonProcessingException {
+    public Result<String> get(String sessionKey) throws JsonProcessingException {
         AssertionRequest request = rp.startAssertion(StartAssertionOptions.builder()
                 .build());
+        mapAssertionRequest.put(sessionKey, request);
         String credentialGetJson = request.toCredentialsGetJson();
+
         return new Result<>(true,"成功", credentialGetJson);
     }
 
-    public Result<String> signIn(String publicKeyCredentialJson) throws IOException {
+    public Result<UserBean> signIn(String publicKeyCredentialJson,String sessionKey) throws IOException {
         PublicKeyCredential<AuthenticatorAssertionResponse, ClientAssertionExtensionOutputs> pkc =
                 PublicKeyCredential.parseAssertionResponseJson(publicKeyCredentialJson);
+        try {
+            AssertionResult result = rp.finishAssertion(FinishAssertionOptions.builder()
+                    .request(mapAssertionRequest.get(sessionKey))  // The PublicKeyCredentialRequestOptions from startAssertion above
+                    .response(pkc)
+                    .build());
 
-        String crId ;
-//        try {
-//            AssertionResult result = rp.finishAssertion(FinishAssertionOptions.builder()
-//                    .request(request)  // The PublicKeyCredentialRequestOptions from startAssertion above
-//                    .response(pkc)
-//                    .build());
-//
-//            if (result.isSuccess()) {
-//                // 处理登录成功部分
-//            }
-//        } catch (AssertionFailedException e) { /* ... */ }
-//        throw new RuntimeException("Authentication failed");
-            return null;
+            if (result.isSuccess()) {
+                LOG.info(result.getUsername());
+                UserBean user =  userDao.getUserByName(result.getUsername());
+                user.setToken(UUID.randomUUID().toString());
+                if(userDao.setUserToken(user.getUserName(),user.getToken())){
+                    userDao.setUserLoginSuccess(user.getToken());
+                    return new Result<>(true,"success", user);
+                }
+            }
+        } catch (AssertionFailedException e) {
+            LOG.error(e.toString());
+            return new Result<>(false, e.toString(),null);
+        }
+
+        return new Result<>(false, "登录失败",null);
     }
 
-
-
-
-    private Optional<UserIdentity> findExistingUser(String username) {
-         return Optional.ofNullable(UserIdentity.builder()
-                 .name(username)
-                 .displayName(username)
-                 .id(new ByteArray(username.getBytes()))
-                 .build());
-    }
 
 }

@@ -4,33 +4,42 @@ import com.yubico.webauthn.CredentialRepository;
 import com.yubico.webauthn.RegisteredCredential;
 import com.yubico.webauthn.data.ByteArray;
 import com.yubico.webauthn.data.PublicKeyCredentialDescriptor;
+import org.guohai.javasqlweb.beans.WebAuthnBean;
+import org.guohai.javasqlweb.dao.WebAuthnDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Repository;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
+
+@Repository
 public class MyCredentialRepository implements CredentialRepository {
 
     private static final Logger LOG  = LoggerFactory.getLogger(MyCredentialRepository.class);
 
-
+    @Autowired
+    WebAuthnDao webAuthnDao;
 
     @Override
     public Set<PublicKeyCredentialDescriptor> getCredentialIdsForUsername(String userName) {
         LOG.info("getCredentialIdsForUsername",userName);
-        return null;
+
+
+        Set<PublicKeyCredentialDescriptor> seta = new HashSet<>(2);
+        seta.add(PublicKeyCredentialDescriptor.builder()
+                .id( new ByteArray(userName.getBytes()))
+                .build());
+        return seta;
+
     }
 
     @Override
     public Optional<ByteArray> getUserHandleForUsername(String userName) {
         LOG.info("getUserHandleForUsername",userName);
-
-        return Optional.empty();
+        return Optional.of( new ByteArray(userName.getBytes()));
     }
 
     /**
@@ -40,9 +49,8 @@ public class MyCredentialRepository implements CredentialRepository {
      */
     @Override
     public Optional<String> getUsernameForUserHandle(ByteArray userHandle) {
-        LOG.info("getUsernameForUserHandle",userHandle.toString());
-
-        return Optional.empty();
+        List<String> listUser  = webAuthnDao.getUserName(userHandle.getBase64());
+        return Optional.of(listUser.get(0));
     }
 
     /**
@@ -53,7 +61,17 @@ public class MyCredentialRepository implements CredentialRepository {
      */
     @Override
     public Optional<RegisteredCredential> lookup(ByteArray credentialId, ByteArray userHandle) {
-        return Optional.empty();
+        LOG.info("lookup");
+        WebAuthnBean webAuthnBean = webAuthnDao.getWebAuthnBean(credentialId.getBase64(), userHandle.getBase64());
+        Optional<WebAuthnBean> auth = Optional.of(webAuthnBean);
+        return auth.map(
+                credential ->
+                        RegisteredCredential.builder()
+                                .credentialId(ByteArray.fromBase64(credential.getCredentialId()))
+                                .userHandle(ByteArray.fromBase64(credential.getUserHandle()))
+                                .publicKeyCose(ByteArray.fromBase64(credential.getPublicKey()))
+                                .build()
+        );
     }
 
     /**
@@ -63,15 +81,15 @@ public class MyCredentialRepository implements CredentialRepository {
      */
     @Override
     public Set<RegisteredCredential> lookupAll(ByteArray credentialId) {
-        List<String> listAuth = new ArrayList<>(2);
+        List<WebAuthnBean> listAuth = webAuthnDao.getAllWebAuthn(credentialId.getBase64())  ;
         return listAuth.stream()
                 .map(
                         credential ->
                                 RegisteredCredential.builder()
-                                        .credentialId(ByteArray.fromBase64(credential))
-                                        .userHandle(ByteArray.fromBase64(credential))
-                                        .publicKeyCose(ByteArray.fromBase64(credential))
-                                        .signatureCount(1)
+                                        .credentialId(ByteArray.fromBase64(credential.getCredentialId()))
+                                        .userHandle(ByteArray.fromBase64(credential.getUserHandle()))
+                                        .publicKeyCose(ByteArray.fromBase64(credential.getPublicKey()))
+                                        .signatureCount(listAuth.size())
                                         .build()
                 ).collect(Collectors.toSet());
 
