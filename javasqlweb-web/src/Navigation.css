@@ -47,6 +47,9 @@
 .ic_s_sqlguid {
     background-image: url(./images/sql-svgrepo-com.svg);
 }
+.ic_w_authn {
+    background-image: url(./images/webauthn.png);
+}
 #navigation_tree {
     margin-left: 5px;
 }

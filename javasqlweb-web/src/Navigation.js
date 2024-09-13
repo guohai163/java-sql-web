@@ -9,6 +9,7 @@ import cookie from 'react-cookies'
 import { LoadingOutlined } from '@ant-design/icons';
 import { Modal, Spin, Input, Form, Select, Tag } from 'antd';
 import cache from './utils';
+import * as webauthnJson from "@github/webauthn-json";
 
 const { confirm } = Modal;
 const { Option, OptGroup } = Select;
@@ -425,6 +426,61 @@ class Navigation extends React.Component {
             }
          })
     }
+    passKeyBind(){
+
+        // 判断浏览器是否支持passkey
+        if(!webauthnJson.supported()){
+            confirm({
+                title:'提示',
+                content: "当前系统环境无法开启passKey功能",
+                onOk(){                        },
+                onCancel(){                        }
+            });
+            return;
+        }
+
+        const client = new FetchHttpClient(config.serverDomain);
+        client.addMiddleware(json());
+        client.get('/webauthn/create',{headers: { 'Content-Type': 'application/json','User-Token': this.state.token }})
+        .then(async (response)=> {
+            if(true === response.jsonData.status){
+                const publicKeyCredential = await webauthnJson.create(JSON.parse(response.jsonData.data));
+                console.log(JSON.stringify({publicKeyCredentialJson: publicKeyCredential}))
+                client.post('/webauthn/register',{headers: { 'Content-Type': 'application/json','User-Token': this.state.token },
+                    body:JSON.stringify(publicKeyCredential)}
+                )
+                .then(response =>{
+                    console.log(response.jsonData)
+                    if(true === response.jsonData.status){
+                        confirm({
+                            title:'提示',
+                            content: 'passKey绑定成功',
+                            onOk(){},
+                            onCancel(){}
+                        });
+                        this.setState({passVisible:false});
+                    }
+                    else{
+                        confirm({
+                            title:'提示',
+                            content: response.jsonData.data,
+                            onOk(){                        },
+                            onCancel(){                        }
+                        });
+                    }
+                })
+            }
+            else{
+                confirm({
+                    title:'提示',
+                    content: response.jsonData.data,
+                    onOk(){                        },
+                    onCancel(){                        }
+                });
+            }
+        })
+
+    }
     modalHandleCancel(){
         this.setState({passVisible:false,inputData:{}});
     }
@@ -458,6 +514,9 @@ class Navigation extends React.Component {
                             </a>
                             <a title="修改密码" onClick={this.showPassModal.bind(this)}>
                                 <img src={dot} alt="修改密码" className="icon ic_u_pass"></img>
+                            </a>
+                            <a title='passkey' onClick={this.passKeyBind.bind(this)}>
+                                <img src={dot} alt="passkey" className='icon ic_w_authn'></img>
                             </a>
                             <a href="#" title="设置" onClick={this.jumpAdmin.bind(this)}>
                                 <img src={dot} alt="setting" className={'admin' === config.userName?'icon ic_s_cog':'hide'}></img>
