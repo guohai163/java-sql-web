@@ -43,7 +43,7 @@
         <dependency>
             <groupId>com.microsoft.sqlserver</groupId>
             <artifactId>mssql-jdbc</artifactId>
-            <version>9.4.0.jre11</version>
+            <version>9.4.0.jre16</version>
             <scope>runtime</scope>
         </dependency>
         <dependency>
@@ -64,12 +64,12 @@
         <dependency>
             <groupId>com.alibaba</groupId>
             <artifactId>druid-spring-boot-starter</artifactId>
-            <version>1.2.8</version>
+            <version>1.2.21</version>
         </dependency>
         <dependency>
             <groupId>org.mybatis.spring.boot</groupId>
             <artifactId>mybatis-spring-boot-starter</artifactId>
-            <version>2.2.0</version>
+            <version>2.3.1</version>
         </dependency>
 
         <dependency>
@@ -86,7 +86,7 @@
         <dependency>
             <groupId>com.yubico</groupId>
             <artifactId>webauthn-server-core</artifactId>
-            <version>2.5.2</version>
+            <version>2.5.4</version>
             <scope>compile</scope>
         </dependency>
     </dependencies>
