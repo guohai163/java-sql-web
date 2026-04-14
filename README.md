@@ -27,26 +27,73 @@
 6. 存储过程查看。
 7. 用户权限分组。数据库服务器分组
 
+## 目录结构
+
+```text
+.
+├── front/                 # React 前端 + Nginx 镜像
+├── server/                # Spring Boot 服务端 + Maven 构建
+├── deploy/                # 部署相关文件，例如数据库初始化 SQL
+├── docker-compose.yml     # 运行数据库、服务端、前端三个容器
+└── .github/workflows/     # Git tag 触发的镜像发布流程
+```
+
 ## 项目部署
 
-### 环境安装
+### 1. 发布镜像
 
-本项目使用Reactjs+Springboot+mysql的组合。最简项目运行可以使用Docker来运行。
+推送 Git tag 后，GitHub Actions 会自动构建并推送两个镜像到 GHCR：
 
 ```shell
-# 首先下载数据库初始化脚本 
-mkdir -p /opt/java-sql-web/script
-cd /opt/java-sql-web/script
-curl -O https://raw.githubusercontent.com/guohai163/java-sql-web/master/script/init.sql
-# 按初始化脚本编辑修改.sql文件。
-vim init.sql
+git tag v0.9.0
+git push origin v0.9.0
+```
 
-# 启动数据库容器,把刚下载好的init.sql文件映射到容器里的docker-entrypoint-initdb.d目录下。为了启动容器自动创建我们需要的库和表。参数MYSQL_ROOT_PASSWORD后为数据库root用户密码，请更换成更安全的
-docker run --name jswdb -v /opt/java-sql-web/script:/docker-entrypoint-initdb.d -e  MYSQL_ROOT_PASSWORD=my-secret-pw -d mariadb:10
-# 启动javasqladmin容器，如dockerhub无法连接可以使用备用的地址 docker.pkg.github.com/guohai163/java-sql-web/javasqlweb:0.5.0
-docker run --name jsw_web --link jswdb:db -p 80:8002 -e MARIADB_PORT_3306_TCP_ADDR=db -e MARIADB_ENV_MYSQL_ROOT_PASSWORD=my-secret-pw gcontainer/java-sql-web:0.8.5
-# 使用浏览器访问 
-open http://localhost
+默认镜像名：
+
+- `ghcr.io/guohai163/java-sql-web-front:<tag>`
+- `ghcr.io/guohai163/java-sql-web-server:<tag>`
+
+### 2. 使用 docker compose 部署
+
+复制环境变量模板并按需修改：
+
+```shell
+cp .env.example .env
+```
+
+至少需要确认：
+
+- `TAG`：要部署的镜像版本，例如 `v0.9.0`
+- `DB_PASSWORD`：MariaDB root 密码
+- `PUBLIC_DOMAIN` / `PUBLIC_HOST`：对外访问域名与完整 URL
+
+启动服务：
+
+```shell
+docker compose up -d
+```
+
+容器职责如下：
+
+- `jsw-front`：唯一对外入口，提供静态页面并将后端请求代理到 `jsw-server`
+- `jsw-server`：Spring Boot API 服务
+- `jsw-db`：MariaDB 数据库，首次启动会执行 `deploy/init.sql`
+
+### 3. 本地构建镜像
+
+```shell
+cd front
+npm ci
+npm run build
+cd ..
+
+cd server
+mvn -DskipTests package
+cd ..
+
+docker build -t jsw-front:local ./front
+docker build -t jsw-server:local ./server
 ```
 
 ### 系统使用

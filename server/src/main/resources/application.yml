@@ -1,0 +1,27 @@
+server:
+  port: ${SERVER_PORT:8002}
+  tomcat:
+    uri-encoding: UTF-8
+spring:
+  datasource:
+    type: com.alibaba.druid.pool.DruidDataSource
+    druid:
+      url: jdbc:mysql://${DB_HOST:${MARIADB_PORT_3306_TCP_ADDR:localhost}}:${DB_PORT:3306}/${DB_NAME:javasqlweb_db}?useUnicode=true&characterEncoding=UTF-8&allowMultiQueries=true&serverTimezone=Hongkong
+      username: ${DB_USERNAME:${MARIADB_ENV_MYSQL_ROOT_NAME:root}}
+      password: ${DB_PASSWORD:${MARIADB_ENV_MYSQL_ROOT_PASSWORD:Passw0rd}}
+  jackson:
+    time-zone: GMT+8
+    date-format: yyyy-MM-dd HH:mm:ss
+mybatis:
+  configuration:
+    map-underscore-to-camel-case: true
+project:
+  version: ${PROJECT_VERSION:0.9.0}
+  limit: ${PROJECT_LIMIT:20000}
+  signkey: ${PROJECT_SIGNKEY:jsw}
+  domain: ${PROJECT_DOMAIN:localhost}
+  host: ${PROJECT_HOST:http://localhost}
+logging:
+  level:
+    org:
+      guohai: DEBUG
