@@ -24,7 +24,7 @@ export default function Spreadsheet(props) {
             const rows10 = {};
             const cells = {};
             let colNum=0;
-            Object.keys(props.data[0]).map((col,cindex) => {
+            Object.keys(props.data[0]).forEach((col,cindex) => {
                 colNum++;
                 cells[cindex] = {text:col, style: 0}
             })
@@ -38,9 +38,9 @@ export default function Spreadsheet(props) {
 
             rows10[0] = {cells}
 
-            props.data.map((row, rindex)=>{
+            props.data.forEach((row, rindex)=>{
                 const cells = {};
-                Object.keys(row).map((col,cindex) => {
+                Object.keys(row).forEach((col,cindex) => {
 
                     cells[cindex] = {text:row[col] === null?'null':row[col].toString()}
                 })

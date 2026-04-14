@@ -1,7 +1,7 @@
 let globalData = {
     userName: '',
     version: '',
-    serverDomain: '//'+window.location.host
-    // serverDomain: 'http://localhost:8002'
-}
+    serverDomain: ''
+};
+
 export default globalData;

@@ -1,54 +1,62 @@
-import React from 'react';
-import {withRouter} from "react-router-dom";
+import React, { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import cookie from 'react-cookies';
 import Navigation from './Navigation';
 import PageContent from './PageContent';
-import cookie from 'react-cookies'
-import FetchHttpClient, { json } from 'fetch-http-client';
-import config from "./config";
+import config from './config';
+import { createClient } from './apiClient';
 
-class JavaSqlAdmin extends React.Component {
+function JavaSqlAdmin() {
+  const navigate = useNavigate();
 
-    
-    componentWillMount(){
-        let token = cookie.load('token')
-        if(undefined === token){
-            this.props.history.push('/login');
+  useEffect(() => {
+    let cancelled = false;
+    const token = cookie.load('token');
+
+    if (token === undefined) {
+      navigate('/login', { replace: true });
+      return undefined;
+    }
+
+    const client = createClient();
+
+    void client.get('/version').then((response) => {
+      if (!cancelled && response.jsonData.status) {
+        config.version = response.jsonData.data;
+      }
+    });
+
+    void client
+      .get('/user/check', { headers: { 'User-Token': token } })
+      .then((response) => {
+        if (cancelled) {
+          return;
         }
-        const client = new FetchHttpClient(config.serverDomain);
-        client.addMiddleware(json());
-        client.get('/version').then(response => {
-            if(response.jsonData.status){
-                config.version = response.jsonData.data
-            }
-        })
-        client.get('/user/check',{headers: { 'User-Token': token }})
-            .then(response => {
-                if(response.status !== 200){
-                    this.props.history.push('/login');
-                }
-                else if(!response.jsonData.status){
-                    this.props.history.push('/login');
-                    
-                }
-                else {
-                    config.userName = response.jsonData.data.userName;
-                }
-            })
-            .catch(rejected => {
-                console.log('catch',rejected)
-                this.props.history.push('/login');
-            })
 
-    }
-    render(){
-        return (
-            <div>
-                <Navigation />
-                <PageContent />
-            </div>
-            
-        )
-    }
+        if (response.status !== 200 || !response.jsonData.status) {
+          navigate('/login', { replace: true });
+          return;
+        }
+
+        config.userName = response.jsonData.data.userName;
+      })
+      .catch(() => {
+        if (!cancelled) {
+          navigate('/login', { replace: true });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [navigate]);
+
+  return (
+    <div>
+      <Navigation />
+      <PageContent />
+    </div>
+  );
 }
 
-export default withRouter(JavaSqlAdmin);
+export default JavaSqlAdmin;

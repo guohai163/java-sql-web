@@ -83,8 +83,10 @@ docker compose up -d
 ### 3. 本地构建镜像
 
 ```shell
+nvm use
+
 cd front
-npm ci
+npm install
 npm run build
 cd ..
 
@@ -94,6 +96,18 @@ cd ..
 
 docker build -t jsw-front:local ./front
 docker build -t jsw-server:local ./server
+```
+
+前端默认使用仓库根目录的 `.nvmrc`，目标 Node 版本为 `24`。本地开发前端时请在 `front/` 目录执行：
+
+```shell
+npm run dev
+```
+
+如果本地后端不是跑在 `http://localhost:8002`，可以在启动前设置：
+
+```shell
+VITE_BACKEND_ORIGIN=http://your-server:8002 npm run dev
 ```
 
 ### 系统使用

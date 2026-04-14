@@ -11,7 +11,7 @@ export default function DataDisplayFast(props) {
                 <tr>
                     {
                         Object.keys(data).map(key => {
-                            return(<th>{key}</th>)
+                            return(<th key={key}>{key}</th>)
                         })
                     }
                 </tr>
@@ -42,10 +42,10 @@ export default function DataDisplayFast(props) {
             let data = props.data
 
             return (
-                data.map( row => {
-                        return(<tr key={row[0]}>{
+                data.map((row, rowIndex) => {
+                        return(<tr key={`row-${rowIndex}`}>{
                             Object.keys(row).map( col => {
-                                return (<td>{dataColumnShow(row[col])}</td>)
+                                return (<td key={`${rowIndex}-${col}`}>{dataColumnShow(row[col])}</td>)
                             })
                         }</tr>)
                     }
