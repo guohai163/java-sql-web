@@ -70,7 +70,7 @@ jobs:
       - name: Build front static assets
         working-directory: ./front
         run: |
-          npm install
+          npm ci
           npm run build
 
       - name: Set up Docker Buildx

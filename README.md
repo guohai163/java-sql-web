@@ -86,7 +86,7 @@ docker compose up -d
 nvm use
 
 cd front
-npm install
+npm ci
 npm run build
 cd ..
 
