@@ -1,8 +1,6 @@
 package org.guohai.javasqlweb.beans;
 
-import lombok.AllArgsConstructor;
 import lombok.Data;
-import lombok.RequiredArgsConstructor;
 
 import java.util.Date;
 
@@ -11,8 +9,6 @@ import java.util.Date;
  * @author guohai
  */
 @Data
-@AllArgsConstructor
-@RequiredArgsConstructor
 public class QueryLogBean {
 
     /**
@@ -23,21 +19,31 @@ public class QueryLogBean {
     /**
      * 查询者IP
      */
-    private final String queryIp;
+    private String queryIp;
 
     /**
      * 查询人
      */
-    private final String queryName;
+    private String queryName;
 
     /**
      * 执行查询时的库
      */
-    private final String queryDatabase;
+    private String queryDatabase;
+
+    /**
+     * 查询实例编号
+     */
+    private Integer serverCode;
+
+    /**
+     * 查询实例名称
+     */
+    private String serverName;
     /**
      * 查询脚本
      */
-    private final String querySqlscript;
+    private String querySqlscript;
 
     /**
      * 查询消耗
@@ -45,7 +51,34 @@ public class QueryLogBean {
     private Integer queryConsuming;
 
     /**
+     * 返回条数
+     */
+    private Integer resultRowCount;
+
+    /**
      * 查询时间
      */
-    private final Date queryTime;
+    private Date queryTime;
+
+    /**
+     * 目标表摘要
+     */
+    private String targetTables;
+
+    public QueryLogBean() {
+    }
+
+    public QueryLogBean(String queryIp,
+                        String queryName,
+                        String queryDatabase,
+                        Integer serverCode,
+                        String querySqlscript,
+                        Date queryTime) {
+        this.queryIp = queryIp;
+        this.queryName = queryName;
+        this.queryDatabase = queryDatabase;
+        this.serverCode = serverCode;
+        this.querySqlscript = querySqlscript;
+        this.queryTime = queryTime;
+    }
 }

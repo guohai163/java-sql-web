@@ -5,10 +5,12 @@ import com.zaxxer.hikari.HikariPoolMXBean;
 import org.guohai.javasqlweb.beans.*;
 import org.guohai.javasqlweb.controller.BackstageController;
 import org.guohai.javasqlweb.dao.BaseConfigDao;
+import org.guohai.javasqlweb.dao.DashboardDao;
 import org.guohai.javasqlweb.dao.UserManageDao;
 import org.guohai.javasqlweb.service.operation.DbOperation;
 import org.guohai.javasqlweb.service.operation.DbOperationFactory;
 import org.guohai.javasqlweb.util.AccessTokenUtils;
+import org.guohai.javasqlweb.util.DashboardRangeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,6 +38,9 @@ public class BackstageServiceImpl implements BackstageService{
 
     @Autowired
     UserManageDao userDao;
+
+    @Autowired
+    DashboardDao dashboardDao;
 
     @Autowired
     DataSource dataSource;
@@ -161,6 +166,60 @@ public class BackstageServiceImpl implements BackstageService{
         return new Result<>(true, "", baseData);
     }
 
+    @Override
+    public Result<DashboardResponse> getDashboard(String range,
+                                                  String grain,
+                                                  Integer userLimit,
+                                                  Integer dbLimit,
+                                                  Integer tableLimit,
+                                                  Integer recentLimit) {
+        DashboardRangeUtils.DashboardRange resolvedRange = DashboardRangeUtils.resolve(range, grain);
+        DashboardResponse response = new DashboardResponse();
+        response.setRange(resolvedRange.getRange());
+        response.setGrain(resolvedRange.getGrain());
+
+        PoolStatBean pool = buildPoolSummary();
+        response.setPool(pool);
+
+        DashboardSummary summary = buildDashboardSummary(
+                resolvedRange.getStartTime(),
+                resolvedRange.getEndTime(),
+                pool
+        );
+        response.setSummary(summary);
+        response.setTrend(dashboardDao.getTrend(
+                resolvedRange.getStartTime(),
+                resolvedRange.getEndTime(),
+                buildBucketExpr(resolvedRange.getGrain())
+        ));
+
+        List<DashboardUserRankingItem> userRanking = dashboardDao.getUserRanking(
+                resolvedRange.getStartTime(),
+                resolvedRange.getEndTime(),
+                normalizeLimit(userLimit, 10)
+        );
+        for (int i = 0; i < userRanking.size(); i++) {
+            userRanking.get(i).setRank(i + 1);
+        }
+        response.setUserRanking(userRanking);
+        response.setDatabaseHotspots(dashboardDao.getDatabaseHotspots(
+                resolvedRange.getStartTime(),
+                resolvedRange.getEndTime(),
+                normalizeLimit(dbLimit, 5)
+        ));
+        response.setTableHotspots(dashboardDao.getTableHotspots(
+                resolvedRange.getStartTime(),
+                resolvedRange.getEndTime(),
+                normalizeLimit(tableLimit, 10)
+        ));
+        response.setRecentQueries(dashboardDao.getRecentQueries(
+                resolvedRange.getStartTime(),
+                resolvedRange.getEndTime(),
+                normalizeLimit(recentLimit, 10)
+        ));
+        return new Result<>(true, "", response);
+    }
+
     /**
      * 获取完整用户数据
      *
@@ -284,5 +343,77 @@ public class BackstageServiceImpl implements BackstageService{
             LOG.warn("Unable to unwrap HikariDataSource", e);
             return null;
         }
+    }
+
+    private PoolStatBean buildPoolSummary() {
+        Result<List<PoolStatBean>> poolStatsResult = getPoolStats();
+        if (!poolStatsResult.getStatus() || poolStatsResult.getData() == null || poolStatsResult.getData().isEmpty()) {
+            return new PoolStatBean();
+        }
+        return poolStatsResult.getData().get(0);
+    }
+
+    private DashboardSummary buildDashboardSummary(java.util.Date startTime,
+                                                   java.util.Date endTime,
+                                                   PoolStatBean pool) {
+        DashboardSummary summary = dashboardDao.getUserSummary(startTime, endTime);
+        if (summary == null) {
+            summary = new DashboardSummary();
+        }
+        List<ConnectConfigBean> connectConfigs = baseConfigDao.getConnData();
+        summary.setTotalInstances(connectConfigs.size());
+        summary.setHealthyInstances(resolveHealthyInstanceCount(connectConfigs));
+        summary.setActivePoolConnections(defaultInteger(pool.getActiveConnections()));
+        summary.setIdlePoolConnections(defaultInteger(pool.getIdleConnections()));
+        summary.setTotalPoolConnections(defaultInteger(pool.getTotalConnections()));
+        summary.setWaitingPoolThreads(defaultInteger(pool.getThreadsAwaitingConnection()));
+        summary.setQueryCount(defaultLong(dashboardDao.countQueries(startTime, endTime)));
+        summary.setTotalReturnedRows(defaultLong(dashboardDao.sumResultRows(startTime, endTime)));
+        summary.setAverageQueryConsuming(defaultDouble(dashboardDao.avgQueryConsuming(startTime, endTime)));
+        summary.setTotalUsers(defaultInteger(summary.getTotalUsers()));
+        summary.setNewUsers(defaultInteger(summary.getNewUsers()));
+        return summary;
+    }
+
+    private Integer resolveHealthyInstanceCount(List<ConnectConfigBean> connectConfigs) {
+        int healthyCount = 0;
+        for (ConnectConfigBean config : connectConfigs) {
+            try {
+                ConnectConfigBean fullConfig = baseConfigDao.getConnectConfig(config.getCode());
+                DbOperation dbOperation = DbOperationFactory.createDbOperation(fullConfig);
+                if (dbOperation != null && Boolean.TRUE.equals(dbOperation.serverHealth())) {
+                    healthyCount++;
+                }
+            } catch (Exception e) {
+                LOG.warn("Dashboard health check failed for server {}", config.getCode(), e);
+            }
+        }
+        return healthyCount;
+    }
+
+    private String buildBucketExpr(String grain) {
+        if ("day".equalsIgnoreCase(grain)) {
+            return "DATE_FORMAT(query_time, '%Y-%m-%d')";
+        }
+        return "DATE_FORMAT(query_time, '%Y-%m-%d %H:00')";
+    }
+
+    private Integer normalizeLimit(Integer value, int defaultValue) {
+        if (value == null || value < 1) {
+            return defaultValue;
+        }
+        return value;
+    }
+
+    private Integer defaultInteger(Integer value) {
+        return value == null ? 0 : value;
+    }
+
+    private Long defaultLong(Long value) {
+        return value == null ? 0L : value;
+    }
+
+    private Double defaultDouble(Double value) {
+        return value == null ? 0D : value;
     }
 }

@@ -184,26 +184,22 @@ public class DbOperationClickHouse implements DbOperation{
         try{
             conn = sqlDs.getConnection();
             st = conn.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE,ResultSet.CONCUR_READ_ONLY);
-            //选择一个数据库
-//            st.execute("use ".concat(dbName));
-            //为了判断是否超过返回条数限制
-            st.setMaxRows(limit + 1);
             //按【;】拆分SQL执行，默认最后一条为查询语句，为了方便使用SET @变量 = XXX
             sql = sql.replace("\n"," ");
             sql = sql.replace("\r"," ");
 
-            //执行sql
-            rs = st.executeQuery(String.format("use %s;" +
-                    "%s;", dbName, sql));
+            st.execute(String.format("use %s", dbName));
+            rs = st.executeQuery(String.format("%s;", sql));
             // 获得结果集结构信息,元数据
             java.sql.ResultSetMetaData md = rs.getMetaData();
             // 获得列数
             int columnCount = md.getColumnCount();
+            rs.last();
+            result[0] = rs.getRow();
+            rs.beforeFirst();
             int dataCount = 1;
-            result[0] = 0;
             while (rs.next()){
                 if(dataCount>limit){
-                    result[0] = dataCount;
                     break;
                 }
                 dataCount++;

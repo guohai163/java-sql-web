@@ -30,8 +30,10 @@ CREATE TABLE `db_query_log` (
   `query_ip` varchar(45) NOT NULL COMMENT '查询人IP',
   `query_name` varchar(45) NOT NULL COMMENT '查询人',
   `query_database` varchar(45) NOT NULL COMMENT '查询语句的库',
+  `server_code` int(11) NULL COMMENT '查询目标实例',
   `query_sqlscript` varchar(8000) NOT NULL COMMENT '查询脚本',
   `query_consuming` int(11) NULL COMMENT '查询耗时',
+  `result_row_count` int(11) NULL COMMENT '返回条数',
   `query_time` datetime NOT NULL COMMENT '查询时间'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -41,11 +43,27 @@ ALTER TABLE `db_query_log`
 ALTER TABLE `db_query_log`
   MODIFY `code` int(11) NOT NULL AUTO_INCREMENT;
 
+CREATE TABLE `db_query_log_target_tb` (
+  `code` int(11) NOT NULL COMMENT '自增值',
+  `query_log_code` int(11) NOT NULL COMMENT '查询日志编号',
+  `database_name` varchar(100) NOT NULL COMMENT '数据库名',
+  `table_name` varchar(200) NOT NULL COMMENT '表名'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+ALTER TABLE `db_query_log_target_tb`
+  ADD PRIMARY KEY (`code`),
+  ADD KEY `idx_query_log_code` (`query_log_code`),
+  ADD KEY `idx_database_table` (`database_name`,`table_name`);
+
+ALTER TABLE `db_query_log_target_tb`
+  MODIFY `code` int(11) NOT NULL AUTO_INCREMENT;
+
 -- 用户表
 CREATE TABLE `user_tb` (
   `code` int(11) NOT NULL COMMENT '自增值',
   `user_name` varchar(45) NOT NULL COMMENT '用户名',
   `email` varchar(100) NOT NULL COMMENT '用户邮箱',
+  `create_time` datetime NOT NULL COMMENT '创建时间',
   `pass_word` varchar(100) NOT NULL COMMENT '密码',
   `token` varchar(45) NOT NULL COMMENT '登录临时令牌',
   `auth_secret` VARCHAR(45) NULL COMMENT '二次验证密钥',

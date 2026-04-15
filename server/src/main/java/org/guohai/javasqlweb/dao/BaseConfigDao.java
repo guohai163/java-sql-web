@@ -64,31 +64,42 @@ public interface BaseConfigDao {
             "(`query_ip`,\n" +
             "`query_name`,\n" +
             "`query_database`,\n" +
+            "`server_code`,\n" +
             "`query_sqlscript`,\n" +
             "`query_time`)\n" +
             "VALUES\n" +
             "(#{queryIp},\n" +
             "#{queryName},\n" +
             "#{queryDatabase},\n" +
+            "#{serverCode},\n" +
             "#{querySqlscript},\n" +
             "#{queryTime});")
     @Options(useGeneratedKeys = true, keyProperty = "code", keyColumn = "code")
     Boolean saveQueryLog(QueryLogBean queryLog);
 
     /**
-     * 更新处理时长
+     * 更新处理统计
      * @param code
      * @param time
+     * @param resultRowCount
      * @return
      */
-    @Update("UPDATE `db_query_log` SET query_consuming=#{time} WHERE code=#{code};")
-    Boolean updateQueryLogTime(Integer code, Integer time);
+    @Update("UPDATE `db_query_log` SET query_consuming=#{time}, result_row_count=#{resultRowCount} WHERE code=#{code};")
+    Boolean updateQueryLogMetrics(@Param("code") Integer code,
+                                  @Param("time") Integer time,
+                                  @Param("resultRowCount") Integer resultRowCount);
 
     /**
      * 倒序查询日志
      * @return
      */
-    @Select("SELECT * FROM db_query_log ORDER BY code DESC LIMIT 2000;")
+    @Select("SELECT l.*, c.db_server_name AS server_name, " +
+            "COALESCE(GROUP_CONCAT(DISTINCT CONCAT(COALESCE(t.database_name, l.query_database), '.', t.table_name) ORDER BY t.table_name SEPARATOR ', '), '-') AS target_tables " +
+            "FROM db_query_log l " +
+            "LEFT JOIN db_connect_config_tb c ON c.code = l.server_code " +
+            "LEFT JOIN db_query_log_target_tb t ON t.query_log_code = l.code " +
+            "GROUP BY l.code, l.query_ip, l.query_name, l.query_database, l.server_code, l.query_sqlscript, l.query_consuming, l.result_row_count, l.query_time, c.db_server_name " +
+            "ORDER BY l.code DESC LIMIT 2000;")
     List<QueryLogBean> getQueryLog();
 
     /**

@@ -19,7 +19,7 @@ public interface UserManageDao {
      * @param name 用户名
      * @return 用户
      */
-    @Select("SELECT code,user_name,email,pass_word,auth_status,auth_secret,login_status,account_status,access_token_hash,access_token_expire_time " +
+    @Select("SELECT code,user_name,email,create_time,pass_word,auth_status,auth_secret,login_status,account_status,access_token_hash,access_token_expire_time " +
             "FROM user_tb WHERE user_name=#{name}")
     UserBean getUserLoginDataByName(@Param("name") String name);
 
@@ -28,7 +28,7 @@ public interface UserManageDao {
      * @param name
      * @return
      */
-    @Select("SELECT code,user_name,email,auth_status,account_status,access_token_hash,access_token_expire_time FROM user_tb WHERE user_name=#{name}")
+    @Select("SELECT code,user_name,email,create_time,auth_status,account_status,access_token_hash,access_token_expire_time FROM user_tb WHERE user_name=#{name}")
     UserBean getUserByName(@Param("name") String name);
 
     /**
@@ -36,7 +36,7 @@ public interface UserManageDao {
      * @param email 邮箱
      * @return 用户
      */
-    @Select("SELECT code,user_name,email,auth_status,account_status,access_token_hash,access_token_expire_time FROM user_tb WHERE email=#{email}")
+    @Select("SELECT code,user_name,email,create_time,auth_status,account_status,access_token_hash,access_token_expire_time FROM user_tb WHERE email=#{email}")
     UserBean getUserByEmail(@Param("email") String email);
 
     /**
@@ -44,7 +44,7 @@ public interface UserManageDao {
      * @param userCode 用户编号
      * @return 用户
      */
-    @Select("SELECT code,user_name,email,pass_word,auth_status,auth_secret,login_status,account_status,access_token_hash,access_token_expire_time " +
+    @Select("SELECT code,user_name,email,create_time,pass_word,auth_status,auth_secret,login_status,account_status,access_token_hash,access_token_expire_time " +
             "FROM user_tb WHERE code=#{userCode}")
     UserBean getUserByCode(@Param("userCode") Integer userCode);
 
@@ -62,7 +62,7 @@ public interface UserManageDao {
      * @param token
      * @return
      */
-    @Select("SELECT code,user_name,email,pass_word,auth_status,auth_secret,login_status,account_status,access_token_hash,access_token_expire_time " +
+    @Select("SELECT code,user_name,email,create_time,pass_word,auth_status,auth_secret,login_status,account_status,access_token_hash,access_token_expire_time " +
             "FROM user_tb WHERE token=#{token}")
     UserBean getUserByToken(@Param("token") String token);
 
@@ -71,7 +71,7 @@ public interface UserManageDao {
      * @param accessTokenHash 访问令牌哈希
      * @return 用户
      */
-    @Select("SELECT code,user_name,email,auth_status,account_status,access_token_hash,access_token_expire_time FROM user_tb WHERE access_token_hash=#{accessTokenHash}")
+    @Select("SELECT code,user_name,email,create_time,auth_status,account_status,access_token_hash,access_token_expire_time FROM user_tb WHERE access_token_hash=#{accessTokenHash}")
     UserBean getUserByAccessTokenHash(@Param("accessTokenHash") String accessTokenHash);
 
     /**
@@ -121,14 +121,14 @@ public interface UserManageDao {
      * 安全的获取一个用户列表
      * @return
      */
-    @Select("SELECT code,user_name,email,auth_status,account_status FROM user_tb;")
+    @Select("SELECT code,user_name,email,create_time,auth_status,account_status FROM user_tb;")
     List<UserBean> getUserList();
 
     /**
      * 安全地获取用户列表以及令牌状态字段
      * @return 用户列表
      */
-    @Select("SELECT code,user_name,email,auth_status,account_status,access_token_hash,access_token_expire_time, " +
+    @Select("SELECT code,user_name,email,create_time,auth_status,account_status,access_token_hash,access_token_expire_time, " +
             "(SELECT task_type FROM user_security_task_tb t " +
             "WHERE t.user_code = user_tb.code AND t.task_status IN ('PENDING_PASSWORD','PENDING_OTP') " +
             "ORDER BY t.created_time DESC LIMIT 1) AS pending_security_task_type, " +
@@ -145,8 +145,8 @@ public interface UserManageDao {
      * @param passwordHash 哈希后的密码
      * @return
      */
-    @Insert("INSERT INTO `user_tb` (`user_name`,`email`,`pass_word`,`token`,`account_status`,`auth_status`,`login_status`) VALUES" +
-            "(#{name},#{email},#{passwordHash},'',#{accountStatus},'UNBIND','LOGOUT');")
+    @Insert("INSERT INTO `user_tb` (`user_name`,`email`,`create_time`,`pass_word`,`token`,`account_status`,`auth_status`,`login_status`) VALUES" +
+            "(#{name},#{email},NOW(),#{passwordHash},'',#{accountStatus},'UNBIND','LOGOUT');")
     Boolean addNewUser(@Param("name") String userName,
                        @Param("email") String email,
                        @Param("passwordHash") String passwordHash,

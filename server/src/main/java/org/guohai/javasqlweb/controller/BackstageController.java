@@ -77,6 +77,28 @@ public class BackstageController {
     }
 
     /**
+     * 获取首页驾驶舱数据
+     * @param range 时间范围
+     * @param grain 粒度
+     * @param userLimit 用户排行数量
+     * @param dbLimit 数据库排行数量
+     * @param tableLimit 表排行数量
+     * @param recentLimit 最近查询数量
+     * @return 驾驶舱数据
+     */
+    @RequestMapping(value = "/dashboard", method = RequestMethod.GET)
+    @ResponseBody
+    public Result<DashboardResponse> getDashboard(
+            @RequestParam(value = "range", defaultValue = "24h") String range,
+            @RequestParam(value = "grain", defaultValue = "hour") String grain,
+            @RequestParam(value = "userLimit", defaultValue = "10") Integer userLimit,
+            @RequestParam(value = "dbLimit", defaultValue = "5") Integer dbLimit,
+            @RequestParam(value = "tableLimit", defaultValue = "10") Integer tableLimit,
+            @RequestParam(value = "recentLimit", defaultValue = "10") Integer recentLimit) {
+        return backstageService.getDashboard(range, grain, userLimit, dbLimit, tableLimit, recentLimit);
+    }
+
+    /**
      * 查询用户列表
      * @return
      */

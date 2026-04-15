@@ -5,17 +5,14 @@ import copy from 'copy-to-clipboard';
 import {
   Alert,
   Button,
-  Col,
   Form,
   Input,
   InputNumber,
   Layout,
   Menu,
   Modal,
-  Row,
   Select,
   Space,
-  Statistic,
   Tag,
   Table,
   message,
@@ -29,12 +26,13 @@ import {
   TeamOutlined,
   UserOutlined,
 } from '@ant-design/icons';
+import AdminDashboard from '@/features/admin/components/AdminDashboard';
 import { createClient } from '@/shared/api/apiClient';
 import logo from '@/shared/assets/brand/logo.svg';
 import './Admin.css';
 
 const { confirm } = Modal;
-const { Content, Footer, Sider } = Layout;
+const { Content, Footer, Header, Sider } = Layout;
 
 function showDialog(content, title = '提示') {
   confirm({
@@ -78,6 +76,13 @@ function Admin() {
   const navigate = useNavigate();
   const [state, setState] = useState({
     menuSelect: '1',
+    dashboardData: null,
+    dashboardLoading: false,
+    dashboardUpdatedAt: '',
+    dashboardFilter: {
+      range: '24h',
+      grain: 'hour',
+    },
     queryLog: [],
     connList: [],
     configVisible: false,
@@ -93,8 +98,6 @@ function Admin() {
     issuedLinkData: null,
     userGroupList: [],
     dbPermissionList: [],
-    userCount: 0,
-    serverCount: 0,
     inputData: {},
     permissionEditGroupCode: 1,
     permissionEditServerList: [],
@@ -123,6 +126,53 @@ function Admin() {
     }));
   };
 
+  const loadDashboard = async (overrides = {}) => {
+    const nextFilter = {
+      ...state.dashboardFilter,
+      ...overrides,
+    };
+    const normalizedFilter = {
+      ...nextFilter,
+      grain: nextFilter.range === '24h' ? nextFilter.grain || 'hour' : 'day',
+    };
+
+    setStatePatch({
+      dashboardLoading: true,
+      dashboardFilter: normalizedFilter,
+    });
+
+    const client = createClient();
+    const query = new URLSearchParams({
+      range: normalizedFilter.range,
+      grain: normalizedFilter.grain,
+      userLimit: '10',
+      dbLimit: '5',
+      tableLimit: '10',
+      recentLimit: '10',
+    });
+    const response = await client.get(`/api/backstage/dashboard?${query.toString()}`, {
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Token': state.token,
+      },
+    });
+
+    if (response.jsonData.status === true) {
+      setStatePatch({
+        dashboardData: response.jsonData.data,
+        dashboardLoading: false,
+        dashboardUpdatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
+      });
+      return;
+    }
+
+    setStatePatch({
+      dashboardData: null,
+      dashboardLoading: false,
+    });
+    showDialog(response.jsonData.message || '首页统计数据加载失败');
+  };
+
   const loadMenu = async (menuKey) => {
     setStatePatch({
       menuSelect: menuKey,
@@ -143,10 +193,7 @@ function Admin() {
 
     switch (menuKey) {
       case '1': {
-        const response = await client.get('/api/backstage/druid/stat', headers);
-        setStatePatch({
-          druidList: response.jsonData.data || [],
-        });
+        await loadDashboard();
         break;
       }
       case '2': {
@@ -206,21 +253,6 @@ function Admin() {
     }
 
     void loadMenu('1');
-
-    const client = createClient();
-    void client
-      .get('/api/backstage/base', {
-        headers: {
-          'Content-Type': 'text/plain',
-          'User-Token': state.token,
-        },
-      })
-      .then((response) => {
-        setStatePatch({
-          userCount: response.jsonData.data.user_count,
-          serverCount: response.jsonData.data.server_count,
-        });
-      });
   }, []);
 
   const testDbConn = async () => {
@@ -608,11 +640,15 @@ function Admin() {
   };
 
   const queryLogColumns = [
+    { title: '查询时间', dataIndex: 'queryTime', width: 168 },
+    { title: '查询者', dataIndex: 'queryName', width: 120 },
     { title: '查询者IP', dataIndex: 'queryIp' },
-    { title: '查询者', dataIndex: 'queryName' },
+    { title: '实例', dataIndex: 'serverName', width: 150 },
     { title: '查询数据库', dataIndex: 'queryDatabase' },
+    { title: '涉及表', dataIndex: 'targetTables', ellipsis: true },
+    { title: '返回条数', dataIndex: 'resultRowCount', width: 110 },
+    { title: '耗时(ms)', dataIndex: 'queryConsuming', width: 110 },
     { title: '查询脚本', dataIndex: 'querySqlscript' },
-    { title: '查询时间', dataIndex: 'queryTime' },
   ];
 
   const connListColumns = [
@@ -809,13 +845,71 @@ function Admin() {
     { key: '5', icon: <ConsoleSqlOutlined />, label: '返回前台' },
   ];
 
+  const menuMeta = {
+    '1': {
+      kicker: 'Dashboard',
+      title: '管理控制台',
+      subtitle: '系统概况、查询趋势和热点对象一屏掌握',
+    },
+    '2': {
+      kicker: 'Users',
+      title: '账号管理',
+      subtitle: '处理用户、激活链接、安全状态和访问令牌信息',
+    },
+    '3': {
+      kicker: 'Servers',
+      title: '服务器管理',
+      subtitle: '维护数据库实例连接、分组和连通性检查',
+    },
+    '4': {
+      kicker: 'Logs',
+      title: '查询日志',
+      subtitle: '回看最近查询行为、返回条数和执行耗时',
+    },
+    '6': {
+      kicker: 'Groups',
+      title: '用户组管理',
+      subtitle: '管理用户组和成员归属',
+    },
+    '7': {
+      kicker: 'Permissions',
+      title: '权限管理',
+      subtitle: '按组配置实例访问权限',
+    },
+  };
+
+  const currentMenuMeta = menuMeta[state.menuSelect] || menuMeta['1'];
+
+  const updateDashboardFilter = async (patch) => {
+    await loadDashboard(patch);
+  };
+
+  const renderPageSection = (title, toolbar, content) => (
+    <section className="admin-panel-card">
+      <div className="admin-panel-head">
+        <div>
+          <h3>{title}</h3>
+        </div>
+        {toolbar ? <div className="admin-panel-actions">{toolbar}</div> : null}
+      </div>
+      <div className="admin-panel-body">{content}</div>
+    </section>
+  );
+
   return (
-    <Layout>
-      <Sider theme="light" className="left_meni">
-        <div id="logo">
-          <img src={logo} alt="logo" />
+    <Layout className="admin-app-shell">
+      <Sider className="admin-sider" theme="light" width={252}>
+        <div className="admin-brand">
+          <div className="admin-brand-mark">
+            <img src={logo} alt="logo" />
+          </div>
+          <div className="admin-brand-copy">
+            <strong>JavaSqlWeb</strong>
+            <span>Admin cockpit</span>
+          </div>
         </div>
         <Menu
+          className="admin-menu"
           items={menuItems}
           mode="inline"
           selectedKeys={[state.menuSelect]}
@@ -825,339 +919,374 @@ function Admin() {
           }}
         />
       </Sider>
-      <Layout>
-        <Content>
-          <div className={state.menuSelect === '1' ? 'right_content' : 'hide'}>
-            <Row gutter={16}>
-              <Col span={12}>
-                <Statistic title="用户人数" value={state.userCount} />
-              </Col>
-              <Col span={12}>
-                <Statistic title="数据库服务器数" value={state.serverCount} />
-              </Col>
-              <Col span={24}>
-                <h4>数据库连接池详情</h4>
-                <Table
-                  columns={druidColumns}
-                  dataSource={state.druidList}
-                  rowKey={(record, index) => `pool-${record.poolName || index}`}
-                  size="small"
-                />
-              </Col>
-            </Row>
+      <Layout className="admin-shell">
+        <Header className="admin-header">
+          <div>
+            <div className="admin-header-kicker">{currentMenuMeta.kicker}</div>
+            <h1>{currentMenuMeta.title}</h1>
+            <p>{currentMenuMeta.subtitle}</p>
           </div>
-          <div className={state.menuSelect === '2' ? 'right_content' : 'hide'}>
-            <div className="admin-toolbar">
-              <Button type="primary" onClick={userAddBtn}>
-                增加用户
-              </Button>
-              <Input
-                allowClear
-                className="admin-search-input"
-                placeholder="按用户名或邮箱搜索"
-                value={state.userSearchKeyword}
-                onChange={(event) => {
+          <div className="admin-header-badge">
+            <span>后台控制台</span>
+            <strong>管理员</strong>
+          </div>
+        </Header>
+        <Content className="admin-content">
+          {state.menuSelect === '1' ? (
+            <AdminDashboard
+              data={state.dashboardData}
+              filter={state.dashboardFilter}
+              loading={state.dashboardLoading}
+              updatedAt={state.dashboardUpdatedAt}
+              onRangeChange={(value) => {
+                void updateDashboardFilter({ range: value });
+              }}
+              onGrainChange={(value) => {
+                void updateDashboardFilter({ grain: value });
+              }}
+              onRefresh={() => {
+                void loadDashboard();
+              }}
+            />
+          ) : null}
+
+          {state.menuSelect === '2'
+            ? renderPageSection(
+                '账号管理',
+                <div className="admin-toolbar">
+                  <Button type="primary" onClick={userAddBtn}>
+                    增加用户
+                  </Button>
+                  <Input
+                    allowClear
+                    className="admin-search-input"
+                    placeholder="按用户名或邮箱搜索"
+                    value={state.userSearchKeyword}
+                    onChange={(event) => {
+                      setStatePatch({
+                        userSearchKeyword: event.target.value,
+                      });
+                    }}
+                  />
+                </div>,
+                <Table
+                  columns={userListColumns}
+                  dataSource={filteredUserList}
+                  pagination={{ pageSize: 25 }}
+                  rowKey="code"
+                  size="small"
+                />,
+              )
+            : null}
+
+          {state.menuSelect === '3'
+            ? renderPageSection(
+                '服务器管理',
+                <Button type="primary" onClick={serverAddBtn}>
+                  增加服务器
+                </Button>,
+                <Table
+                  columns={connListColumns}
+                  dataSource={state.connList}
+                  pagination={{ pageSize: 25 }}
+                  rowKey="code"
+                  size="small"
+                />,
+              )
+            : null}
+
+          {state.menuSelect === '4'
+            ? renderPageSection(
+                '查询日志',
+                null,
+                <Table
+                  columns={queryLogColumns}
+                  dataSource={state.queryLog}
+                  pagination={{ pageSize: 25 }}
+                  rowKey={(record, index) => `query-log-${record.queryTime}-${index}`}
+                  size="small"
+                />,
+              )
+            : null}
+
+          {state.menuSelect === '6'
+            ? renderPageSection(
+                '用户组管理',
+                <Button type="primary" onClick={userGroupAddBtn}>
+                  增加用户组
+                </Button>,
+                <Table
+                  className="font_eng"
+                  columns={userGroupListColumns}
+                  dataSource={state.userGroupList}
+                  pagination={{ pageSize: 25 }}
+                  rowKey="code"
+                  size="small"
+                />,
+              )
+            : null}
+
+          {state.menuSelect === '7'
+            ? renderPageSection(
+                '权限管理',
+                <Button type="primary" onClick={permissionAddBtn}>
+                  增加授权
+                </Button>,
+                <Table
+                  columns={dbPermissionListColumns}
+                  dataSource={state.dbPermissionList}
+                  pagination={{ pageSize: 25 }}
+                  rowKey={(record, index) => `perm-${record.groupCode || index}`}
+                  size="small"
+                />,
+              )
+            : null}
+
+          <Modal
+            confirmLoading={state.confirmLoading}
+            open={state.userAddVisible}
+            title="增加新用户"
+            onCancel={connHandleCancel}
+            onOk={userHandleOk}
+          >
+            <Form size="small" labelCol={{ span: 7 }}>
+              <Form.Item label="邮箱">
+                <Input id="email" onChange={onInputChange} />
+              </Form.Item>
+            </Form>
+          </Modal>
+
+          <Modal
+            open={state.linkVisible}
+            title={state.issuedLinkTitle || '链接已生成'}
+            onCancel={() => {
+              setStatePatch({
+                linkVisible: false,
+                issuedLinkTitle: '',
+                issuedLinkData: null,
+              });
+            }}
+            footer={[
+              <Button key="copy" type="primary" onClick={copyIssuedLink}>
+                复制链接
+              </Button>,
+              <Button
+                key="close"
+                onClick={() => {
                   setStatePatch({
-                    userSearchKeyword: event.target.value,
+                    linkVisible: false,
+                    issuedLinkTitle: '',
+                    issuedLinkData: null,
                   });
                 }}
-              />
-            </div>
-            <Modal
-              confirmLoading={state.confirmLoading}
-              open={state.userAddVisible}
-              title="增加新用户"
-              onCancel={connHandleCancel}
-              onOk={userHandleOk}
-            >
-              <Form size="small" labelCol={{ span: 7 }}>
-                <Form.Item label="邮箱">
-                  <Input id="email" onChange={onInputChange} />
-                </Form.Item>
-              </Form>
-            </Modal>
-            <Modal
-              open={state.linkVisible}
-              title={state.issuedLinkTitle || '链接已生成'}
-              onCancel={() => {
-                setStatePatch({
-                  linkVisible: false,
-                  issuedLinkTitle: '',
-                  issuedLinkData: null,
-                });
-              }}
-              footer={[
-                <Button key="copy" type="primary" onClick={copyIssuedLink}>
-                  复制链接
-                </Button>,
-                <Button
-                  key="close"
-                  onClick={() => {
-                    setStatePatch({
-                      linkVisible: false,
-                      issuedLinkTitle: '',
-                      issuedLinkData: null,
-                    });
-                  }}
+              >
+                关闭
+              </Button>,
+            ]}
+          >
+            <Form size="small" labelCol={{ span: 6 }}>
+              <Form.Item label="用户名">
+                <span>{state.issuedLinkData?.userName || '-'}</span>
+              </Form.Item>
+              <Form.Item label="邮箱">
+                <span>{state.issuedLinkData?.email || '-'}</span>
+              </Form.Item>
+              <Form.Item label="任务类型">
+                <Tag color={getPendingTaskMeta(state.issuedLinkData?.taskType).color}>
+                  {getPendingTaskMeta(state.issuedLinkData?.taskType).text}
+                </Tag>
+              </Form.Item>
+              <Form.Item label="过期时间">
+                <span>{state.issuedLinkData?.expireTime || '-'}</span>
+              </Form.Item>
+              <Form.Item label="激活链接">
+                <Input.TextArea
+                  autoSize={{ minRows: 3, maxRows: 5 }}
+                  readOnly
+                  value={state.issuedLinkData?.linkUrl || ''}
+                />
+              </Form.Item>
+            </Form>
+          </Modal>
+
+          <Modal
+            confirmLoading={state.confirmLoading}
+            open={state.configVisible}
+            title="增加新服务器"
+            onCancel={connHandleCancel}
+            onOk={connHandleOk}
+          >
+            <Form size="small" labelCol={{ span: 7 }}>
+              <Form.Item label="服务器名">
+                <Input
+                  id="dbServerName"
+                  value={state.inputData.dbServerName}
+                  onChange={onInputChange}
+                />
+              </Form.Item>
+              <Form.Item label="服务器地址">
+                <Input
+                  id="dbServerHost"
+                  value={state.inputData.dbServerHost}
+                  onChange={onInputChange}
+                />
+              </Form.Item>
+              <Form.Item label="服务器端口">
+                <InputNumber
+                  id="dbServerPort"
+                  max={65535}
+                  min={1}
+                  value={state.inputData.dbServerPort}
+                  onChange={onPortChange}
+                />
+              </Form.Item>
+              <Form.Item label="服务器用户名">
+                <Input
+                  id="dbServerUsername"
+                  value={state.inputData.dbServerUsername}
+                  onChange={onInputChange}
+                />
+              </Form.Item>
+              <Form.Item label="服务器密码">
+                <Input.Password
+                  id="dbServerPassword"
+                  value={state.inputData.dbServerPassword}
+                  onChange={onInputChange}
+                />
+              </Form.Item>
+              <Form.Item label="服务器类型">
+                <Select
+                  placeholder="Select a type"
+                  value={state.inputData.dbServerType}
+                  onChange={onSelectChange}
                 >
-                  关闭
-                </Button>,
-              ]}
-            >
-              <Form size="small" labelCol={{ span: 6 }}>
-                <Form.Item label="用户名">
-                  <span>{state.issuedLinkData?.userName || '-'}</span>
-                </Form.Item>
-                <Form.Item label="邮箱">
-                  <span>{state.issuedLinkData?.email || '-'}</span>
-                </Form.Item>
-                <Form.Item label="任务类型">
-                  <Tag color={getPendingTaskMeta(state.issuedLinkData?.taskType).color}>
-                    {getPendingTaskMeta(state.issuedLinkData?.taskType).text}
-                  </Tag>
-                </Form.Item>
-                <Form.Item label="过期时间">
-                  <span>{state.issuedLinkData?.expireTime || '-'}</span>
-                </Form.Item>
-                <Form.Item label="激活链接">
-                  <Input.TextArea
-                    autoSize={{ minRows: 3, maxRows: 5 }}
-                    readOnly
-                    value={state.issuedLinkData?.linkUrl || ''}
+                  <Select.Option value="mssql">mssql</Select.Option>
+                  <Select.Option value="mysql">mysql</Select.Option>
+                  <Select.Option value="postgresql">postgresql</Select.Option>
+                </Select>
+              </Form.Item>
+              <Form.Item label="连接安全">
+                <Select
+                  value={state.inputData.dbSslMode || 'DEFAULT'}
+                  onChange={onSslModeChange}
+                >
+                  <Select.Option value="DEFAULT">DEFAULT</Select.Option>
+                  <Select.Option value="DISABLE_ENCRYPTION">DISABLE_ENCRYPTION</Select.Option>
+                  <Select.Option value="LEGACY_TLS">LEGACY_TLS</Select.Option>
+                </Select>
+              </Form.Item>
+              {state.inputData.dbServerType === 'mssql' &&
+              state.inputData.dbSslMode === 'LEGACY_TLS' ? (
+                <Form.Item label="风险提示">
+                  <Alert
+                    message="LEGACY_TLS 仅适用于可信内网且无法升级的旧 SQL Server。启用后需要部署层显式放开 TLS1.0。"
+                    showIcon
+                    type="warning"
                   />
                 </Form.Item>
-              </Form>
-            </Modal>
-            <Table
-              columns={userListColumns}
-              dataSource={filteredUserList}
-              pagination={{ pageSize: 25 }}
-              rowKey="code"
-              size="small"
-            />
-          </div>
-          <div className={state.menuSelect === '3' ? 'right_content' : 'hide'}>
-            <Button type="primary" style={{ marginBottom: 16 }} onClick={serverAddBtn}>
-              增加服务器
-            </Button>
-            <Modal
-              confirmLoading={state.confirmLoading}
-              open={state.configVisible}
-              title="增加新服务器"
-              onCancel={connHandleCancel}
-              onOk={connHandleOk}
-            >
-              <Form size="small" labelCol={{ span: 7 }}>
-                <Form.Item label="服务器名">
-                  <Input
-                    id="dbServerName"
-                    value={state.inputData.dbServerName}
-                    onChange={onInputChange}
-                  />
-                </Form.Item>
-                <Form.Item label="服务器地址">
-                  <Input
-                    id="dbServerHost"
-                    value={state.inputData.dbServerHost}
-                    onChange={onInputChange}
-                  />
-                </Form.Item>
-                <Form.Item label="服务器端口">
-                  <InputNumber
-                    id="dbServerPort"
-                    max={65535}
-                    min={1}
-                    value={state.inputData.dbServerPort}
-                    onChange={onPortChange}
-                  />
-                </Form.Item>
-                <Form.Item label="服务器用户名">
-                  <Input
-                    id="dbServerUsername"
-                    value={state.inputData.dbServerUsername}
-                    onChange={onInputChange}
-                  />
-                </Form.Item>
-                <Form.Item label="服务器密码">
-                  <Input.Password
-                    id="dbServerPassword"
-                    value={state.inputData.dbServerPassword}
-                    onChange={onInputChange}
-                  />
-                </Form.Item>
-                <Form.Item label="服务器类型">
-                  <Select
-                    placeholder="Select a type"
-                    value={state.inputData.dbServerType}
-                    onChange={onSelectChange}
-                  >
-                    <Select.Option value="mssql">mssql</Select.Option>
-                    <Select.Option value="mysql">mysql</Select.Option>
-                    <Select.Option value="postgresql">postgresql</Select.Option>
-                  </Select>
-                </Form.Item>
-                <Form.Item label="连接安全">
-                  <Select
-                    value={state.inputData.dbSslMode || 'DEFAULT'}
-                    onChange={onSslModeChange}
-                  >
-                    <Select.Option value="DEFAULT">DEFAULT</Select.Option>
-                    <Select.Option value="DISABLE_ENCRYPTION">DISABLE_ENCRYPTION</Select.Option>
-                    <Select.Option value="LEGACY_TLS">LEGACY_TLS</Select.Option>
-                  </Select>
-                </Form.Item>
-                {state.inputData.dbServerType === 'mssql' &&
-                state.inputData.dbSslMode === 'LEGACY_TLS' ? (
-                  <Form.Item label="风险提示">
-                    <Alert
-                      message="LEGACY_TLS 仅适用于可信内网且无法升级的旧 SQL Server。启用后需要部署层显式放开 TLS1.0。"
-                      showIcon
-                      type="warning"
-                    />
-                  </Form.Item>
-                ) : null}
-                <Form.Item label="服务器分组">
-                  <Input
-                    id="dbGroup"
-                    value={state.inputData.dbGroup}
-                    onChange={onInputChange}
-                  />
-                </Form.Item>
-                <Form.Item label="测试连接">
-                  <Button type="primary" onClick={testDbConn}>
-                    连接...
-                  </Button>
-                </Form.Item>
-              </Form>
-            </Modal>
-            <Table
-              columns={connListColumns}
-              dataSource={state.connList}
-              pagination={{ pageSize: 25 }}
-              rowKey="code"
-              size="small"
-            />
-          </div>
-          <div className={state.menuSelect === '4' ? 'div_content' : 'hide'}>
-            <Table
-              columns={queryLogColumns}
-              dataSource={state.queryLog}
-              pagination={{ pageSize: 25 }}
-              rowKey={(record, index) => `query-log-${record.queryTime}-${index}`}
-              size="small"
-            />
-          </div>
-          <div className={state.menuSelect === '6' ? 'right_content' : 'hide'}>
-            <Button type="primary" style={{ marginBottom: 16 }} onClick={userGroupAddBtn}>
-              增加用户组
-            </Button>
-            <Modal
-              confirmLoading={state.confirmLoading}
-              open={state.userGroupAddVisible}
-              title="增加新用户组"
-              onCancel={connHandleCancel}
-              onOk={userGroupHandleOk}
-            >
-              <Form size="small" labelCol={{ span: 7 }}>
-                <Form.Item label="组名">
-                  <Input
-                    id="groupName"
-                    value={state.inputData.groupName}
-                    onChange={onInputChange}
-                  />
-                </Form.Item>
-                <Form.Item label="备注">
-                  <Input
-                    id="comment"
-                    value={state.inputData.comment}
-                    onChange={onInputChange}
-                  />
-                </Form.Item>
-                <Form.Item label="用户">
-                  <Select
-                    mode="multiple"
-                    placeholder="选择进入该组用户"
-                    value={state.userGroupEditUserList}
-                    onChange={onUserGroupFromUserChange}
-                  >
-                    {state.userList.map((row) => (
-                      <Select.Option
-                        key={row.code}
-                        label={row.userName}
-                        value={`${row.code}:${row.userName}`}
-                      >
-                        {row.userName} ({row.code})
-                      </Select.Option>
-                    ))}
-                  </Select>
-                </Form.Item>
-              </Form>
-            </Modal>
-            <Table
-              className="font_eng"
-              columns={userGroupListColumns}
-              dataSource={state.userGroupList}
-              pagination={{ pageSize: 25 }}
-              rowKey="code"
-              size="small"
-            />
-          </div>
-          <div className={state.menuSelect === '7' ? 'right_content' : 'hide'}>
-            <Button type="primary" style={{ marginBottom: 16 }} onClick={permissionAddBtn}>
-              增加授权
-            </Button>
-            <Modal
-              confirmLoading={state.confirmLoading}
-              open={state.permissionAddVisible}
-              title="增加授权"
-              onCancel={connHandleCancel}
-              onOk={permissionHandleOk}
-            >
-              <Form size="small" labelCol={{ span: 7 }}>
-                <Form.Item label="用户组">
-                  <Select
-                    showSearch
-                    id="groupCode"
-                    value={state.permissionEditGroupCode}
-                    onChange={onInputPermissionGroupChange}
-                  >
-                    {state.userGroupList.map((row) => (
-                      <Select.Option key={row.code} value={row.code}>
-                        {row.groupName}
-                      </Select.Option>
-                    ))}
-                  </Select>
-                </Form.Item>
-                <Form.Item label="服务器">
-                  <Select
-                    mode="multiple"
-                    placeholder="选择进入该组用户"
-                    value={state.permissionEditServerList}
-                    onChange={onInputPermissionServerChange}
-                  >
-                    {state.connList.map((row) => (
-                      <Select.Option
-                        key={row.code}
-                        label={row.dbServerName}
-                        value={row.code}
-                      >
-                        {row.dbServerName} ({row.code})
-                      </Select.Option>
-                    ))}
-                  </Select>
-                </Form.Item>
-              </Form>
-            </Modal>
-            <Table
-              columns={dbPermissionListColumns}
-              dataSource={state.dbPermissionList}
-              pagination={{ pageSize: 25 }}
-              rowKey={(record, index) => `perm-${record.groupCode || index}`}
-              size="small"
-            />
-          </div>
+              ) : null}
+              <Form.Item label="服务器分组">
+                <Input
+                  id="dbGroup"
+                  value={state.inputData.dbGroup}
+                  onChange={onInputChange}
+                />
+              </Form.Item>
+              <Form.Item label="测试连接">
+                <Button type="primary" onClick={testDbConn}>
+                  连接...
+                </Button>
+              </Form.Item>
+            </Form>
+          </Modal>
+
+          <Modal
+            confirmLoading={state.confirmLoading}
+            open={state.userGroupAddVisible}
+            title="增加新用户组"
+            onCancel={connHandleCancel}
+            onOk={userGroupHandleOk}
+          >
+            <Form size="small" labelCol={{ span: 7 }}>
+              <Form.Item label="组名">
+                <Input
+                  id="groupName"
+                  value={state.inputData.groupName}
+                  onChange={onInputChange}
+                />
+              </Form.Item>
+              <Form.Item label="备注">
+                <Input
+                  id="comment"
+                  value={state.inputData.comment}
+                  onChange={onInputChange}
+                />
+              </Form.Item>
+              <Form.Item label="用户">
+                <Select
+                  mode="multiple"
+                  placeholder="选择进入该组用户"
+                  value={state.userGroupEditUserList}
+                  onChange={onUserGroupFromUserChange}
+                >
+                  {state.userList.map((row) => (
+                    <Select.Option
+                      key={row.code}
+                      label={row.userName}
+                      value={`${row.code}:${row.userName}`}
+                    >
+                      {row.userName} ({row.code})
+                    </Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </Form>
+          </Modal>
+
+          <Modal
+            confirmLoading={state.confirmLoading}
+            open={state.permissionAddVisible}
+            title="增加授权"
+            onCancel={connHandleCancel}
+            onOk={permissionHandleOk}
+          >
+            <Form size="small" labelCol={{ span: 7 }}>
+              <Form.Item label="用户组">
+                <Select
+                  showSearch
+                  id="groupCode"
+                  value={state.permissionEditGroupCode}
+                  onChange={onInputPermissionGroupChange}
+                >
+                  {state.userGroupList.map((row) => (
+                    <Select.Option key={row.code} value={row.code}>
+                      {row.groupName}
+                    </Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
+              <Form.Item label="服务器">
+                <Select
+                  mode="multiple"
+                  placeholder="选择进入该组用户"
+                  value={state.permissionEditServerList}
+                  onChange={onInputPermissionServerChange}
+                >
+                  {state.connList.map((row) => (
+                    <Select.Option
+                      key={row.code}
+                      label={row.dbServerName}
+                      value={row.code}
+                    >
+                      {row.dbServerName} ({row.code})
+                    </Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </Form>
+          </Modal>
         </Content>
-        <Footer>javaSqlWeb ©2020 Created by Hai</Footer>
+        <Footer className="admin-footer">JavaSqlWeb admin cockpit</Footer>
       </Layout>
     </Layout>
   );

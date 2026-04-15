@@ -7,8 +7,8 @@
     "npm": ">=10.0.0"
   },
   "dependencies": {
-    "@github/webauthn-json": "^2.1.1",
     "@ant-design/icons": "^5.2.6",
+    "@github/webauthn-json": "^2.1.1",
     "antd": "^5.12.4",
     "codemirror": "^5.65.0",
     "copy-to-clipboard": "^3.3.1",
@@ -22,6 +22,7 @@
     "react-dom": "^19.2.1",
     "react-router-dom": "^6.21.0",
     "react-syntax-highlighter": "^15.4.4",
+    "recharts": "^3.8.1",
     "x-data-spreadsheet": "^1.1.9"
   },
   "devDependencies": {

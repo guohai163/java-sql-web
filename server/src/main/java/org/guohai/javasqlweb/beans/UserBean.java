@@ -29,6 +29,11 @@ public class UserBean {
      * 密码，创建用户时使用
      */
     private String passWord;
+
+    /**
+     * 创建时间
+     */
+    private Date createTime;
     /**
      * 登录令牌
      */

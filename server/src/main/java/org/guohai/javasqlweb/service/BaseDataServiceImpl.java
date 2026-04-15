@@ -2,10 +2,12 @@ package org.guohai.javasqlweb.service;
 
 import org.guohai.javasqlweb.beans.*;
 import org.guohai.javasqlweb.dao.BaseConfigDao;
+import org.guohai.javasqlweb.dao.QueryLogTargetDao;
 import org.guohai.javasqlweb.service.operation.DbOperation;
 import org.guohai.javasqlweb.service.operation.DbOperationFactory;
 import org.guohai.javasqlweb.util.AuditSqlMaskingUtils;
 import org.guohai.javasqlweb.util.ReadOnlySqlGuard;
+import org.guohai.javasqlweb.util.SqlTargetExtractor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,6 +15,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -32,6 +35,9 @@ public class BaseDataServiceImpl implements BaseDataService{
     private static final Logger LOG  = LoggerFactory.getLogger(BaseDataServiceImpl.class);
     @Autowired
     BaseConfigDao baseConfigDao;
+
+    @Autowired
+    QueryLogTargetDao queryLogTargetDao;
 
     @Value("${project.limit}")
     private Integer limit;
@@ -336,16 +342,18 @@ public class BaseDataServiceImpl implements BaseDataService{
                 String saveSql = maskedSql.length() > SAVE_SQL_LENGTH_LIMIT
                         ? maskedSql.substring(0, SAVE_SQL_LENGTH_LIMIT)
                         : maskedSql;
-                QueryLogBean queryLog = new QueryLogBean(userIp, user.getUserName(), dbName, saveSql, new Date());
+                QueryLogBean queryLog = new QueryLogBean(userIp, user.getUserName(), dbName, serverCode, saveSql, new Date());
                 baseConfigDao.saveQueryLog(queryLog);
                 LOG.info(maskedSql);
                 Long startTime = System.currentTimeMillis();
                 Object[] result = operation.queryDatabaseBySql(dbName, sql, limit);
+                Integer resultRowCount = resolveResultRowCount(result);
                 String returnResult = Integer.parseInt(result[0].toString())>Integer.parseInt(result[1].toString())?
                         String.format("因程序限制只显示%s条数据",result[1].toString()):
                         "";
                 Long endTime = System.currentTimeMillis()-startTime;
-                baseConfigDao.updateQueryLogTime(queryLog.getCode(), endTime.intValue() );
+                baseConfigDao.updateQueryLogMetrics(queryLog.getCode(), endTime.intValue(), resultRowCount);
+                saveQueryTargets(queryLog.getCode(), dbName, sql);
                 return new Result<>(true, returnResult, result[2]);
             } catch (Exception e) {
                 e.printStackTrace();
@@ -451,5 +459,33 @@ public class BaseDataServiceImpl implements BaseDataService{
             return new Result<>(false, "无权限访问该数据库服务器", null);
         }
         return null;
+    }
+
+    private Integer resolveResultRowCount(Object[] result) {
+        if (result == null || result.length < 2) {
+            return 0;
+        }
+        Integer totalRows = parseInteger(result[0]);
+        Integer displayedRows = parseInteger(result[1]);
+        return Math.max(totalRows, displayedRows);
+    }
+
+    private Integer parseInteger(Object value) {
+        if (value == null) {
+            return 0;
+        }
+        try {
+            return Integer.parseInt(value.toString());
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
+    private void saveQueryTargets(Integer queryLogCode, String dbName, String sql) {
+        List<QueryLogTargetBean> targets = new ArrayList<>(SqlTargetExtractor.extract(sql, dbName));
+        for (QueryLogTargetBean target : targets) {
+            target.setQueryLogCode(queryLogCode);
+            queryLogTargetDao.saveTarget(target);
+        }
     }
 }

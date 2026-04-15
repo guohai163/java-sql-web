@@ -1,6 +1,7 @@
 package org.guohai.javasqlweb.service;
 
 import org.guohai.javasqlweb.beans.ConnectConfigBean;
+import org.guohai.javasqlweb.beans.DashboardResponse;
 import org.guohai.javasqlweb.beans.LinkIssueResult;
 import org.guohai.javasqlweb.beans.PoolStatBean;
 import org.guohai.javasqlweb.beans.QueryLogBean;
@@ -53,6 +54,23 @@ public interface BackstageService {
      * @return
      */
     Result<Map> getSiteBaseData();
+
+    /**
+     * 获取首页驾驶舱数据
+     * @param range 时间范围
+     * @param grain 粒度
+     * @param userLimit 用户排行数量
+     * @param dbLimit 数据库排行数量
+     * @param tableLimit 表排行数量
+     * @param recentLimit 最近查询数量
+     * @return 驾驶舱数据
+     */
+    Result<DashboardResponse> getDashboard(String range,
+                                           String grain,
+                                           Integer userLimit,
+                                           Integer dbLimit,
+                                           Integer tableLimit,
+                                           Integer recentLimit);
 
     /**
      * 获取完整用户数据
