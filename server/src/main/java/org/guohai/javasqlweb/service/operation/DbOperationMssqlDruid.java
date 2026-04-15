@@ -23,6 +23,7 @@ public class DbOperationMssqlDruid implements DbOperation {
 
     private static final String SSL_MODE_DEFAULT = "DEFAULT";
     private static final String SSL_MODE_DISABLE_ENCRYPTION = "DISABLE_ENCRYPTION";
+    private static final String SSL_MODE_LEGACY_TLS = "LEGACY_TLS";
 
     /**
      * 日志
@@ -331,6 +332,13 @@ public class DbOperationMssqlDruid implements DbOperation {
         String sslMode = conn.getDbSslMode() == null ? SSL_MODE_DEFAULT : conn.getDbSslMode();
         if (SSL_MODE_DISABLE_ENCRYPTION.equalsIgnoreCase(sslMode)) {
             return String.format("jdbc:sqlserver://%s:%s;encrypt=false", conn.getDbServerHost(), conn.getDbServerPort());
+        }
+        if (SSL_MODE_LEGACY_TLS.equalsIgnoreCase(sslMode)) {
+            return String.format(
+                    "jdbc:sqlserver://%s:%s;encrypt=true;trustServerCertificate=true",
+                    conn.getDbServerHost(),
+                    conn.getDbServerPort()
+            );
         }
         return String.format("jdbc:sqlserver://%s:%s;encrypt=true", conn.getDbServerHost(), conn.getDbServerPort());
     }

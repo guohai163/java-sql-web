@@ -839,8 +839,19 @@ function Admin() {
                   >
                     <Select.Option value="DEFAULT">DEFAULT</Select.Option>
                     <Select.Option value="DISABLE_ENCRYPTION">DISABLE_ENCRYPTION</Select.Option>
+                    <Select.Option value="LEGACY_TLS">LEGACY_TLS</Select.Option>
                   </Select>
                 </Form.Item>
+                {state.inputData.dbServerType === 'mssql' &&
+                state.inputData.dbSslMode === 'LEGACY_TLS' ? (
+                  <Form.Item label="风险提示">
+                    <Alert
+                      message="LEGACY_TLS 仅适用于可信内网且无法升级的旧 SQL Server。启用后需要部署层显式放开 TLS1.0。"
+                      showIcon
+                      type="warning"
+                    />
+                  </Form.Item>
+                ) : null}
                 <Form.Item label="服务器分组">
                   <Input
                     id="dbGroup"

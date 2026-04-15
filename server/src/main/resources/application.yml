@@ -20,6 +20,7 @@ project:
   domain: ${PROJECT_DOMAIN:localhost}
   host: ${PROJECT_HOST:http://localhost}
   auto-user-link-enabled: ${PROJECT_AUTO_USER_LINK_ENABLED:false}
+  legacy-tls-enabled: ${PROJECT_LEGACY_TLS_ENABLED:false}
 management:
   endpoints:
     web:

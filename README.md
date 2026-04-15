@@ -80,6 +80,15 @@ docker compose up -d
 - `jsw-server`：Spring Boot API 服务
 - `jsw-db`：MariaDB 数据库，首次启动会执行 `deploy/init.sql`
 
+如需兼容极少数仅支持 TLS 1.0 且强制加密的老 MSSQL，可在部署层为 `jsw-server` 增加：
+
+```shell
+PROJECT_LEGACY_TLS_ENABLED=true
+JAVA_TOOL_OPTIONS="-Djdk.tls.client.protocols=TLSv1,TLSv1.1,TLSv1.2"
+```
+
+该模式仅建议用于可信内网环境，且需要同时把对应服务器的“连接安全”配置改为 `LEGACY_TLS`。
+
 ### 2.1 使用 Kubernetes 部署
 
 仓库提供了一套基于原生 YAML 的 K8s 部署清单：
@@ -115,6 +124,15 @@ bash scripts/deploy-k8s.sh
 - `jsw-server`：Spring Boot API（Deployment + ClusterIP Service）
 - `jsw-front`：前端 Nginx（Deployment + ClusterIP Service）
 - `Ingress`：将外部流量转到 `jsw-front`
+
+如需兼容旧 MSSQL 的 `LEGACY_TLS` 模式，需要在 `jsw-server` 的部署环境变量里显式加入：
+
+```text
+PROJECT_LEGACY_TLS_ENABLED=true
+JAVA_TOOL_OPTIONS=-Djdk.tls.client.protocols=TLSv1,TLSv1.1,TLSv1.2
+```
+
+注意：这会降低当前进程里的 MSSQL TLS 安全基线，仅适用于可信内网老库。
 
 ### 3. 本地构建镜像
 

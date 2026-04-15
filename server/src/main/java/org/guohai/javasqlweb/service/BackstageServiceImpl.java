@@ -30,6 +30,8 @@ import java.util.Map;
  */
 @Service
 public class BackstageServiceImpl implements BackstageService{
+
+    private static final String LEGACY_TLS_MODE = "LEGACY_TLS";
     @Autowired
     BaseConfigDao baseConfigDao;
 
@@ -41,6 +43,9 @@ public class BackstageServiceImpl implements BackstageService{
 
     @Autowired
     HealthEndpoint healthEndpoint;
+
+    @org.springframework.beans.factory.annotation.Value("${project.legacy-tls-enabled:false}")
+    private boolean legacyTlsEnabled;
 
     private static final Logger LOG  = LoggerFactory.getLogger(BackstageServiceImpl.class);
     /**
@@ -97,6 +102,13 @@ public class BackstageServiceImpl implements BackstageService{
      */
     @Override
     public Result<String> testServerConnect(ConnectConfigBean server) {
+        if ("mssql".equalsIgnoreCase(server.getDbServerType())
+                && LEGACY_TLS_MODE.equalsIgnoreCase(server.getDbSslMode())
+                && !legacyTlsEnabled) {
+            return new Result<>(false,
+                    "当前服务器配置为 LEGACY_TLS，但应用未启用 project.legacy-tls-enabled。请先在部署层显式开启遗留 TLS 模式。",
+                    "当前服务器配置为 LEGACY_TLS，但应用未启用 project.legacy-tls-enabled。请先在部署层显式开启遗留 TLS 模式。");
+        }
         try {
             DbOperation dbOperation  = DbOperationFactory.createDbOperation(server);
             dbOperation.serverHealth();
@@ -106,7 +118,12 @@ public class BackstageServiceImpl implements BackstageService{
             if ("mssql".equalsIgnoreCase(server.getDbServerType())
                     && e.getMessage() != null
                     && e.getMessage().contains("TLS10 is not accepted by client preferences")) {
-                String message = "目标 SQL Server 仅支持 TLS 1.0。若该库位于可信内网，可将连接安全改为 DISABLE_ENCRYPTION；若服务器启用了 Force Encryption，则需由 DBA 关闭强制加密或升级 TLS。";
+                String message;
+                if (LEGACY_TLS_MODE.equalsIgnoreCase(server.getDbSslMode())) {
+                    message = "目标 SQL Server 仍在要求 TLS 1.0。请检查部署是否已为 JVM 显式开启 TLS1.0 兼容参数，或确认 SQL Server 的 Force Encryption / 证书配置。";
+                } else {
+                    message = "目标 SQL Server 仅支持 TLS 1.0。若该库位于可信内网且必须兼容，可将连接安全改为 LEGACY_TLS；若服务器启用了 Force Encryption，则需由 DBA 关闭强制加密或升级 TLS。";
+                }
                 return new Result<>(false, message, message);
             }
             return new Result<>(false,e.getMessage(),e.getMessage());
