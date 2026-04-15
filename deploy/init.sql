@@ -48,7 +48,9 @@ CREATE TABLE `user_tb` (
   `token` varchar(45) NOT NULL COMMENT '登录临时令牌',
   `auth_secret` VARCHAR(45) NULL COMMENT '二次验证密钥',
   `auth_status` varchar(45) NOT NULL DEFAULT 'UNBIND' COMMENT '密保绑定状态',
-  `login_status` VARCHAR(45) NOT NULL DEFAULT 'LOGGING'
+  `login_status` VARCHAR(45) NOT NULL DEFAULT 'LOGGING',
+  `access_token` VARCHAR(44) NULL COMMENT '长期访问令牌',
+  `access_token_expire_time` datetime NULL COMMENT '访问令牌过期时间'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 ALTER TABLE `user_tb`
@@ -117,3 +119,7 @@ CREATE TABLE `passkey_auths_tb` (
 
 -- ALTER TABLE `javasqlweb_db`.`db_connect_config_tb`
 -- ADD COLUMN `db_group` VARCHAR(45) NOT NULL DEFAULT 'default' AFTER `create_time`;
+
+-- ALTER TABLE `javasqlweb_db`.`user_tb`
+-- ADD COLUMN `access_token` VARCHAR(44) NULL COMMENT '长期访问令牌' AFTER `login_status`,
+-- ADD COLUMN `access_token_expire_time` datetime NULL COMMENT '访问令牌过期时间' AFTER `access_token`;

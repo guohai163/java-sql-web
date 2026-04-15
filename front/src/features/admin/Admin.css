@@ -40,6 +40,17 @@
     padding: 10px;
 }
 
+.admin-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.admin-search-input {
+    max-width: 280px;
+}
+
 .font_eng {
     word-wrap: break-word;
     white-space: normal;

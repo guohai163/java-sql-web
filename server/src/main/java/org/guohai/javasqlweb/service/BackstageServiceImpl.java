@@ -6,6 +6,7 @@ import org.guohai.javasqlweb.dao.BaseConfigDao;
 import org.guohai.javasqlweb.dao.UserManageDao;
 import org.guohai.javasqlweb.service.operation.DbOperation;
 import org.guohai.javasqlweb.service.operation.DbOperationFactory;
+import org.guohai.javasqlweb.util.AccessTokenUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -106,7 +107,9 @@ public class BackstageServiceImpl implements BackstageService{
      */
     @Override
     public Result<List<UserBean>> getUserData() {
-        return new Result<>(true, "", userDao.getUserList());
+        List<UserBean> userList = userDao.getUserListWithAccessToken();
+        userList.forEach(this::enrichUserAccessTokenStatus);
+        return new Result<>(true, "", userList);
     }
 
     /**
@@ -200,5 +203,16 @@ public class BackstageServiceImpl implements BackstageService{
         }
         baseConfigDao.updateConnServer(server);
         return new Result<>(true, "","修改成功");
+    }
+
+    private void enrichUserAccessTokenStatus(UserBean user) {
+        user.setHasAccessToken(AccessTokenUtils.hasAccessToken(user));
+        user.setAccessTokenStatus(AccessTokenUtils.resolveStatus(user));
+        user.setAccessToken(null);
+        user.setMaskedAccessToken(null);
+        user.setAccessTokenFullVisible(false);
+        user.setCanCreateAccessToken(null);
+        user.setCanRenewAccessToken(null);
+        user.setCanResetAccessToken(null);
     }
 }

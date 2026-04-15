@@ -1,24 +1,25 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Pubsub from 'pubsub-js';
 import cookie from 'react-cookies';
-import { CSVLink } from 'react-csv';
 import { Controlled as CodeMirror } from 'react-codemirror2';
 import { Empty, List, Modal, Spin, Switch, Tabs } from 'antd';
 import { LoadingOutlined } from '@ant-design/icons';
-import dot from './images/dot.gif';
-import Spreadsheet from './Spreadsheet';
-import DataDisplayFast from './DataDisplayFast';
-import './PageContent.css';
+import { createClient } from '@/shared/api/apiClient';
+import dot from '@/features/workbench/assets/dot.gif';
+import DataDisplayFast from '@/features/workbench/components/DataDisplayFast';
+import Spreadsheet from '@/features/workbench/components/Spreadsheet';
+import '@/features/workbench/styles/PageContent.css';
 import 'codemirror/lib/codemirror.css';
 import 'codemirror/addon/hint/show-hint.css';
 import 'codemirror/addon/hint/show-hint.js';
 import 'codemirror/addon/hint/sql-hint.js';
 import 'codemirror/mode/sql/sql';
 import 'codemirror/theme/idea.css';
-import { createClient } from './apiClient';
 
 const { confirm } = Modal;
 const antIcon = <LoadingOutlined style={{ fontSize: 34 }} spin />;
+const RENDER_MODE_STORAGE_KEY = 'jsw_query_render_mode';
+const LARGE_RESULT_SIZE = 2000;
 
 function showDialog(content, title = '提示') {
   confirm({
@@ -27,6 +28,14 @@ function showDialog(content, title = '提示') {
     onOk() {},
     onCancel() {},
   });
+}
+
+function readRenderModePreference() {
+  return localStorage.getItem(RENDER_MODE_STORAGE_KEY) !== 'legacy';
+}
+
+function saveRenderModePreference(useModernMode) {
+  localStorage.setItem(RENDER_MODE_STORAGE_KEY, useModernMode ? 'modern' : 'legacy');
 }
 
 function createPane(overrides = {}) {
@@ -41,7 +50,7 @@ function createPane(overrides = {}) {
     sql: '',
     queryResult: [],
     dataAreaRefresh: [],
-    dataDisplayStyle: true,
+    dataDisplayStyle: readRenderModePreference(),
     selectedSql: '',
     ...overrides,
   };
@@ -62,6 +71,40 @@ function readHistorySql(serverCode) {
   const historyData = localStorage.getItem(cacheKey);
 
   return historyData === null ? [] : JSON.parse(historyData);
+}
+
+function escapeCsvValue(value) {
+  if (value === null || value === undefined) {
+    return '';
+  }
+
+  const normalizedValue = String(value).replace(/\r\n/g, '\n');
+  if (/[",\n]/.test(normalizedValue)) {
+    return `"${normalizedValue.replace(/"/g, '""')}"`;
+  }
+  return normalizedValue;
+}
+
+function buildCsvContent(rows) {
+  if (!rows || rows.length === 0) {
+    return '';
+  }
+
+  const headers = Object.keys(rows[0]);
+  const csvRows = [
+    headers.map(escapeCsvValue).join(','),
+    ...rows.map((row) =>
+      headers.map((header) => escapeCsvValue(row[header])).join(','),
+    ),
+  ];
+
+  return csvRows.join('\r\n');
+}
+
+function createExportFileName(pane) {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const database = pane.database || 'query';
+  return `${database}-${timestamp}.csv`;
 }
 
 function PageContent() {
@@ -90,10 +133,21 @@ function PageContent() {
   const clientRef = useRef(createClient());
   const newTabIndexRef = useRef(2);
   const stateRef = useRef(state);
+  const editorRef = useRef(null);
 
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
+
+  const resetEditorViewport = () => {
+    window.requestAnimationFrame(() => {
+      if (!editorRef.current) {
+        return;
+      }
+      editorRef.current.scrollTo(null, 0);
+      editorRef.current.setCursor({ line: 0, ch: 0 });
+    });
+  };
 
   useEffect(() => {
     const handleResize = () => {
@@ -153,6 +207,7 @@ function PageContent() {
           database: data.selectDatabase,
         })),
       }));
+      resetEditorViewport();
       return;
     }
 
@@ -167,6 +222,7 @@ function PageContent() {
           })),
         };
       });
+      resetEditorViewport();
       return;
     }
 
@@ -181,6 +237,7 @@ function PageContent() {
           })),
         };
       });
+      resetEditorViewport();
       return;
     }
 
@@ -206,6 +263,7 @@ function PageContent() {
           database: data.selectDatabase,
         })),
       }));
+      resetEditorViewport();
       return;
     }
 
@@ -233,6 +291,7 @@ function PageContent() {
           sql: response.jsonData.data.viewData,
         })),
       }));
+      resetEditorViewport();
       return;
     }
 
@@ -380,6 +439,10 @@ function PageContent() {
         const nextHistory = currentHistory.includes(sql)
           ? currentHistory
           : [sql, ...currentHistory];
+        const preferredDisplayStyle = readRenderModePreference();
+        const shouldUseModernDisplay = response.jsonData.data.length <= LARGE_RESULT_SIZE
+          ? preferredDisplayStyle
+          : false;
 
         if (!currentHistory.includes(sql)) {
           localStorage.setItem(
@@ -394,7 +457,7 @@ function PageContent() {
           historySql: nextHistory,
           panes: updatePaneByKey(previous.panes, currentPane.key, (pane) => ({
             ...pane,
-            dataDisplayStyle: response.jsonData.data.length <= 2000,
+            dataDisplayStyle: shouldUseModernDisplay,
             queryResult: response.jsonData.data,
             dataAreaRefresh: [sql],
           })),
@@ -423,6 +486,7 @@ function PageContent() {
         sql: sqlScript,
       })),
     }));
+    resetEditorViewport();
   };
 
   const deleteHistorySql = (sqlScript) => {
@@ -441,6 +505,7 @@ function PageContent() {
   };
 
   const dataStyleSwitch = (checked) => {
+    saveRenderModePreference(checked);
     setState((previous) => ({
       ...previous,
       panes: updatePaneByKey(previous.panes, previous.activeKey, (pane) => ({
@@ -448,6 +513,27 @@ function PageContent() {
         dataDisplayStyle: checked,
       })),
     }));
+  };
+
+  const exportQueryResult = (pane) => {
+    if (!pane.queryResult || pane.queryResult.length === 0) {
+      showDialog('当前没有可导出的查询结果');
+      return;
+    }
+
+    const csvContent = buildCsvContent(pane.queryResult);
+    const csvBlob = new Blob([`\uFEFF${csvContent}`], {
+      type: 'text/csv;charset=utf-8;',
+    });
+    const downloadUrl = URL.createObjectURL(csvBlob);
+    const link = document.createElement('a');
+
+    link.href = downloadUrl;
+    link.download = createExportFileName(pane);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(downloadUrl);
   };
 
   const onTabsChange = (activeKey) => {
@@ -541,6 +627,10 @@ function PageContent() {
                     <div id="queryfieldscontainer">
                       <div id="sqlquerycontainer">
                         <CodeMirror
+                          editorDidMount={(editor) => {
+                            editorRef.current = editor;
+                            editor.scrollTo(null, 0);
+                          }}
                           onBeforeChange={(editor, metadata, value) => {
                             setState((previous) => ({
                               ...previous,
@@ -596,7 +686,9 @@ function PageContent() {
                     onClick={executeSql}
                   />
                   {pane.queryResult.length !== 0 ? (
-                    <CSVLink data={pane.queryResult}>导出查询结果</CSVLink>
+                    <button type="button" onClick={() => exportQueryResult(pane)}>
+                      导出查询结果
+                    </button>
                   ) : (
                     <span></span>
                   )}

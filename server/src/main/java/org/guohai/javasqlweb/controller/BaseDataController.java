@@ -1,6 +1,7 @@
 package org.guohai.javasqlweb.controller;
 
 import org.guohai.javasqlweb.beans.*;
+import org.guohai.javasqlweb.config.AuthenticationInterceptor;
 import org.guohai.javasqlweb.config.LoginRequired;
 import org.guohai.javasqlweb.service.BaseDataService;
 import org.slf4j.Logger;
@@ -29,8 +30,8 @@ public class BaseDataController {
 
     @ResponseBody
     @RequestMapping(value = "/serverlist")
-    public Result<List<ConnectConfigBean>> getAllConnect(@RequestHeader(value = "User-Token", required =  false) String token){
-        return baseDataService.getHavaPermConn(token);
+    public Result<List<ConnectConfigBean>> getAllConnect(HttpServletRequest request){
+        return baseDataService.getHavaPermConn(getAuthenticatedUser(request));
     }
 
     /**
@@ -40,8 +41,9 @@ public class BaseDataController {
      */
     @ResponseBody
     @RequestMapping(value = "/serverinfo/{serverCode}")
-    public Result<ConnectConfigBean> getServerInfo(@PathVariable("serverCode") String serverCode){
-        return baseDataService.getServerInfo(Integer.parseInt(serverCode));
+    public Result<ConnectConfigBean> getServerInfo(@PathVariable("serverCode") String serverCode,
+                                                   HttpServletRequest request){
+        return baseDataService.getServerInfo(Integer.parseInt(serverCode), getAuthenticatedUser(request));
     }
     /**
      * 通过DBCode获得所有库
@@ -50,8 +52,9 @@ public class BaseDataController {
      */
     @ResponseBody
     @RequestMapping(value = "/dblist/{serverCode}")
-    public Result<List<DatabaseNameBean>> getAllDbName(@PathVariable("serverCode") String serverCode){
-        return baseDataService.getDbName(Integer.parseInt(serverCode));
+    public Result<List<DatabaseNameBean>> getAllDbName(@PathVariable("serverCode") String serverCode,
+                                                       HttpServletRequest request){
+        return baseDataService.getDbName(Integer.parseInt(serverCode), getAuthenticatedUser(request));
     }
 
     /**
@@ -62,8 +65,10 @@ public class BaseDataController {
      */
     @ResponseBody
     @RequestMapping(value = "/tablelist/{serverCode}/{dbName}")
-    public Result<List<TablesNameBean>> getTableName(@PathVariable("serverCode") String serverCode, @PathVariable("dbName") String dbName){
-        return baseDataService.getTableList(Integer.parseInt(serverCode),dbName);
+    public Result<List<TablesNameBean>> getTableName(@PathVariable("serverCode") String serverCode,
+                                                     @PathVariable("dbName") String dbName,
+                                                     HttpServletRequest request){
+        return baseDataService.getTableList(Integer.parseInt(serverCode), dbName, getAuthenticatedUser(request));
     }
 
     /**
@@ -74,8 +79,10 @@ public class BaseDataController {
      */
     @ResponseBody
     @RequestMapping(value = "/tablecolumn/{serverCode}/{dbName}")
-    public Result<Map<String, String[]>> getTableCouumn(@PathVariable("serverCode") String serverCode, @PathVariable("dbName") String dbName){
-        return baseDataService.getTableColumn(Integer.parseInt(serverCode), dbName);
+    public Result<Map<String, String[]>> getTableCouumn(@PathVariable("serverCode") String serverCode,
+                                                        @PathVariable("dbName") String dbName,
+                                                        HttpServletRequest request){
+        return baseDataService.getTableColumn(Integer.parseInt(serverCode), dbName, getAuthenticatedUser(request));
     }
 
     /**
@@ -89,8 +96,14 @@ public class BaseDataController {
     @RequestMapping(value = "/columnslist/{serverCode}/{dbName}/{tableName}")
     public Result<List<ColumnsNameBean>> getColumnsName(@PathVariable("serverCode") String serverCode,
                                                        @PathVariable("dbName") String dbName,
-                                                       @PathVariable("tableName") String tableName){
-        return baseDataService.getColumnList(Integer.parseInt(serverCode), dbName, tableName);
+                                                       @PathVariable("tableName") String tableName,
+                                                       HttpServletRequest request){
+        return baseDataService.getColumnList(
+                Integer.parseInt(serverCode),
+                dbName,
+                tableName,
+                getAuthenticatedUser(request)
+        );
     }
 
     /**
@@ -104,8 +117,14 @@ public class BaseDataController {
     @RequestMapping(value = "/indexeslist/{serverCode}/{dbName}/{tableName}")
     public Result<List<TableIndexesBean>> getIndexesName(@PathVariable("serverCode") String serverCode,
                                                          @PathVariable("dbName") String dbName,
-                                                         @PathVariable("tableName") String tableName){
-        return baseDataService.getTableIndexes(Integer.parseInt(serverCode), dbName, tableName);
+                                                         @PathVariable("tableName") String tableName,
+                                                         HttpServletRequest request){
+        return baseDataService.getTableIndexes(
+                Integer.parseInt(serverCode),
+                dbName,
+                tableName,
+                getAuthenticatedUser(request)
+        );
     }
 
     /**
@@ -117,8 +136,9 @@ public class BaseDataController {
     @ResponseBody
     @RequestMapping(value = "/views/{serverCode}/{dbName}")
     public Result<List<ViewNameBean>> getViewList(@PathVariable("serverCode") String serverCode,
-                                                  @PathVariable("dbName") String dbName){
-        return baseDataService.getViewList(Integer.parseInt(serverCode), dbName);
+                                                  @PathVariable("dbName") String dbName,
+                                                  HttpServletRequest request){
+        return baseDataService.getViewList(Integer.parseInt(serverCode), dbName, getAuthenticatedUser(request));
     }
 
     /**
@@ -132,8 +152,14 @@ public class BaseDataController {
     @RequestMapping(value = "/views/{serverCode}/{dbName}/{viewName}")
     public Result<ViewNameBean> getView(@PathVariable("serverCode") String serverCode,
                                         @PathVariable("dbName") String dbName,
-                                        @PathVariable("viewName") String viewName){
-        return baseDataService.getViewByName(Integer.parseInt(serverCode), dbName, viewName);
+                                        @PathVariable("viewName") String viewName,
+                                        HttpServletRequest request){
+        return baseDataService.getViewByName(
+                Integer.parseInt(serverCode),
+                dbName,
+                viewName,
+                getAuthenticatedUser(request)
+        );
     }
 
 
@@ -146,8 +172,9 @@ public class BaseDataController {
     @ResponseBody
     @RequestMapping(value = "/storedprocedures/{serverCode}/{dbName}")
     public Result<List<StoredProceduresBean>> getSpList(@PathVariable("serverCode") String serverCode,
-                                                        @PathVariable("dbName") String dbName){
-        return baseDataService.getSpList(Integer.parseInt(serverCode), dbName);
+                                                        @PathVariable("dbName") String dbName,
+                                                        HttpServletRequest request){
+        return baseDataService.getSpList(Integer.parseInt(serverCode), dbName, getAuthenticatedUser(request));
     }
 
     /**
@@ -161,8 +188,14 @@ public class BaseDataController {
     @RequestMapping(value = "/storedprocedures/{serverCode}/{dbName}/{spName}")
     public Result<StoredProceduresBean> getSpByName(@PathVariable("serverCode") String serverCode,
                                                     @PathVariable("dbName") String dbName,
-                                                    @PathVariable("spName") String spName){
-        return baseDataService.getSpByName(Integer.parseInt(serverCode), dbName, spName);
+                                                    @PathVariable("spName") String spName,
+                                                    HttpServletRequest request){
+        return baseDataService.getSpByName(
+                Integer.parseInt(serverCode),
+                dbName,
+                spName,
+                getAuthenticatedUser(request)
+        );
     }
     /**
      * 执行业务查询
@@ -175,17 +208,25 @@ public class BaseDataController {
     @RequestMapping(value = "/query/{serverCode}/{dbName}", method = RequestMethod.POST)
     public Result<Object> quereyData(@PathVariable("serverCode") String serverCode,
                                      @PathVariable("dbName") String dbName,
-                                     @RequestHeader(value = "User-Token", required =  false) String token,
                                      HttpServletRequest request,
                                      @RequestBody String sql){
-        return baseDataService.quereyDataBySql(Integer.parseInt(serverCode), dbName, sql, token, request.getRemoteAddr());
+        return baseDataService.quereyDataBySql(
+                Integer.parseInt(serverCode),
+                dbName,
+                sql,
+                getAuthenticatedUser(request),
+                request.getRemoteAddr()
+        );
     }
 
     @ResponseBody
     @RequestMapping(value = "/server/group")
-    public Result<List<String>> getDbGroup(@RequestHeader(value = "User-Token", required =  false) String token){
-        return baseDataService.getDbGroup(token);
+    public Result<List<String>> getDbGroup(HttpServletRequest request){
+        return baseDataService.getDbGroup(getAuthenticatedUser(request));
     }
 
+    private UserBean getAuthenticatedUser(HttpServletRequest request) {
+        return (UserBean) request.getAttribute(AuthenticationInterceptor.AUTHENTICATED_USER_ATTR);
+    }
 
 }

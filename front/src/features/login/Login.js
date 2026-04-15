@@ -12,7 +12,7 @@ import {
 } from '@ant-design/icons';
 import * as webauthnJson from '@github/webauthn-json';
 import QRCode from 'qrcode.react';
-import { createClient } from './apiClient';
+import { createClient } from '@/shared/api/apiClient';
 
 const { confirm } = Modal;
 

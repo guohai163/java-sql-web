@@ -45,8 +45,17 @@ public interface UserManageDao {
      * @param token
      * @return
      */
-    @Select("SELECT code,user_name,auth_status,auth_secret,login_status FROM user_tb WHERE token=#{token}")
+    @Select("SELECT code,user_name,auth_status,auth_secret,login_status,access_token,access_token_expire_time " +
+            "FROM user_tb WHERE token=#{token}")
     UserBean getUserByToken(@Param("token") String token);
+
+    /**
+     * 通过访问令牌查找用户
+     * @param accessToken 访问令牌
+     * @return 用户
+     */
+    @Select("SELECT code,user_name,auth_status,access_token,access_token_expire_time FROM user_tb WHERE access_token=#{accessToken}")
+    UserBean getUserByAccessToken(@Param("accessToken") String accessToken);
 
 
     /**
@@ -99,6 +108,13 @@ public interface UserManageDao {
     List<UserBean> getUserList();
 
     /**
+     * 安全地获取用户列表以及令牌状态字段
+     * @return 用户列表
+     */
+    @Select("SELECT code,user_name,auth_status,access_token,access_token_expire_time FROM user_tb;")
+    List<UserBean> getUserListWithAccessToken();
+
+    /**
      * 增加新用户
      * @param userName
      * @param userPass
@@ -132,4 +148,26 @@ public interface UserManageDao {
      */
     @Update("UPDATE user_tb SET auth_secret='',auth_status='UNBIND' WHERE user_name=#{name};")
     Boolean unbindUserOtp(@Param("name") String userName);
+
+    /**
+     * 首次设置访问令牌
+     * @param userCode 用户编号
+     * @param accessToken 访问令牌
+     * @param expireTime 过期时间
+     * @return 是否成功
+     */
+    @Update("UPDATE user_tb SET access_token=#{accessToken},access_token_expire_time=#{expireTime} WHERE code=#{userCode}")
+    Boolean setAccessToken(@Param("userCode") Integer userCode,
+                           @Param("accessToken") String accessToken,
+                           @Param("expireTime") java.util.Date expireTime);
+
+    /**
+     * 续期访问令牌
+     * @param userCode 用户编号
+     * @param expireTime 过期时间
+     * @return 是否成功
+     */
+    @Update("UPDATE user_tb SET access_token_expire_time=#{expireTime} WHERE code=#{userCode}")
+    Boolean renewAccessToken(@Param("userCode") Integer userCode,
+                             @Param("expireTime") java.util.Date expireTime);
 }

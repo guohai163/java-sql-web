@@ -1,9 +1,9 @@
 import React from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
-import Admin from './Admin';
-import JavaSqlAdmin from './JavaSqlAdmin';
-import Login from './Login';
-import SqlGuid from './sqlGuid';
+import Admin from '@/features/admin/Admin';
+import Login from '@/features/login/Login';
+import SqlGuide from '@/features/sql-guide/SqlGuide';
+import JavaSqlAdmin from '@/features/workbench/JavaSqlAdmin';
 
 function App() {
   return (
@@ -16,7 +16,7 @@ function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/admin" element={<Admin />} />
-        <Route path="/guid" element={<SqlGuid />} />
+        <Route path="/guid" element={<SqlGuide />} />
         <Route path="/" element={<JavaSqlAdmin />} />
         <Route path="*" element={<Navigate replace to="/" />} />
       </Routes>

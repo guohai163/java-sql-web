@@ -1,11 +1,9 @@
 package org.guohai.javasqlweb.service;
 
 import org.guohai.javasqlweb.beans.*;
-import org.guohai.javasqlweb.dao.UserManageDao;
 import org.guohai.javasqlweb.dao.BaseConfigDao;
 import org.guohai.javasqlweb.service.operation.DbOperation;
 import org.guohai.javasqlweb.service.operation.DbOperationFactory;
-import org.guohai.javasqlweb.service.operation.DbOperationMssqlDruid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,9 +31,6 @@ public class BaseDataServiceImpl implements BaseDataService{
     @Autowired
     BaseConfigDao baseConfigDao;
 
-    @Autowired
-    UserManageDao adminDao;
-
     @Value("${project.limit}")
     private Integer limit;
     /**
@@ -58,7 +53,11 @@ public class BaseDataServiceImpl implements BaseDataService{
      * @return
      */
     @Override
-    public Result<ConnectConfigBean> getServerInfo(Integer serverCode) {
+    public Result<ConnectConfigBean> getServerInfo(Integer serverCode, UserBean user) {
+        Result<ConnectConfigBean> permissionCheck = validateServerPermission(serverCode, user);
+        if (permissionCheck != null) {
+            return permissionCheck;
+        }
         ConnectConfigBean connBean = baseConfigDao.getConnectConfig(serverCode);
         connBean.setDbServerPassword("");
         connBean.setDbServerUsername("");
@@ -73,7 +72,11 @@ public class BaseDataServiceImpl implements BaseDataService{
      * @return
      */
     @Override
-    public Result<List<DatabaseNameBean>> getDbName(Integer serverCode) {
+    public Result<List<DatabaseNameBean>> getDbName(Integer serverCode, UserBean user) {
+        Result<List<DatabaseNameBean>> permissionCheck = validateServerPermission(serverCode, user);
+        if (permissionCheck != null) {
+            return permissionCheck;
+        }
 
         DbOperation operation = createDbOperation(serverCode);
         if(null != operation){
@@ -97,7 +100,11 @@ public class BaseDataServiceImpl implements BaseDataService{
      * @return
      */
     @Override
-    public Result<List<TablesNameBean>> getTableList(Integer serverCode, String dbName) {
+    public Result<List<TablesNameBean>> getTableList(Integer serverCode, String dbName, UserBean user) {
+        Result<List<TablesNameBean>> permissionCheck = validateServerPermission(serverCode, user);
+        if (permissionCheck != null) {
+            return permissionCheck;
+        }
         DbOperation operation = createDbOperation(serverCode);
         if(null != operation){
             try{
@@ -121,7 +128,11 @@ public class BaseDataServiceImpl implements BaseDataService{
      * @return
      */
     @Override
-    public Result<List<ColumnsNameBean>> getColumnList(Integer serverCode, String dbName, String tableName) {
+    public Result<List<ColumnsNameBean>> getColumnList(Integer serverCode, String dbName, String tableName, UserBean user) {
+        Result<List<ColumnsNameBean>> permissionCheck = validateServerPermission(serverCode, user);
+        if (permissionCheck != null) {
+            return permissionCheck;
+        }
         
         DbOperation operation = createDbOperation(serverCode);
         if(null != operation){
@@ -144,7 +155,11 @@ public class BaseDataServiceImpl implements BaseDataService{
      * @return
      */
     @Override
-    public Result<Map<String, String[]>> getTableColumn(Integer serverCode, String dbName) {
+    public Result<Map<String, String[]>> getTableColumn(Integer serverCode, String dbName, UserBean user) {
+        Result<Map<String, String[]>> permissionCheck = validateServerPermission(serverCode, user);
+        if (permissionCheck != null) {
+            return permissionCheck;
+        }
         DbOperation operation = createDbOperation(serverCode);
         if(null != operation){
             try {
@@ -168,7 +183,11 @@ public class BaseDataServiceImpl implements BaseDataService{
      * @return
      */
     @Override
-    public Result<List<TableIndexesBean>> getTableIndexes(Integer serverCode, String dbName, String tableName) {
+    public Result<List<TableIndexesBean>> getTableIndexes(Integer serverCode, String dbName, String tableName, UserBean user) {
+        Result<List<TableIndexesBean>> permissionCheck = validateServerPermission(serverCode, user);
+        if (permissionCheck != null) {
+            return permissionCheck;
+        }
         DbOperation operation = createDbOperation(serverCode);
         if(null != operation){
             try{
@@ -190,7 +209,11 @@ public class BaseDataServiceImpl implements BaseDataService{
      * @return
      */
     @Override
-    public Result<List<ViewNameBean>> getViewList(Integer serverCode, String dbName) {
+    public Result<List<ViewNameBean>> getViewList(Integer serverCode, String dbName, UserBean user) {
+        Result<List<ViewNameBean>> permissionCheck = validateServerPermission(serverCode, user);
+        if (permissionCheck != null) {
+            return permissionCheck;
+        }
         DbOperation operation = createDbOperation(serverCode);
         if(null != operation){
             try{
@@ -213,7 +236,11 @@ public class BaseDataServiceImpl implements BaseDataService{
      * @return
      */
     @Override
-    public Result<ViewNameBean> getViewByName(Integer serverCode, String dbName, String viewName) {
+    public Result<ViewNameBean> getViewByName(Integer serverCode, String dbName, String viewName, UserBean user) {
+        Result<ViewNameBean> permissionCheck = validateServerPermission(serverCode, user);
+        if (permissionCheck != null) {
+            return permissionCheck;
+        }
         DbOperation operation = createDbOperation(serverCode);
         if(null != operation){
             try{
@@ -235,7 +262,11 @@ public class BaseDataServiceImpl implements BaseDataService{
      * @return
      */
     @Override
-    public Result<List<StoredProceduresBean>> getSpList(Integer serverCode, String dbName) {
+    public Result<List<StoredProceduresBean>> getSpList(Integer serverCode, String dbName, UserBean user) {
+        Result<List<StoredProceduresBean>> permissionCheck = validateServerPermission(serverCode, user);
+        if (permissionCheck != null) {
+            return permissionCheck;
+        }
         DbOperation operation = createDbOperation(serverCode);
         if(null != operation){
             try{
@@ -258,7 +289,11 @@ public class BaseDataServiceImpl implements BaseDataService{
      * @return
      */
     @Override
-    public Result<StoredProceduresBean> getSpByName(Integer serverCode, String dbName, String spName) {
+    public Result<StoredProceduresBean> getSpByName(Integer serverCode, String dbName, String spName, UserBean user) {
+        Result<StoredProceduresBean> permissionCheck = validateServerPermission(serverCode, user);
+        if (permissionCheck != null) {
+            return permissionCheck;
+        }
         DbOperation operation = createDbOperation(serverCode);
         if(null != operation){
             try{
@@ -282,10 +317,10 @@ public class BaseDataServiceImpl implements BaseDataService{
      * @return
      */
     @Override
-    public Result<Object> quereyDataBySql(Integer serverCode, String dbName, String sql, String token, String userIp) {
-        UserBean user = adminDao.getUserByToken(token);
-        if(null == user){
-            return new Result<>(false,"",null);
+    public Result<Object> quereyDataBySql(Integer serverCode, String dbName, String sql, UserBean user, String userIp) {
+        Result<Object> permissionCheck = validateServerPermission(serverCode, user);
+        if (permissionCheck != null) {
+            return permissionCheck;
         }
         DbOperation operation = createDbOperation(serverCode);
         if(null != operation){
@@ -344,8 +379,7 @@ public class BaseDataServiceImpl implements BaseDataService{
      * @return
      */
     @Override
-    public Result<List<String>> getDbGroup(String token) {
-        UserBean user = adminDao.getUserByToken(token);
+    public Result<List<String>> getDbGroup(UserBean user) {
         if(null == user){
             return new Result<>(false,"",null);
         }
@@ -359,8 +393,7 @@ public class BaseDataServiceImpl implements BaseDataService{
      * @return
      */
     @Override
-    public Result<List<ConnectConfigBean>> getHavaPermConn(String token) {
-        UserBean user = adminDao.getUserByToken(token);
+    public Result<List<ConnectConfigBean>> getHavaPermConn(UserBean user) {
         if(null == user){
             return new Result<>(false,"",null);
         }
@@ -399,5 +432,15 @@ public class BaseDataServiceImpl implements BaseDataService{
             }
         }
         return dbOperation;
+    }
+
+    private <T> Result<T> validateServerPermission(Integer serverCode, UserBean user) {
+        if (user == null || user.getCode() == null) {
+            return new Result<>(false, "未认证用户", null);
+        }
+        if (!Boolean.TRUE.equals(baseConfigDao.hasServerPermission(user.getCode(), serverCode))) {
+            return new Result<>(false, "无权限访问该数据库服务器", null);
+        }
+        return null;
     }
 }

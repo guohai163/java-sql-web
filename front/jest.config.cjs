@@ -1,7 +1,7 @@
 module.exports = {
   rootDir: '.',
   testEnvironment: 'jsdom',
-  setupFilesAfterEnv: ['<rootDir>/src/setupTests.js'],
+  setupFilesAfterEnv: ['<rootDir>/src/app/setupTests.js'],
   transform: {
     '^.+\\.[jt]sx?$': [
       'babel-jest',
@@ -16,5 +16,6 @@ module.exports = {
   moduleNameMapper: {
     '^.+\\.(css|less|sass|scss)$': 'identity-obj-proxy',
     '^.+\\.(gif|ttf|eot|svg|png|jpg|jpeg|webp)$': '<rootDir>/test/fileMock.cjs',
+    '^@/(.*)$': '<rootDir>/src/$1',
   },
 };

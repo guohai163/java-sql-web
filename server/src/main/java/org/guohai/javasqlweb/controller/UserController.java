@@ -78,6 +78,54 @@ public class UserController {
     }
 
     /**
+     * 获取当前用户访问令牌信息
+     * @param token 登录令牌
+     * @return 访问令牌信息
+     */
+    @ResponseBody
+    @RequestMapping(value = "/access-token", method = RequestMethod.GET)
+    public Result<UserBean> getAccessTokenInfo(
+            @RequestHeader(value = "User-Token", required = false) String token) {
+        return userService.getAccessTokenInfo(token);
+    }
+
+    /**
+     * 首次生成访问令牌
+     * @param token 登录令牌
+     * @return 访问令牌信息
+     */
+    @ResponseBody
+    @RequestMapping(value = "/access-token", method = RequestMethod.POST)
+    public Result<UserBean> createAccessToken(
+            @RequestHeader(value = "User-Token", required = false) String token) {
+        return userService.createAccessToken(token);
+    }
+
+    /**
+     * 续期访问令牌
+     * @param token 登录令牌
+     * @return 访问令牌信息
+     */
+    @ResponseBody
+    @RequestMapping(value = "/access-token/renew", method = RequestMethod.PUT)
+    public Result<UserBean> renewAccessToken(
+            @RequestHeader(value = "User-Token", required = false) String token) {
+        return userService.renewAccessToken(token);
+    }
+
+    /**
+     * 重置访问令牌
+     * @param token 登录令牌
+     * @return 访问令牌信息
+     */
+    @ResponseBody
+    @RequestMapping(value = "/access-token/reset", method = RequestMethod.PUT)
+    public Result<UserBean> resetAccessToken(
+            @RequestHeader(value = "User-Token", required = false) String token) {
+        return userService.resetAccessToken(token);
+    }
+
+    /**
      *
      * @param sign
      * @param userName

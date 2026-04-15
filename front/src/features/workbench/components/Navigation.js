@@ -2,15 +2,16 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Pubsub from 'pubsub-js';
 import cookie from 'react-cookies';
-import { Input, Form, Modal, Select, Spin, Tag } from 'antd';
+import copy from 'copy-to-clipboard';
+import { Button, Input, Form, Modal, Select, Spin, Tag, message } from 'antd';
 import { LoadingOutlined } from '@ant-design/icons';
 import * as webauthnJson from '@github/webauthn-json';
-import cache from './utils';
-import config from './config';
-import dot from './images/dot.gif';
-import logo from './images/logo.svg';
-import './Navigation.css';
-import { createClient } from './apiClient';
+import { createClient } from '@/shared/api/apiClient';
+import logo from '@/shared/assets/brand/logo.svg';
+import cache from '@/shared/lib/cache';
+import config from '@/shared/config/runtimeConfig';
+import dot from '@/features/workbench/assets/dot.gif';
+import '@/features/workbench/styles/Navigation.css';
 
 const { confirm } = Modal;
 const antIcon = <LoadingOutlined style={{ fontSize: 24 }} spin />;
@@ -25,6 +26,16 @@ function showDialog(content, title = '提示') {
     onOk() {},
     onCancel() {},
   });
+}
+
+function getAccessTokenStatusMeta(status) {
+  if (status === 'ACTIVE') {
+    return { color: 'success', text: '有效' };
+  }
+  if (status === 'EXPIRED') {
+    return { color: 'warning', text: '已过期' };
+  }
+  return { color: 'default', text: '未申请' };
 }
 
 function Navigation() {
@@ -46,6 +57,9 @@ function Navigation() {
     filterTableList: [],
     filterSpList: [],
     passVisible: false,
+    accessTokenInfo: null,
+    accessTokenLoading: false,
+    accessTokenActionLoading: false,
     inputData: {},
     dbGroup: [],
     viewList: [],
@@ -410,6 +424,10 @@ function Navigation() {
   };
 
   const modalHandleOk = async () => {
+    if (!(state.inputData.userNewPassword || '').trim()) {
+      showDialog('请输入新密码');
+      return;
+    }
     const client = createClient();
     const response = await client.post('/api/backstage/change_new_pass', {
       headers: {
@@ -475,17 +493,99 @@ function Navigation() {
     }
   };
 
+  const loadAccessTokenInfo = async () => {
+    setStatePatch({
+      accessTokenLoading: true,
+    });
+
+    const client = createClient();
+    const response = await client.get('/user/access-token', {
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Token': state.token,
+      },
+    });
+
+    if (response.jsonData.status === true) {
+      setStatePatch({
+        accessTokenInfo: response.jsonData.data,
+        accessTokenLoading: false,
+      });
+      return;
+    }
+
+    setStatePatch({
+      accessTokenInfo: null,
+      accessTokenLoading: false,
+    });
+    showDialog(response.jsonData.message || '访问令牌信息加载失败');
+  };
+
+  const accessTokenAction = async (method, url) => {
+    setStatePatch({
+      accessTokenActionLoading: true,
+    });
+
+    const client = createClient();
+    const response = await client[method](url, {
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Token': state.token,
+      },
+    });
+
+    if (response.jsonData.status === true) {
+      setStatePatch({
+        accessTokenInfo: response.jsonData.data,
+        accessTokenActionLoading: false,
+      });
+      message.success(response.jsonData.message || '访问令牌操作成功');
+      return;
+    }
+
+    setStatePatch({
+      accessTokenActionLoading: false,
+    });
+    showDialog(response.jsonData.message || '访问令牌操作失败');
+  };
+
+  const createAccessToken = async () => {
+    await accessTokenAction('post', '/user/access-token');
+  };
+
+  const renewAccessToken = async () => {
+    await accessTokenAction('put', '/user/access-token/renew');
+  };
+
+  const resetAccessToken = async () => {
+    await accessTokenAction('put', '/user/access-token/reset');
+  };
+
+  const copyAccessToken = () => {
+    const accessToken = state.accessTokenInfo?.accessToken;
+    if (!accessToken) {
+      showDialog('当前没有可复制的完整访问令牌');
+      return;
+    }
+    copy(accessToken);
+    message.success('访问令牌已复制');
+  };
+
   const modalHandleCancel = () => {
     setStatePatch({
       passVisible: false,
+      accessTokenInfo: null,
+      accessTokenLoading: false,
+      accessTokenActionLoading: false,
       inputData: {},
     });
   };
 
-  const showPassModal = () => {
+  const showPassModal = async () => {
     setStatePatch({
       passVisible: true,
     });
+    await loadAccessTokenInfo();
   };
 
   const onInputChange = (event) => {
@@ -826,9 +926,11 @@ function Navigation() {
       </div>
       <Modal
         open={state.passVisible}
-        title="修改密码"
+        title="账号安全"
         onCancel={modalHandleCancel}
         onOk={modalHandleOk}
+        okText="更新密码"
+        cancelText="关闭"
       >
         <Form labelCol={{ span: 7 }} size="small">
           <Form.Item label="请输入新密码" rules={[{ required: true, message: '请输入密码!' }]}>
@@ -839,6 +941,84 @@ function Navigation() {
             />
           </Form.Item>
         </Form>
+        <div className="security-section">
+          <div className="security-section-title">访问令牌</div>
+          {state.accessTokenLoading ? (
+            <div className="security-loading">
+              <Spin indicator={antIcon} />
+            </div>
+          ) : (
+            <>
+              <div className="security-meta">
+                <Tag color={getAccessTokenStatusMeta(state.accessTokenInfo?.accessTokenStatus).color}>
+                  {getAccessTokenStatusMeta(state.accessTokenInfo?.accessTokenStatus).text}
+                </Tag>
+                <span>
+                  到期时间：{state.accessTokenInfo?.accessTokenExpireTime || '未申请'}
+                </span>
+              </div>
+              {state.accessTokenInfo?.hasAccessToken ? (
+                <div className="security-token-box">
+                  {state.accessTokenInfo.accessTokenFullVisible
+                    ? state.accessTokenInfo.accessToken
+                    : state.accessTokenInfo.maskedAccessToken}
+                </div>
+              ) : (
+                <div className="security-help">当前还没有访问令牌</div>
+              )}
+              {state.accessTokenInfo?.accessTokenFullVisible ? (
+                <Button size="small" type="primary" onClick={copyAccessToken}>
+                  复制完整令牌
+                </Button>
+              ) : null}
+              {state.accessTokenInfo?.authStatus !== 'BIND' ? (
+                <div className="security-help">需先绑定OTP才能申请或续期访问令牌</div>
+              ) : null}
+              <div className="security-actions">
+                {state.accessTokenInfo?.canCreateAccessToken ? (
+                  <Button
+                    loading={state.accessTokenActionLoading}
+                    type="primary"
+                    onClick={() => {
+                      void createAccessToken();
+                    }}
+                  >
+                    申请访问令牌
+                  </Button>
+                ) : null}
+                {state.accessTokenInfo?.canRenewAccessToken ? (
+                  <Button
+                    loading={state.accessTokenActionLoading}
+                    onClick={() => {
+                      void renewAccessToken();
+                    }}
+                  >
+                    续期90天
+                  </Button>
+                ) : null}
+                {state.accessTokenInfo?.canResetAccessToken ? (
+                  <Button
+                    danger
+                    loading={state.accessTokenActionLoading}
+                    onClick={() => {
+                      void resetAccessToken();
+                    }}
+                  >
+                    重置令牌
+                  </Button>
+                ) : null}
+              </div>
+              <div className="security-help">
+                接口请求时请在 Header 中传 <code>Authorization: Bearer &lt;token&gt;</code>
+              </div>
+              {state.accessTokenInfo?.hasAccessToken && !state.accessTokenInfo?.accessTokenFullVisible ? (
+                <div className="security-help">
+                  完整令牌只会在申请成功或重置成功时显示一次，请及时复制保存。
+                </div>
+              ) : null}
+            </>
+          )}
+        </div>
       </Modal>
     </div>
   );

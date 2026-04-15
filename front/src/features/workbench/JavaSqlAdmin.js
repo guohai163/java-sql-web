@@ -1,10 +1,10 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import cookie from 'react-cookies';
-import Navigation from './Navigation';
-import PageContent from './PageContent';
-import config from './config';
-import { createClient } from './apiClient';
+import Navigation from '@/features/workbench/components/Navigation';
+import PageContent from '@/features/workbench/components/PageContent';
+import { createClient } from '@/shared/api/apiClient';
+import config from '@/shared/config/runtimeConfig';
 
 function JavaSqlAdmin() {
   const navigate = useNavigate();

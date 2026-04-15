@@ -3,13 +3,13 @@ import { Button, Image, Layout, List, Menu, message } from 'antd';
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { docco } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 import copy from 'copy-to-clipboard';
-import sqlicon from './images/sql-svgrepo-com.svg';
-import './sqlGuid.css';
-import { createClient } from './apiClient';
+import { createClient } from '@/shared/api/apiClient';
+import sqlicon from '@/shared/assets/icons/sql-svgrepo-com.svg';
+import './SqlGuide.css';
 
 const { Header, Content } = Layout;
 
-function SqlGuid() {
+function SqlGuide() {
   const [guidData, setGuidData] = useState([]);
   const [menuKey, setMenuKey] = useState('stage');
 
@@ -76,4 +76,4 @@ function SqlGuid() {
   );
 }
 
-export default SqlGuid;
+export default SqlGuide;

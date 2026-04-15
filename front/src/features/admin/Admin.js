@@ -14,6 +14,7 @@ import {
   Select,
   Space,
   Statistic,
+  Tag,
   Table,
 } from 'antd';
 import {
@@ -25,9 +26,9 @@ import {
   TeamOutlined,
   UserOutlined,
 } from '@ant-design/icons';
-import logo from './images/logo.svg';
+import { createClient } from '@/shared/api/apiClient';
+import logo from '@/shared/assets/brand/logo.svg';
 import './Admin.css';
-import { createClient } from './apiClient';
 
 const { confirm } = Modal;
 const { Content, Footer, Sider } = Layout;
@@ -54,6 +55,7 @@ function Admin() {
     permissionAddVisible: false,
     druidList: [],
     userList: [],
+    userSearchKeyword: '',
     userGroupList: [],
     dbPermissionList: [],
     userCount: 0,
@@ -589,6 +591,24 @@ function Admin() {
     { title: '用户名', dataIndex: 'userName' },
     { title: '二次验证绑定', dataIndex: 'authStatus' },
     {
+      title: '访问令牌状态',
+      dataIndex: 'accessTokenStatus',
+      render: (value) => {
+        if (value === 'ACTIVE') {
+          return <Tag color="success">有效</Tag>;
+        }
+        if (value === 'EXPIRED') {
+          return <Tag color="warning">已过期</Tag>;
+        }
+        return <Tag>未申请</Tag>;
+      },
+    },
+    {
+      title: '令牌到期时间',
+      dataIndex: 'accessTokenExpireTime',
+      render: (value) => value || '-',
+    },
+    {
       title: '操作',
       render: (text, record) => (
         <Space size="middle">
@@ -641,6 +661,14 @@ function Admin() {
     },
   ];
 
+  const normalizedUserSearchKeyword = state.userSearchKeyword.trim().toLowerCase();
+  const filteredUserList =
+    normalizedUserSearchKeyword === ''
+      ? state.userList
+      : state.userList.filter((user) =>
+          (user.userName || '').toLowerCase().includes(normalizedUserSearchKeyword),
+        );
+
   const menuItems = [
     { key: '1', icon: <EditOutlined />, label: '基础信息' },
     { key: '2', icon: <UserOutlined />, label: '账号管理' },
@@ -689,9 +717,22 @@ function Admin() {
             </Row>
           </div>
           <div className={state.menuSelect === '2' ? 'right_content' : 'hide'}>
-            <Button type="primary" style={{ marginBottom: 16 }} onClick={userAddBtn}>
-              增加用户
-            </Button>
+            <div className="admin-toolbar">
+              <Button type="primary" onClick={userAddBtn}>
+                增加用户
+              </Button>
+              <Input
+                allowClear
+                className="admin-search-input"
+                placeholder="按用户名搜索"
+                value={state.userSearchKeyword}
+                onChange={(event) => {
+                  setStatePatch({
+                    userSearchKeyword: event.target.value,
+                  });
+                }}
+              />
+            </div>
             <Modal
               confirmLoading={state.confirmLoading}
               open={state.userAddVisible}
@@ -710,7 +751,7 @@ function Admin() {
             </Modal>
             <Table
               columns={userListColumns}
-              dataSource={state.userList}
+              dataSource={filteredUserList}
               pagination={{ pageSize: 25 }}
               rowKey="code"
               size="small"

@@ -32,6 +32,21 @@ public interface UserService {
     Result<UserBean> checkLoginStatus(String token);
 
     /**
+     * 校验业务查询接口的认证信息
+     * @param token 短期登录态
+     * @param authorizationHeader Bearer 头
+     * @return 认证结果
+     */
+    Result<UserBean> checkApiAccess(String token, String authorizationHeader);
+
+    /**
+     * 校验后台管理接口认证
+     * @param token 短期登录态
+     * @return 认证结果
+     */
+    Result<UserBean> checkAdminAccess(String token);
+
+    /**
      * 绑定OTP
      * @param token 用户令牌
      * @param otpPass 一次密码
@@ -62,4 +77,32 @@ public interface UserService {
      * @return
      */
     Result<UserBean> createUserByLink(String user, String time, String sign);
+
+    /**
+     * 获取访问令牌信息
+     * @param token 短期登录态
+     * @return 令牌信息
+     */
+    Result<UserBean> getAccessTokenInfo(String token);
+
+    /**
+     * 申请访问令牌
+     * @param token 短期登录态
+     * @return 令牌信息
+     */
+    Result<UserBean> createAccessToken(String token);
+
+    /**
+     * 续期访问令牌
+     * @param token 短期登录态
+     * @return 令牌信息
+     */
+    Result<UserBean> renewAccessToken(String token);
+
+    /**
+     * 重置访问令牌
+     * @param token 短期登录态
+     * @return 令牌信息
+     */
+    Result<UserBean> resetAccessToken(String token);
 }

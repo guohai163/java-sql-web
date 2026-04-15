@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import App from './App';
+import App from '@/app/App';
 
 jest.mock('react-cookies', () => ({
   __esModule: true,
@@ -33,27 +33,27 @@ jest.mock('fetch-http-client', () => {
   };
 });
 
-jest.mock('./Navigation', () => ({
+jest.mock('@/features/workbench/components/Navigation', () => ({
   __esModule: true,
   default: () => <div>navigation shell</div>,
 }));
 
-jest.mock('./PageContent', () => ({
+jest.mock('@/features/workbench/components/PageContent', () => ({
   __esModule: true,
   default: () => <div>page content shell</div>,
 }));
 
-jest.mock('./Login', () => ({
+jest.mock('@/features/login/Login', () => ({
   __esModule: true,
   default: () => <div>login shell</div>,
 }));
 
-jest.mock('./Admin', () => ({
+jest.mock('@/features/admin/Admin', () => ({
   __esModule: true,
   default: () => <div>admin shell</div>,
 }));
 
-jest.mock('./JavaSqlAdmin', () => ({
+jest.mock('@/features/workbench/JavaSqlAdmin', () => ({
   __esModule: true,
   default: () => (
     <div>
@@ -63,7 +63,7 @@ jest.mock('./JavaSqlAdmin', () => ({
   ),
 }));
 
-jest.mock('./sqlGuid', () => ({
+jest.mock('@/features/sql-guide/SqlGuide', () => ({
   __esModule: true,
   default: () => <div>sql guid shell</div>,
 }));

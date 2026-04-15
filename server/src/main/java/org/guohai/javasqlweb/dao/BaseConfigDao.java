@@ -35,6 +35,19 @@ public interface BaseConfigDao {
     List<ConnectConfigBean> getHavePermConnConfig(Integer userCode);
 
     /**
+     * 检查用户是否有指定数据库服务器权限
+     * @param userCode 用户编号
+     * @param serverCode 服务器编号
+     * @return 是否有权限
+     */
+    @Select("SELECT EXISTS(" +
+            "SELECT 1 FROM user_permissions a " +
+            "JOIN db_permissions b ON a.group_code=b.group_code " +
+            "WHERE a.user_code=#{userCode} AND b.db_code=#{serverCode}" +
+            ")")
+    Boolean hasServerPermission(@Param("userCode") Integer userCode, @Param("serverCode") Integer serverCode);
+
+    /**
      * 获得指定code的连接属性
      * @param code
      * @return

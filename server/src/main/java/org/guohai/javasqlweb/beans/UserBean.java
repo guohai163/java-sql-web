@@ -2,6 +2,7 @@ package org.guohai.javasqlweb.beans;
 
 import lombok.Data;
 
+import java.util.Date;
 
 
 /**
@@ -46,6 +47,51 @@ public class UserBean {
      * 一次密码
      */
     private String otpPass;
+
+    /**
+     * 长期访问令牌
+     */
+    private String accessToken;
+
+    /**
+     * 访问令牌过期时间
+     */
+    private Date accessTokenExpireTime;
+
+    /**
+     * 访问令牌状态
+     */
+    private String accessTokenStatus;
+
+    /**
+     * 是否已有访问令牌
+     */
+    private Boolean hasAccessToken;
+
+    /**
+     * 脱敏后的访问令牌
+     */
+    private String maskedAccessToken;
+
+    /**
+     * 当前响应中是否显示完整令牌
+     */
+    private Boolean accessTokenFullVisible;
+
+    /**
+     * 是否允许申请访问令牌
+     */
+    private Boolean canCreateAccessToken;
+
+    /**
+     * 是否允许续期访问令牌
+     */
+    private Boolean canRenewAccessToken;
+
+    /**
+     * 是否允许重置访问令牌
+     */
+    private Boolean canResetAccessToken;
 
     @Override
     public String toString(){

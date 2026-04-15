@@ -35,6 +35,15 @@ div#sqlquerycontainer {
     float: left;
     width: 69%;
 }
+.CodeMirror {
+    height: 320px;
+}
+.CodeMirror-scroll {
+    min-height: 320px;
+}
+.CodeMirror pre {
+    line-height: 1.5;
+}
 textarea#sqlquery {
     width: 100%;
     -moz-border-radius: 4px;
@@ -102,7 +111,7 @@ td {
     border:#000000 solid 1px; padding:5px; 
 }  
 .ic_s_host {
-    background-image: url(./images/s_host.png);
+    background-image: url(../assets/s_host.png);
 }
 .right_area {
     margin-left: 240px;
@@ -123,12 +132,4 @@ td {
     overflow: scroll; /* 1 */
 
 
-}
-
-
-.container > div {
-    display: inline-block;
-
-    text-align: center;
-    line-height: 50px;
 }
