@@ -110,7 +110,7 @@ function Admin() {
       case '1': {
         const response = await client.get('/api/backstage/druid/stat', headers);
         setStatePatch({
-          druidList: response.jsonData,
+          druidList: response.jsonData.data || [],
         });
         break;
       }
@@ -317,6 +317,13 @@ function Admin() {
   const onSelectChange = (value) => {
     updateInputData({
       dbServerType: value,
+      dbSslMode: value === 'mssql' ? state.inputData.dbSslMode || 'DEFAULT' : 'DEFAULT',
+    });
+  };
+
+  const onSslModeChange = (value) => {
+    updateInputData({
+      dbSslMode: value,
     });
   };
 
@@ -370,6 +377,7 @@ function Admin() {
       configVisible: true,
       inputData: {
         dbGroup: 'default',
+        dbSslMode: 'DEFAULT',
       },
     });
   };
@@ -561,6 +569,7 @@ function Admin() {
     { title: '服务器端口', dataIndex: 'dbServerPort' },
     { title: '用户名', dataIndex: 'dbServerUsername' },
     { title: '服务器类型', dataIndex: 'dbServerType' },
+    { title: '连接安全', dataIndex: 'dbSslMode', render: (value) => value || 'DEFAULT' },
     { title: '服务器分组', dataIndex: 'dbGroup' },
     {
       title: '操作',
@@ -578,12 +587,18 @@ function Admin() {
   ];
 
   const druidColumns = [
-    { title: '连接名', dataIndex: 'Name' },
-    { title: '连接地址', dataIndex: 'URL' },
-    { title: '数据库类型', dataIndex: 'DbType' },
-    { title: '驱动类名', dataIndex: 'DriverClassName' },
-    { title: '执行数(总共)', dataIndex: 'ExecuteCount' },
-    { title: '池中连接数', dataIndex: 'PoolingCount' },
+    { title: '连接池名', dataIndex: 'poolName' },
+    { title: '连接地址', dataIndex: 'jdbcUrl' },
+    { title: '驱动类名', dataIndex: 'driverClassName' },
+    {
+      title: '健康状态',
+      dataIndex: 'healthStatus',
+      render: (value) => (value === 'UP' ? <Tag color="success">UP</Tag> : <Tag color="error">{value || 'DOWN'}</Tag>),
+    },
+    { title: '活跃连接数', dataIndex: 'activeConnections' },
+    { title: '空闲连接数', dataIndex: 'idleConnections' },
+    { title: '总连接数', dataIndex: 'totalConnections' },
+    { title: '等待连接线程数', dataIndex: 'threadsAwaitingConnection' },
   ];
 
   const userListColumns = [
@@ -710,7 +725,7 @@ function Admin() {
                 <Table
                   columns={druidColumns}
                   dataSource={state.druidList}
-                  rowKey={(record, index) => `druid-${record.Name || index}`}
+                  rowKey={(record, index) => `pool-${record.poolName || index}`}
                   size="small"
                 />
               </Col>
@@ -815,6 +830,15 @@ function Admin() {
                     <Select.Option value="mssql">mssql</Select.Option>
                     <Select.Option value="mysql">mysql</Select.Option>
                     <Select.Option value="postgresql">postgresql</Select.Option>
+                  </Select>
+                </Form.Item>
+                <Form.Item label="连接安全">
+                  <Select
+                    value={state.inputData.dbSslMode || 'DEFAULT'}
+                    onChange={onSslModeChange}
+                  >
+                    <Select.Option value="DEFAULT">DEFAULT</Select.Option>
+                    <Select.Option value="DISABLE_ENCRYPTION">DISABLE_ENCRYPTION</Select.Option>
                   </Select>
                 </Form.Item>
                 <Form.Item label="服务器分组">

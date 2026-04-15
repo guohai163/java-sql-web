@@ -165,13 +165,39 @@ curl -fsSL https://raw.githubusercontent.com/guohai163/java-sql-web/v2.1.1/scrip
 bash install-openclaw-skill.sh v2.1.1
 ```
 
-安装完成后，刷新或重启 OpenClaw 的 skills 加载，然后可通过：
+如果 OpenClaw 实际运行时使用的 home 目录和你当前 shell 的 `$HOME` 不一致，可以显式指定：
+
+```shell
+OPENCLAW_HOME=/actual/openclaw/home bash install-openclaw-skill.sh v2.1.1
+```
+
+安装脚本只负责把 Skill 文件复制到 `OPENCLAW_HOME/skills/`，还需要在 `OPENCLAW_HOME/openclaw.json` 里启用并注入运行时变量：
+
+```json
+{
+  "skills": {
+    "entries": {
+      "java-sql-web-query": {
+        "enabled": true,
+        "env": {
+          "JSW_BASE_URL": "https://your-jsw.example.com",
+          "JSW_ACCESS_TOKEN": "jsw_xxx"
+        }
+      }
+    }
+  }
+}
+```
+
+配置完成后，刷新或重启 OpenClaw 的 skills 加载，然后可通过：
 
 ```text
 $java-sql-web-query
 ```
 
 显式调用该 skill。
+
+提示：不要只靠“你有什么 skill”这类泛化提问来验证安装结果，模型的自述不一定会实时枚举新装 skill。最稳妥的验证方式是直接显式调用 `$java-sql-web-query`。
 
 ### 系统使用
 

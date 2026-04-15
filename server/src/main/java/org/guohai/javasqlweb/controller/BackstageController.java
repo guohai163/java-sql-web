@@ -1,6 +1,5 @@
 package org.guohai.javasqlweb.controller;
 
-import com.alibaba.druid.stat.DruidStatManagerFacade;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.guohai.javasqlweb.beans.*;
@@ -58,13 +57,13 @@ public class BackstageController {
     }
 
     /**
-     * 获取druid状态
+     * 获取连接池状态摘要
      * @return
      */
     @RequestMapping(value = "/druid/stat")
     @ResponseBody
-    public Object druidStat(){
-        return DruidStatManagerFacade.getInstance().getDataSourceStatDataList();
+    public Result<List<PoolStatBean>> druidStat(){
+        return backstageService.getPoolStats();
     }
 
     /**

@@ -2,6 +2,8 @@ package org.guohai.javasqlweb.util;
 
 import org.guohai.javasqlweb.beans.UserBean;
 
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -40,8 +42,8 @@ public final class AccessTokenUtils {
 
     public static boolean hasAccessToken(UserBean user) {
         return user != null
-                && user.getAccessToken() != null
-                && !user.getAccessToken().trim().isEmpty();
+                && user.getAccessTokenHash() != null
+                && !user.getAccessTokenHash().trim().isEmpty();
     }
 
     public static boolean isExpired(Date expireTime) {
@@ -65,5 +67,19 @@ public final class AccessTokenUtils {
         return accessToken.substring(0, MASK_VISIBLE_CHARS)
                 + "************************"
                 + accessToken.substring(accessToken.length() - MASK_VISIBLE_CHARS);
+    }
+
+    public static String hashAccessToken(String accessToken) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hashBytes = digest.digest(accessToken.getBytes());
+            StringBuilder builder = new StringBuilder(hashBytes.length * 2);
+            for (byte hashByte : hashBytes) {
+                builder.append(String.format("%02x", hashByte & 0xff));
+            }
+            return builder.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 is not available", e);
+        }
     }
 }

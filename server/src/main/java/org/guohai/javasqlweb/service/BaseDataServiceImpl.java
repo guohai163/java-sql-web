@@ -4,6 +4,8 @@ import org.guohai.javasqlweb.beans.*;
 import org.guohai.javasqlweb.dao.BaseConfigDao;
 import org.guohai.javasqlweb.service.operation.DbOperation;
 import org.guohai.javasqlweb.service.operation.DbOperationFactory;
+import org.guohai.javasqlweb.util.AuditSqlMaskingUtils;
+import org.guohai.javasqlweb.util.ReadOnlySqlGuard;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -322,14 +324,21 @@ public class BaseDataServiceImpl implements BaseDataService{
         if (permissionCheck != null) {
             return permissionCheck;
         }
+        ConnectConfigBean connectConfigBean = baseConfigDao.getConnectConfig(serverCode);
+        String guardResult = ReadOnlySqlGuard.validate(sql, connectConfigBean == null ? "" : connectConfigBean.getDbServerType());
+        if (guardResult != null) {
+            return new Result<>(false, guardResult, null);
+        }
         DbOperation operation = createDbOperation(serverCode);
         if(null != operation){
             try{
-                //如果sql超过长度限制，截取后保存sql
-                String saveSql = sql.length() > SAVE_SQL_LENGTH_LIMIT ? sql.substring(0, SAVE_SQL_LENGTH_LIMIT) : sql;
+                String maskedSql = AuditSqlMaskingUtils.mask(sql);
+                String saveSql = maskedSql.length() > SAVE_SQL_LENGTH_LIMIT
+                        ? maskedSql.substring(0, SAVE_SQL_LENGTH_LIMIT)
+                        : maskedSql;
                 QueryLogBean queryLog = new QueryLogBean(userIp, user.getUserName(), dbName, saveSql, new Date());
                 baseConfigDao.saveQueryLog(queryLog);
-                LOG.info(sql);
+                LOG.info(maskedSql);
                 Long startTime = System.currentTimeMillis();
                 Object[] result = operation.queryDatabaseBySql(dbName, sql, limit);
                 String returnResult = Integer.parseInt(result[0].toString())>Integer.parseInt(result[1].toString())?

@@ -49,4 +49,9 @@ public class ConnectConfigBean {
      */
     String dbGroup;
 
+    /**
+     * 连接安全模式
+     */
+    private String dbSslMode;
+
 }

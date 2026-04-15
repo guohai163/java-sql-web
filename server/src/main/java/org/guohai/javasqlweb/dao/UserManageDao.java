@@ -1,11 +1,10 @@
 package org.guohai.javasqlweb.dao;
 
-import com.fasterxml.jackson.databind.jsonFormatVisitors.JsonBooleanFormatVisitor;
 import org.apache.ibatis.annotations.*;
 import org.guohai.javasqlweb.beans.UserBean;
 import org.springframework.stereotype.Repository;
-import org.springframework.web.bind.annotation.PathVariable;
 
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -16,21 +15,22 @@ import java.util.List;
 public interface UserManageDao {
 
     /**
-     * 查询指定用户名密码的用户数据是否存在
-     * @param name
-     * @param pass
-     * @return
+     * 按用户名获取登录鉴权所需字段
+     * @param name 用户名
+     * @return 用户
      */
-    @Select("SELECT user_name,auth_status FROM user_tb WHERE user_name=#{name} AND pass_word=md5(CONCAT(md5(#{pass}),'jsa'))")
-    UserBean checkUserNamePass(@Param("name") String name, @Param("pass") String pass);
+    @Select("SELECT code,user_name,pass_word,auth_status,auth_secret,login_status,access_token_hash,access_token_expire_time " +
+            "FROM user_tb WHERE user_name=#{name}")
+    UserBean getUserLoginDataByName(@Param("name") String name);
 
     /**
      * 通过用户名检查用户是否存在
      * @param name
      * @return
      */
-    @Select("SELECT user_name,auth_status FROM user_tb WHERE user_name=#{name}")
+    @Select("SELECT code,user_name,auth_status,access_token_hash,access_token_expire_time FROM user_tb WHERE user_name=#{name}")
     UserBean getUserByName(@Param("name") String name);
+
     /**
      * 更新用户登录令牌
      * @param name
@@ -45,18 +45,17 @@ public interface UserManageDao {
      * @param token
      * @return
      */
-    @Select("SELECT code,user_name,auth_status,auth_secret,login_status,access_token,access_token_expire_time " +
+    @Select("SELECT code,user_name,pass_word,auth_status,auth_secret,login_status,access_token_hash,access_token_expire_time " +
             "FROM user_tb WHERE token=#{token}")
     UserBean getUserByToken(@Param("token") String token);
 
     /**
-     * 通过访问令牌查找用户
-     * @param accessToken 访问令牌
+     * 通过访问令牌哈希查找用户
+     * @param accessTokenHash 访问令牌哈希
      * @return 用户
      */
-    @Select("SELECT code,user_name,auth_status,access_token,access_token_expire_time FROM user_tb WHERE access_token=#{accessToken}")
-    UserBean getUserByAccessToken(@Param("accessToken") String accessToken);
-
+    @Select("SELECT code,user_name,auth_status,access_token_hash,access_token_expire_time FROM user_tb WHERE access_token_hash=#{accessTokenHash}")
+    UserBean getUserByAccessTokenHash(@Param("accessTokenHash") String accessTokenHash);
 
     /**
      * 设置用户二次验证的密钥,和登录临时token
@@ -76,6 +75,7 @@ public interface UserManageDao {
      */
     @Update("UPDATE user_tb SET auth_status='BIND',login_status='LOGGED' WHERE user_name=#{user}")
     Boolean setUserBindStatus(@Param("user") String user);
+
     /**
      * 通过令牌查询用户二次验证密钥
      * @param token
@@ -111,18 +111,18 @@ public interface UserManageDao {
      * 安全地获取用户列表以及令牌状态字段
      * @return 用户列表
      */
-    @Select("SELECT code,user_name,auth_status,access_token,access_token_expire_time FROM user_tb;")
+    @Select("SELECT code,user_name,auth_status,access_token_hash,access_token_expire_time FROM user_tb;")
     List<UserBean> getUserListWithAccessToken();
 
     /**
      * 增加新用户
-     * @param userName
-     * @param userPass
+     * @param userName 用户名
+     * @param passwordHash 哈希后的密码
      * @return
      */
     @Insert("INSERT INTO `user_tb` (`user_name`,`pass_word`,`token`) VALUES" +
-            "(#{name},md5(CONCAT(md5(#{pass}),'jsa')),'');")
-    Boolean addNewUser(@Param("name") String userName,@Param("pass") String userPass);
+            "(#{name},#{passwordHash},'');")
+    Boolean addNewUser(@Param("name") String userName, @Param("passwordHash") String passwordHash);
 
     /**
      * 删除指定用户
@@ -133,13 +133,13 @@ public interface UserManageDao {
     Boolean delUser(@Param("name") String userName);
 
     /**
-     * 通过有效Token直接修改用户密码
-     * @param token
-     * @param newPass
+     * 按用户编号修改密码
+     * @param userCode 用户编号
+     * @param passwordHash 新密码哈希
      * @return
      */
-    @Update("UPDATE user_tb SET pass_word=md5(CONCAT(md5(#{newpass}),'jsa')) WHERE token=#{token}")
-    Boolean changeUserPassword(@Param("token") String token, @Param("newpass") String newPass);
+    @Update("UPDATE user_tb SET pass_word=#{passwordHash} WHERE code=#{userCode}")
+    Boolean changeUserPasswordByCode(@Param("userCode") Integer userCode, @Param("passwordHash") String passwordHash);
 
     /**
      * 管理员为用户解绑OTP
@@ -150,16 +150,16 @@ public interface UserManageDao {
     Boolean unbindUserOtp(@Param("name") String userName);
 
     /**
-     * 首次设置访问令牌
+     * 首次设置访问令牌哈希
      * @param userCode 用户编号
-     * @param accessToken 访问令牌
+     * @param accessTokenHash 访问令牌哈希
      * @param expireTime 过期时间
      * @return 是否成功
      */
-    @Update("UPDATE user_tb SET access_token=#{accessToken},access_token_expire_time=#{expireTime} WHERE code=#{userCode}")
-    Boolean setAccessToken(@Param("userCode") Integer userCode,
-                           @Param("accessToken") String accessToken,
-                           @Param("expireTime") java.util.Date expireTime);
+    @Update("UPDATE user_tb SET access_token_hash=#{accessTokenHash},access_token_expire_time=#{expireTime} WHERE code=#{userCode}")
+    Boolean setAccessTokenHash(@Param("userCode") Integer userCode,
+                               @Param("accessTokenHash") String accessTokenHash,
+                               @Param("expireTime") Date expireTime);
 
     /**
      * 续期访问令牌
@@ -169,5 +169,5 @@ public interface UserManageDao {
      */
     @Update("UPDATE user_tb SET access_token_expire_time=#{expireTime} WHERE code=#{userCode}")
     Boolean renewAccessToken(@Param("userCode") Integer userCode,
-                             @Param("expireTime") java.util.Date expireTime);
+                             @Param("expireTime") Date expireTime);
 }

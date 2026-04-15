@@ -20,7 +20,7 @@ public interface BaseConfigDao {
      * 返回完整的配置项
      * @return
      */
-    @Select("SELECT code,db_server_name,db_server_type,db_group FROM db_connect_config_tb;")
+    @Select("SELECT code,db_server_name,db_server_type,db_ssl_mode,db_group FROM db_connect_config_tb;")
     List<ConnectConfigBean> getAllConnectConfig();
 
     /**
@@ -28,7 +28,7 @@ public interface BaseConfigDao {
      * @param userCode
      * @return
      */
-    @Select("SELECT DISTINCT c.code,c.db_server_name,c.db_server_type,c.db_group FROM user_permissions a " +
+    @Select("SELECT DISTINCT c.code,c.db_server_name,c.db_server_type,c.db_ssl_mode,c.db_group FROM user_permissions a " +
             "join db_permissions b on a.group_code=b.group_code " +
             "join db_connect_config_tb c on b.db_code=c.code " +
             "where user_code=#{userCode};")
@@ -96,7 +96,7 @@ public interface BaseConfigDao {
      * @return
      */
     @Select("SELECT `code`,`db_server_name`,`db_server_host`,`db_server_port`,`db_server_username`," +
-            "'' as `db_server_password`,`db_server_type`,`create_time` " +
+            "'' as `db_server_password`,`db_server_type`,`db_ssl_mode`,`create_time` " +
             ",`db_group` "+
             "FROM `db_connect_config_tb`;")
     List<ConnectConfigBean> getConnData();
@@ -138,6 +138,7 @@ public interface BaseConfigDao {
             "`db_server_username`,\n" +
             "`db_server_password`,\n" +
             "`db_server_type`,\n" +
+            "`db_ssl_mode`,\n" +
             "`create_time`,`db_group`)\n" +
             "VALUES\n" +
             "(#{server.dbServerName},\n" +
@@ -146,6 +147,7 @@ public interface BaseConfigDao {
             "#{server.dbServerUsername},\n" +
             "#{server.dbServerPassword},\n" +
             "#{server.dbServerType},\n" +
+            "#{server.dbSslMode},\n" +
             "now(),#{server.dbGroup});")
     Boolean addConnServer(@Param("server") ConnectConfigBean server);
 
@@ -165,6 +167,7 @@ public interface BaseConfigDao {
             "`db_server_password` = #{server.dbServerPassword}," +
             "</if>" +
             "`db_server_type` = #{server.dbServerType}," +
+            "`db_ssl_mode` = #{server.dbSslMode}," +
             "`db_group` = #{server.dbGroup}" +
             "WHERE `code` = #{server.code};"+
             "</script>")

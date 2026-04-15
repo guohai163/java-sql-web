@@ -4,11 +4,9 @@ server:
     uri-encoding: UTF-8
 spring:
   datasource:
-    type: com.alibaba.druid.pool.DruidDataSource
-    druid:
-      url: jdbc:mysql://${DB_HOST:${MARIADB_PORT_3306_TCP_ADDR:localhost}}:${DB_PORT:3306}/${DB_NAME:javasqlweb_db}?useUnicode=true&characterEncoding=UTF-8&allowMultiQueries=true&serverTimezone=Hongkong
-      username: ${DB_USERNAME:${MARIADB_ENV_MYSQL_ROOT_NAME:root}}
-      password: ${DB_PASSWORD:${MARIADB_ENV_MYSQL_ROOT_PASSWORD:Passw0rd}}
+    url: jdbc:mysql://${DB_HOST:${MARIADB_PORT_3306_TCP_ADDR:localhost}}:${DB_PORT:3306}/${DB_NAME:javasqlweb_db}?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Hongkong
+    username: ${DB_USERNAME:${MARIADB_ENV_MYSQL_ROOT_NAME:root}}
+    password: ${DB_PASSWORD:${MARIADB_ENV_MYSQL_ROOT_PASSWORD:Passw0rd}}
   jackson:
     time-zone: GMT+8
     date-format: yyyy-MM-dd HH:mm:ss
@@ -21,6 +19,15 @@ project:
   signkey: ${PROJECT_SIGNKEY:jsw}
   domain: ${PROJECT_DOMAIN:localhost}
   host: ${PROJECT_HOST:http://localhost}
+  auto-user-link-enabled: ${PROJECT_AUTO_USER_LINK_ENABLED:false}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: never
 logging:
   level:
     org:

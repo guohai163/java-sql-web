@@ -1,8 +1,6 @@
 package org.guohai.javasqlweb.service;
 
 import org.guohai.javasqlweb.beans.*;
-
-import javax.swing.text.View;
 import java.util.List;
 import java.util.Map;
 

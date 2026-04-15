@@ -8,6 +8,8 @@ import org.guohai.javasqlweb.beans.UserBean;
 import org.guohai.javasqlweb.beans.UserLoginStatus;
 import org.guohai.javasqlweb.dao.UserManageDao;
 import org.guohai.javasqlweb.util.AccessTokenUtils;
+import org.guohai.javasqlweb.util.PasswordUtils;
+import org.guohai.javasqlweb.util.RateLimitUtils;
 import org.guohai.javasqlweb.util.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,7 +33,10 @@ public class UserServiceImpl implements UserService {
     private static final String ACCESS_TOKEN_INVALID = "access token invalid";
     private static final String ACCESS_TOKEN_EXPIRED = "access token expired";
     private static final String ACCESS_TOKEN_REQUIRED_OTP = "需先绑定OTP后才能管理访问令牌";
+    private static final String AUTO_USER_LINK_DISABLED = "自动建号链接未启用";
+    private static final String TOO_MANY_REQUESTS = "请求过于频繁，请稍后再试";
     private static final Long FW = Long.valueOf(1000 * 60 * 5);
+    private static final long RATE_LIMIT_WINDOW_MS = 5 * 60 * 1000L;
 
     /**
      * 管理DAO
@@ -42,6 +47,9 @@ public class UserServiceImpl implements UserService {
     @Value("${project.signkey}")
     private String signKey;
 
+    @Value("${project.auto-user-link-enabled:false}")
+    private boolean autoUserLinkEnabled;
+
     /**
      * 登录方法
      *
@@ -51,10 +59,17 @@ public class UserServiceImpl implements UserService {
      */
     @Override
     public Result<UserBean> login(String name, String pass) {
-        UserBean user = userDao.checkUserNamePass(name, pass);
+        if (!RateLimitUtils.tryAcquire("login", name, 10, RATE_LIMIT_WINDOW_MS)) {
+            return new Result<>(false, TOO_MANY_REQUESTS, null);
+        }
+        UserBean user = userDao.getUserLoginDataByName(name);
         if (user == null) {
             return new Result<>(false, "登录失败", null);
         }
+        if (!isPasswordMatched(user, pass)) {
+            return new Result<>(false, "登录失败", null);
+        }
+        upgradeLegacyPasswordIfNeeded(user, pass);
         user.setToken(UUID.randomUUID().toString());
         if (OtpAuthStatus.UNBIND == user.getAuthStatus() || OtpAuthStatus.BINDING == user.getAuthStatus()) {
             GoogleAuthenticator gAuth = new GoogleAuthenticator();
@@ -114,7 +129,7 @@ public class UserServiceImpl implements UserService {
                 return new Result<>(false, ACCESS_TOKEN_INVALID, null);
             }
 
-            UserBean user = userDao.getUserByAccessToken(accessToken);
+            UserBean user = userDao.getUserByAccessTokenHash(AccessTokenUtils.hashAccessToken(accessToken));
             if (user == null) {
                 return new Result<>(false, ACCESS_TOKEN_INVALID, null);
             }
@@ -157,6 +172,9 @@ public class UserServiceImpl implements UserService {
      */
     @Override
     public Result<String> bindOtp(String token, String otpPass) {
+        if (!RateLimitUtils.tryAcquire("bindOtp", token, 10, RATE_LIMIT_WINDOW_MS)) {
+            return new Result<>(false, TOO_MANY_REQUESTS, "rate_limit");
+        }
         UserBean user = userDao.getUserByToken(token);
         if (user == null) {
             return new Result<>(false, "用户还未登录", "token_error");
@@ -183,6 +201,9 @@ public class UserServiceImpl implements UserService {
      */
     @Override
     public Result<String> verifyOtp(String token, String otpPass) {
+        if (!RateLimitUtils.tryAcquire("verifyOtp", token, 10, RATE_LIMIT_WINDOW_MS)) {
+            return new Result<>(false, TOO_MANY_REQUESTS, "rate_limit");
+        }
         UserBean user = userDao.getUserByToken(token);
         if (user == null) {
             return new Result<>(false, "还未登录", "token_error");
@@ -222,6 +243,9 @@ public class UserServiceImpl implements UserService {
      */
     @Override
     public Result<UserBean> createUserByLink(String userName, String time, String sign) {
+        if (!autoUserLinkEnabled) {
+            return new Result<>(false, AUTO_USER_LINK_DISABLED, null);
+        }
         Long currentTime = System.currentTimeMillis();
         Long requestTime = Long.parseLong(time) * 1000;
         LOG.info(String.format("当前时间: %d ,传入时间: %d", currentTime, requestTime));
@@ -234,7 +258,7 @@ public class UserServiceImpl implements UserService {
         UserBean userBean = userDao.getUserByName(userName);
 
         if (userBean == null) {
-            userDao.addNewUser(userName, userName);
+            userDao.addNewUser(userName, PasswordUtils.encode(PasswordUtils.randomTemporaryPassword()));
             userBean = new UserBean();
             userBean.setUserName(userName);
             userBean.setAuthStatus(OtpAuthStatus.UNBIND);
@@ -262,6 +286,9 @@ public class UserServiceImpl implements UserService {
      */
     @Override
     public Result<UserBean> getAccessTokenInfo(String token) {
+        if (!RateLimitUtils.tryAcquire("accessTokenInfo", token, 30, RATE_LIMIT_WINDOW_MS)) {
+            return new Result<>(false, TOO_MANY_REQUESTS, null);
+        }
         Result<UserBean> loginResult = getCurrentLoggedInUser(token);
         if (!loginResult.getStatus()) {
             return loginResult;
@@ -276,6 +303,9 @@ public class UserServiceImpl implements UserService {
      */
     @Override
     public Result<UserBean> createAccessToken(String token) {
+        if (!RateLimitUtils.tryAcquire("createAccessToken", token, 10, RATE_LIMIT_WINDOW_MS)) {
+            return new Result<>(false, TOO_MANY_REQUESTS, null);
+        }
         Result<UserBean> loginResult = getCurrentLoggedInUser(token);
         if (!loginResult.getStatus()) {
             return loginResult;
@@ -290,11 +320,13 @@ public class UserServiceImpl implements UserService {
 
         String accessToken = AccessTokenUtils.generateAccessToken();
         Date expireTime = AccessTokenUtils.buildExpireTime();
-        if (!Boolean.TRUE.equals(userDao.setAccessToken(user.getCode(), accessToken, expireTime))) {
+        String accessTokenHash = AccessTokenUtils.hashAccessToken(accessToken);
+        if (!Boolean.TRUE.equals(userDao.setAccessTokenHash(user.getCode(), accessTokenHash, expireTime))) {
             return new Result<>(false, "访问令牌生成失败", null);
         }
 
         user.setAccessToken(accessToken);
+        user.setAccessTokenHash(accessTokenHash);
         user.setAccessTokenExpireTime(expireTime);
         return new Result<>(true, "访问令牌申请成功", buildAccessTokenResponse(user, true));
     }
@@ -306,6 +338,9 @@ public class UserServiceImpl implements UserService {
      */
     @Override
     public Result<UserBean> renewAccessToken(String token) {
+        if (!RateLimitUtils.tryAcquire("renewAccessToken", token, 10, RATE_LIMIT_WINDOW_MS)) {
+            return new Result<>(false, TOO_MANY_REQUESTS, null);
+        }
         Result<UserBean> loginResult = getCurrentLoggedInUser(token);
         if (!loginResult.getStatus()) {
             return loginResult;
@@ -333,6 +368,9 @@ public class UserServiceImpl implements UserService {
      */
     @Override
     public Result<UserBean> resetAccessToken(String token) {
+        if (!RateLimitUtils.tryAcquire("resetAccessToken", token, 10, RATE_LIMIT_WINDOW_MS)) {
+            return new Result<>(false, TOO_MANY_REQUESTS, null);
+        }
         Result<UserBean> loginResult = getCurrentLoggedInUser(token);
         if (!loginResult.getStatus()) {
             return loginResult;
@@ -347,11 +385,13 @@ public class UserServiceImpl implements UserService {
 
         String accessToken = AccessTokenUtils.generateAccessToken();
         Date expireTime = AccessTokenUtils.buildExpireTime();
-        if (!Boolean.TRUE.equals(userDao.setAccessToken(user.getCode(), accessToken, expireTime))) {
+        String accessTokenHash = AccessTokenUtils.hashAccessToken(accessToken);
+        if (!Boolean.TRUE.equals(userDao.setAccessTokenHash(user.getCode(), accessTokenHash, expireTime))) {
             return new Result<>(false, "访问令牌重置失败", null);
         }
 
         user.setAccessToken(accessToken);
+        user.setAccessTokenHash(accessTokenHash);
         user.setAccessTokenExpireTime(expireTime);
         return new Result<>(true, "访问令牌重置成功", buildAccessTokenResponse(user, true));
     }
@@ -388,5 +428,18 @@ public class UserServiceImpl implements UserService {
             user.setAccessToken(null);
         }
         return user;
+    }
+
+    private boolean isPasswordMatched(UserBean user, String rawPassword) {
+        if (PasswordUtils.isBcryptHash(user.getPassWord())) {
+            return PasswordUtils.matches(rawPassword, user.getPassWord());
+        }
+        return PasswordUtils.legacyHash(rawPassword).equals(user.getPassWord());
+    }
+
+    private void upgradeLegacyPasswordIfNeeded(UserBean user, String rawPassword) {
+        if (!PasswordUtils.isBcryptHash(user.getPassWord())) {
+            userDao.changeUserPasswordByCode(user.getCode(), PasswordUtils.encode(rawPassword));
+        }
     }
 }

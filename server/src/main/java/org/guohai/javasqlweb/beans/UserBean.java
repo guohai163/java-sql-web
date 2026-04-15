@@ -1,5 +1,6 @@
 package org.guohai.javasqlweb.beans;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
 
 import java.util.Date;
@@ -52,6 +53,12 @@ public class UserBean {
      * 长期访问令牌
      */
     private String accessToken;
+
+    /**
+     * 长期访问令牌哈希
+     */
+    @JsonIgnore
+    private String accessTokenHash;
 
     /**
      * 访问令牌过期时间

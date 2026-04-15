@@ -1,14 +1,17 @@
 package org.guohai.javasqlweb.service.operation;
 
-import com.alibaba.druid.pool.DruidDataSourceFactory;
 import org.guohai.javasqlweb.beans.*;
+import org.guohai.javasqlweb.util.HikariDataSourceUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 
 import javax.sql.DataSource;
 import java.sql.*;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 import static org.guohai.javasqlweb.util.Utils.closeResource;
 
@@ -35,18 +38,14 @@ public class DbOperationMysqlDruid implements DbOperation {
      * @throws Exception
      */
     DbOperationMysqlDruid(ConnectConfigBean conn) throws Exception {
-
-        Map dbConfig = new HashMap();
-        dbConfig.put("url",String.format("jdbc:mysql://%s:%s?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&allowMultiQueries=true",
-                conn.getDbServerHost(),conn.getDbServerPort()));
-        dbConfig.put("username",conn.getDbServerUsername());
-        dbConfig.put("password",conn.getDbServerPassword());
-        dbConfig.put("initialSize","2");
-        dbConfig.put("minIdle","1");
-        dbConfig.put("maxWait","10000");
-        dbConfig.put("maxActive","20");
-        dbConfig.put("validationQuery","select now()");
-        sqlDs = DruidDataSourceFactory.createDataSource(dbConfig);
+        sqlDs = HikariDataSourceUtils.createDataSource(
+                "jsw-mysql-" + conn.getCode(),
+                String.format("jdbc:mysql://%s:%s?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&allowMultiQueries=true",
+                        conn.getDbServerHost(), conn.getDbServerPort()),
+                conn.getDbServerUsername(),
+                conn.getDbServerPassword(),
+                "select now()"
+        );
     }
 
     /**

@@ -1,11 +1,14 @@
 package org.guohai.javasqlweb.service.operation;
 
-import com.alibaba.druid.pool.DruidDataSourceFactory;
 import org.guohai.javasqlweb.beans.*;
+import org.guohai.javasqlweb.util.HikariDataSourceUtils;
 
 import javax.sql.DataSource;
 import java.sql.*;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 import static org.guohai.javasqlweb.util.Utils.closeResource;
 
@@ -22,18 +25,13 @@ public class DbOperationClickHouse implements DbOperation{
      * @throws Exception
      */
     DbOperationClickHouse(ConnectConfigBean conn) throws Exception {
-
-        Map dbConfig = new HashMap();
-        dbConfig.put("url",String.format("jdbc:clickhouse://%s:%s",
-                conn.getDbServerHost(),conn.getDbServerPort()));
-        dbConfig.put("username",conn.getDbServerUsername());
-        dbConfig.put("password",conn.getDbServerPassword());
-        dbConfig.put("initialSize","2");
-        dbConfig.put("minIdle","1");
-        dbConfig.put("maxWait","10000");
-        dbConfig.put("maxActive","20");
-        dbConfig.put("validationQuery","select now()");
-        sqlDs = DruidDataSourceFactory.createDataSource(dbConfig);
+        sqlDs = HikariDataSourceUtils.createDataSource(
+                "jsw-clickhouse-" + conn.getCode(),
+                String.format("jdbc:clickhouse://%s:%s", conn.getDbServerHost(), conn.getDbServerPort()),
+                conn.getDbServerUsername(),
+                conn.getDbServerPassword(),
+                "select now()"
+        );
     }
 
 

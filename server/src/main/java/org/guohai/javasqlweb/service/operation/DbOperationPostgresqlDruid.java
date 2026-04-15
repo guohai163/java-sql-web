@@ -1,8 +1,8 @@
 package org.guohai.javasqlweb.service.operation;
 
-import com.alibaba.druid.pool.DruidDataSourceFactory;
 import org.guohai.javasqlweb.beans.*;
 import org.guohai.javasqlweb.service.BaseDataServiceImpl;
+import org.guohai.javasqlweb.util.HikariDataSourceUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,7 +44,7 @@ public class DbOperationPostgresqlDruid implements DbOperation {
     DbOperationPostgresqlDruid(ConnectConfigBean conn) throws Exception {
 
         connect = conn;
-        sqlDs = DruidDataSourceFactory.createDataSource(getDbConfigMap("postgres"));
+        sqlDs = createDataSource("postgres");
     }
 
 
@@ -75,7 +75,7 @@ public class DbOperationPostgresqlDruid implements DbOperation {
                 synchronized (BaseDataServiceImpl.class) {
                     if (null == postgresMap.get(dbName)) {
                         try {
-                            postgresMap.put(dbName,DruidDataSourceFactory.createDataSource(getDbConfigMap(dbName)));
+                            postgresMap.put(dbName, createDataSource(dbName));
                         } catch (Exception e) {
                             e.printStackTrace();
                         }
@@ -276,18 +276,15 @@ public class DbOperationPostgresqlDruid implements DbOperation {
      * @param dbName
      * @return
      */
-    private Map getDbConfigMap(String dbName){
-        Map dbConfig = new HashMap(8);
-        dbConfig.put("url",String.format("jdbc:postgresql://%s:%s/%s",
-                connect.getDbServerHost(),connect.getDbServerPort(),dbName));
-        dbConfig.put("username",connect.getDbServerUsername());
-        dbConfig.put("password",connect.getDbServerPassword());
-        dbConfig.put("initialSize","2");
-        dbConfig.put("minIdle","1");
-        dbConfig.put("maxWait","10000");
-        dbConfig.put("maxActive","20");
-        dbConfig.put("validationQuery","select now()");
-        return dbConfig;
+    private DataSource createDataSource(String dbName){
+        return HikariDataSourceUtils.createDataSource(
+                "jsw-postgresql-" + dbName,
+                String.format("jdbc:postgresql://%s:%s/%s",
+                        connect.getDbServerHost(), connect.getDbServerPort(), dbName),
+                connect.getDbServerUsername(),
+                connect.getDbServerPassword(),
+                "select now()"
+        );
     }
 
 }

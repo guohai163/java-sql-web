@@ -1,6 +1,7 @@
 package org.guohai.javasqlweb.service;
 
 import org.guohai.javasqlweb.beans.ConnectConfigBean;
+import org.guohai.javasqlweb.beans.PoolStatBean;
 import org.guohai.javasqlweb.beans.QueryLogBean;
 import org.guohai.javasqlweb.beans.Result;
 import org.guohai.javasqlweb.beans.UserBean;
@@ -26,6 +27,12 @@ public interface BackstageService {
      * @return
      */
     Result<List<ConnectConfigBean>> getConnData();
+
+    /**
+     * 获取连接池摘要
+     * @return 连接池信息
+     */
+    Result<List<PoolStatBean>> getPoolStats();
 
     /**
      * 测试数据库连接性

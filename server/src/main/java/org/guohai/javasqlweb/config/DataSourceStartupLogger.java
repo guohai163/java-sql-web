@@ -16,10 +16,10 @@ public class DataSourceStartupLogger {
 
     private static final Logger LOG = LoggerFactory.getLogger(DataSourceStartupLogger.class);
 
-    @Value("${spring.datasource.druid.url}")
+    @Value("${spring.datasource.url}")
     private String dataSourceUrl;
 
-    @Value("${spring.datasource.druid.username:}")
+    @Value("${spring.datasource.username:}")
     private String dataSourceUsername;
 
     @EventListener(ApplicationReadyEvent.class)

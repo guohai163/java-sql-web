@@ -1,7 +1,7 @@
 package org.guohai.javasqlweb.service.operation;
 
-import com.alibaba.druid.pool.DruidDataSourceFactory;
 import org.guohai.javasqlweb.beans.*;
+import org.guohai.javasqlweb.util.HikariDataSourceUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,6 +21,9 @@ import static org.guohai.javasqlweb.util.Utils.closeResource;
  */
 public class DbOperationMssqlDruid implements DbOperation {
 
+    private static final String SSL_MODE_DEFAULT = "DEFAULT";
+    private static final String SSL_MODE_DISABLE_ENCRYPTION = "DISABLE_ENCRYPTION";
+
     /**
      * 日志
      */
@@ -38,17 +41,13 @@ public class DbOperationMssqlDruid implements DbOperation {
      * @throws Exception
      */
     DbOperationMssqlDruid(ConnectConfigBean conn) throws Exception {
-
-        Map dbConfig = new HashMap();
-        dbConfig.put("url",String.format("jdbc:sqlserver://%s:%s",conn.getDbServerHost(),conn.getDbServerPort()));
-        dbConfig.put("username",conn.getDbServerUsername());
-        dbConfig.put("password",conn.getDbServerPassword());
-        dbConfig.put("initialSize","2");
-        dbConfig.put("minIdle","1");
-        dbConfig.put("maxWait","10000");
-        dbConfig.put("maxActive","20");
-        dbConfig.put("validationQuery","select getdate()");
-        sqlDs = DruidDataSourceFactory.createDataSource(dbConfig);
+        sqlDs = HikariDataSourceUtils.createDataSource(
+                "jsw-mssql-" + conn.getCode(),
+                buildJdbcUrl(conn),
+                conn.getDbServerUsername(),
+                conn.getDbServerPassword(),
+                "select getdate()"
+        );
     }
     /**
      * 获得实例服务器库列表
@@ -326,6 +325,14 @@ public class DbOperationMssqlDruid implements DbOperation {
         ResultSet rs = st.executeQuery("SELECT getdate()");
         closeResource(rs,st,conn);
         return true;
+    }
+
+    private String buildJdbcUrl(ConnectConfigBean conn) {
+        String sslMode = conn.getDbSslMode() == null ? SSL_MODE_DEFAULT : conn.getDbSslMode();
+        if (SSL_MODE_DISABLE_ENCRYPTION.equalsIgnoreCase(sslMode)) {
+            return String.format("jdbc:sqlserver://%s:%s;encrypt=false", conn.getDbServerHost(), conn.getDbServerPort());
+        }
+        return String.format("jdbc:sqlserver://%s:%s;encrypt=true", conn.getDbServerHost(), conn.getDbServerPort());
     }
 
 }

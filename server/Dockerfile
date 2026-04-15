@@ -1,4 +1,4 @@
-FROM openjdk:11.0.16
+FROM eclipse-temurin:17-jre
 
 WORKDIR /opt/jsw
 

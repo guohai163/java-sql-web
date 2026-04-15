@@ -4,8 +4,10 @@ set -euo pipefail
 REPO_OWNER="guohai163"
 REPO_NAME="java-sql-web"
 SKILL_NAME="java-sql-web-query"
-TARGET_ROOT="${HOME}/.openclaw/skills"
+OPENCLAW_HOME="${OPENCLAW_HOME:-${HOME}/.openclaw}"
+TARGET_ROOT="${OPENCLAW_HOME}/skills"
 TARGET_DIR="${TARGET_ROOT}/${SKILL_NAME}"
+OPENCLAW_CONFIG_FILE="${OPENCLAW_HOME}/openclaw.json"
 VERSION="${VERSION:-${1:-}}"
 
 require_command() {
@@ -85,6 +87,39 @@ for required_file in \
 done
 
 echo "Installed ${SKILL_NAME} from ${VERSION}"
+echo "OpenClaw home: ${OPENCLAW_HOME}"
 echo "Skill path: ${TARGET_DIR}"
-echo "Next step: refresh or restart OpenClaw so it reloads skills."
-echo "Then invoke it with: \$${SKILL_NAME}"
+
+if [[ -f "${OPENCLAW_CONFIG_FILE}" ]]; then
+  if grep -Fq "\"${SKILL_NAME}\"" "${OPENCLAW_CONFIG_FILE}"; then
+    echo "Detected an existing ${SKILL_NAME} entry in ${OPENCLAW_CONFIG_FILE}"
+  else
+    echo "Warning: ${OPENCLAW_CONFIG_FILE} exists, but no ${SKILL_NAME} entry was found."
+  fi
+else
+  echo "Warning: ${OPENCLAW_CONFIG_FILE} does not exist yet."
+fi
+
+cat <<EOF
+
+To make this skill available in OpenClaw, ensure ${OPENCLAW_CONFIG_FILE} contains:
+
+{
+  "skills": {
+    "entries": {
+      "${SKILL_NAME}": {
+        "enabled": true,
+        "env": {
+          "JSW_BASE_URL": "https://your-jsw.example.com",
+          "JSW_ACCESS_TOKEN": "jsw_xxx"
+        }
+      }
+    }
+  }
+}
+
+Notes:
+- If OpenClaw runs under a different home directory, reinstall with OPENCLAW_HOME=/actual/openclaw/home
+- After updating openclaw.json, refresh or restart OpenClaw so it reloads skills and entry configuration
+- A generic question like "你有什么 skill" may not reliably reflect newly installed skills; verify with: \$${SKILL_NAME}
+EOF
