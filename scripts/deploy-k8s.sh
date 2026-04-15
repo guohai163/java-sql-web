@@ -40,12 +40,19 @@ set +a
 : "${INGRESS_HOST:?INGRESS_HOST is required}"
 : "${DB_STORAGE_SIZE:?DB_STORAGE_SIZE is required}"
 
+PROJECT_LEGACY_TLS_ENABLED="${PROJECT_LEGACY_TLS_ENABLED:-false}"
+JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:-}"
+
 if [[ -z "${DB_STORAGE_CLASS:-}" ]]; then
   unset DB_STORAGE_CLASS
 fi
 
 INIT_SQL_INDENT="$(sed 's/^/    /' "${ROOT_DIR}/deploy/init.sql")"
+LEGACY_TLS_SECURITY_INDENT="$(sed 's/^/    /' "${ROOT_DIR}/deploy/java-security/legacy-tls.security")"
 export INIT_SQL_INDENT
+export LEGACY_TLS_SECURITY_INDENT
+export PROJECT_LEGACY_TLS_ENABLED
+export JAVA_TOOL_OPTIONS
 
 apply_template_file() {
   local file_path="$1"
@@ -58,6 +65,7 @@ kubectl create namespace "${NAMESPACE}" --dry-run=client -o yaml | kubectl apply
 echo "Applying base Kubernetes resources"
 apply_template_file "${BASE_DIR}/namespace.yaml"
 apply_template_file "${BASE_DIR}/configmap-init-sql.yaml"
+apply_template_file "${BASE_DIR}/configmap-legacy-tls-security.yaml"
 apply_template_file "${BASE_DIR}/secret-app.yaml.tpl"
 apply_template_file "${BASE_DIR}/service-db.yaml"
 apply_template_file "${BASE_DIR}/statefulset-db.yaml"

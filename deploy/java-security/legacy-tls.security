@@ -1,0 +1,10 @@
+# Re-enable legacy TLSv1/TLSv1.1 for special MSSQL compatibility scenarios.
+# This file is intended to be loaded with:
+# -Djava.security.properties=/opt/jsw/legacy-tls.security
+#
+# WARNING:
+# This lowers the TLS baseline for the current JVM process and should only be
+# used for trusted internal legacy SQL Server instances that cannot yet support
+# TLS 1.2+.
+
+jdk.tls.disabledAlgorithms=SSLv3, DTLSv1.0, RC4, DES, MD5withRSA, DH keySize < 1024, EC keySize < 224, 3DES_EDE_CBC, anon, NULL, ECDH, TLS_RSA_*, rsa_pkcs1_sha1 usage HandshakeSignature, ecdsa_sha1 usage HandshakeSignature, dsa_sha1 usage HandshakeSignature

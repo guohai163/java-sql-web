@@ -61,6 +61,10 @@ spec:
                 secretKeyRef:
                   name: jsw-app-secret
                   key: PROJECT_SIGNKEY
+            - name: PROJECT_LEGACY_TLS_ENABLED
+              value: "${PROJECT_LEGACY_TLS_ENABLED}"
+            - name: JAVA_TOOL_OPTIONS
+              value: "${JAVA_TOOL_OPTIONS}"
           readinessProbe:
             httpGet:
               path: /health
@@ -82,3 +86,11 @@ spec:
             limits:
               cpu: "1"
               memory: "1Gi"
+          volumeMounts:
+            - name: legacy-tls-security
+              mountPath: /opt/jsw/legacy-tls.security
+              subPath: legacy-tls.security
+      volumes:
+        - name: legacy-tls-security
+          configMap:
+            name: jsw-legacy-tls-security

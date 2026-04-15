@@ -84,10 +84,16 @@ docker compose up -d
 
 ```shell
 PROJECT_LEGACY_TLS_ENABLED=true
-JAVA_TOOL_OPTIONS="-Djdk.tls.client.protocols=TLSv1,TLSv1.1,TLSv1.2"
+JAVA_TOOL_OPTIONS="-Djdk.tls.client.protocols=TLSv1,TLSv1.1,TLSv1.2 -Djava.security.properties=/opt/jsw/legacy-tls.security"
 ```
 
 该模式仅建议用于可信内网环境，且需要同时把对应服务器的“连接安全”配置改为 `LEGACY_TLS`。
+
+`docker-compose.yml` 已默认把本地文件挂载到容器内：
+
+```text
+./deploy/java-security/legacy-tls.security -> /opt/jsw/legacy-tls.security
+```
 
 ### 2.1 使用 Kubernetes 部署
 
@@ -129,10 +135,22 @@ bash scripts/deploy-k8s.sh
 
 ```text
 PROJECT_LEGACY_TLS_ENABLED=true
-JAVA_TOOL_OPTIONS=-Djdk.tls.client.protocols=TLSv1,TLSv1.1,TLSv1.2
+JAVA_TOOL_OPTIONS=-Djdk.tls.client.protocols=TLSv1,TLSv1.1,TLSv1.2 -Djava.security.properties=/opt/jsw/legacy-tls.security
 ```
 
 注意：这会降低当前进程里的 MSSQL TLS 安全基线，仅适用于可信内网老库。
+
+K8s 部署脚本会把：
+
+```text
+deploy/java-security/legacy-tls.security
+```
+
+渲染为 ConfigMap 并挂载到：
+
+```text
+/opt/jsw/legacy-tls.security
+```
 
 ### 3. 本地构建镜像
 
@@ -162,6 +180,14 @@ npm run dev
 
 ```shell
 VITE_BACKEND_ORIGIN=http://your-server:8002 npm run dev
+```
+
+如果是直接用 `java -jar` 启动服务端，可按下面方式启用旧 MSSQL 的 `LEGACY_TLS` 模式：
+
+```shell
+PROJECT_LEGACY_TLS_ENABLED=true \
+JAVA_TOOL_OPTIONS="-Djdk.tls.client.protocols=TLSv1,TLSv1.1,TLSv1.2 -Djava.security.properties=/absolute/path/legacy-tls.security" \
+java -jar /opt/jsw/program.jar
 ```
 
 ## 部署到 OpenClaw

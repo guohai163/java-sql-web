@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: jsw-legacy-tls-security
+  namespace: ${NAMESPACE}
+data:
+  legacy-tls.security: |
+${LEGACY_TLS_SECURITY_INDENT}

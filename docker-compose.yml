@@ -31,6 +31,10 @@ services:
       PROJECT_VERSION: ${TAG}
       PROJECT_DOMAIN: ${PUBLIC_DOMAIN:-localhost}
       PROJECT_HOST: ${PUBLIC_HOST:-http://localhost}
+      PROJECT_LEGACY_TLS_ENABLED: ${PROJECT_LEGACY_TLS_ENABLED:-false}
+      JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:-}
+    volumes:
+      - ./deploy/java-security/legacy-tls.security:/opt/jsw/legacy-tls.security:ro
     expose:
       - "8002"
 
