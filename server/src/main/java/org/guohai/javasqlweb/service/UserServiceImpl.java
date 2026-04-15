@@ -4,17 +4,17 @@ import com.warrenstrange.googleauth.GoogleAuthenticator;
 import com.warrenstrange.googleauth.GoogleAuthenticatorKey;
 import org.guohai.javasqlweb.beans.OtpAuthStatus;
 import org.guohai.javasqlweb.beans.Result;
+import org.guohai.javasqlweb.beans.SecurityTaskInfo;
 import org.guohai.javasqlweb.beans.UserBean;
 import org.guohai.javasqlweb.beans.UserLoginStatus;
+import org.guohai.javasqlweb.beans.AccountStatus;
 import org.guohai.javasqlweb.dao.UserManageDao;
 import org.guohai.javasqlweb.util.AccessTokenUtils;
 import org.guohai.javasqlweb.util.PasswordUtils;
 import org.guohai.javasqlweb.util.RateLimitUtils;
-import org.guohai.javasqlweb.util.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.Date;
@@ -33,10 +33,11 @@ public class UserServiceImpl implements UserService {
     private static final String ACCESS_TOKEN_INVALID = "access token invalid";
     private static final String ACCESS_TOKEN_EXPIRED = "access token expired";
     private static final String ACCESS_TOKEN_REQUIRED_OTP = "需先绑定OTP后才能管理访问令牌";
-    private static final String AUTO_USER_LINK_DISABLED = "自动建号链接未启用";
     private static final String TOO_MANY_REQUESTS = "请求过于频繁，请稍后再试";
-    private static final Long FW = Long.valueOf(1000 * 60 * 5);
     private static final long RATE_LIMIT_WINDOW_MS = 5 * 60 * 1000L;
+    private static final String ACCOUNT_PENDING_ACTIVATION_MESSAGE = "账号未激活，请使用管理员发送的激活链接完成初始化密码和OTP绑定";
+    private static final String ACCOUNT_PENDING_PASSWORD_RESET_MESSAGE = "账号正在等待密码重置，请使用管理员发送的重置链接完成密码设置";
+    private static final String ACCOUNT_PENDING_OTP_RESET_MESSAGE = "账号正在等待OTP重绑，请使用管理员发送的链接完成OTP绑定";
 
     /**
      * 管理DAO
@@ -44,11 +45,8 @@ public class UserServiceImpl implements UserService {
     @Autowired
     UserManageDao userDao;
 
-    @Value("${project.signkey}")
-    private String signKey;
-
-    @Value("${project.auto-user-link-enabled:false}")
-    private boolean autoUserLinkEnabled;
+    @Autowired
+    UserSecurityTaskService userSecurityTaskService;
 
     /**
      * 登录方法
@@ -65,6 +63,10 @@ public class UserServiceImpl implements UserService {
         UserBean user = userDao.getUserLoginDataByName(name);
         if (user == null) {
             return new Result<>(false, "登录失败", null);
+        }
+        Result<UserBean> accountStatusResult = ensureAccountReadyForLogin(user);
+        if (!accountStatusResult.getStatus()) {
+            return accountStatusResult;
         }
         if (!isPasswordMatched(user, pass)) {
             return new Result<>(false, "登录失败", null);
@@ -234,49 +236,66 @@ public class UserServiceImpl implements UserService {
     }
 
     /**
-     * 通过链接创建用户
-     *
-     * @param userName
-     * @param time
-     * @param sign
-     * @return
+     * 已登录用户修改密码
+     * @param token 登录态
+     * @param newPass 新密码
+     * @return 结果
      */
     @Override
-    public Result<UserBean> createUserByLink(String userName, String time, String sign) {
-        if (!autoUserLinkEnabled) {
-            return new Result<>(false, AUTO_USER_LINK_DISABLED, null);
+    public Result<String> changePassword(String token, String newPass) {
+        Result<UserBean> loginResult = getCurrentLoggedInUser(token);
+        if (!loginResult.getStatus()) {
+            return new Result<>(false, loginResult.getMessage(), null);
         }
-        Long currentTime = System.currentTimeMillis();
-        Long requestTime = Long.parseLong(time) * 1000;
-        LOG.info(String.format("当前时间: %d ,传入时间: %d", currentTime, requestTime));
-        if (currentTime - FW > requestTime || currentTime + FW < requestTime) {
-            return new Result<>(false, "时间范围异常", null);
+        String passwordValidationMessage = PasswordUtils.validateComplexity(newPass);
+        if (passwordValidationMessage != null) {
+            return new Result<>(false, passwordValidationMessage, null);
         }
-        if (!sign.equals(Utils.MD5(String.format("%s%s%s", userName, time, signKey)))) {
-            return new Result<>(false, "签名没通过", null);
-        }
-        UserBean userBean = userDao.getUserByName(userName);
+        userDao.changeUserPasswordByCode(loginResult.getData().getCode(), PasswordUtils.encode(newPass));
+        return new Result<>(true, "密码修改成功", "success");
+    }
 
-        if (userBean == null) {
-            userDao.addNewUser(userName, PasswordUtils.encode(PasswordUtils.randomTemporaryPassword()));
-            userBean = new UserBean();
-            userBean.setUserName(userName);
-            userBean.setAuthStatus(OtpAuthStatus.UNBIND);
-        }
-        LOG.info(String.format("数据库查询的用户状态，用户名%s,密保状态%s", userBean.getUserName(), userBean.getAuthStatus().toString()));
-        userBean.setToken(UUID.randomUUID().toString());
+    /**
+     * 查询安全任务信息
+     * @param uuid 安全任务UUID
+     * @return 任务信息
+     */
+    @Override
+    public Result<SecurityTaskInfo> getSecurityTaskInfo(String uuid) {
+        return userSecurityTaskService.getTaskInfo(uuid);
+    }
 
-        if (OtpAuthStatus.UNBIND == userBean.getAuthStatus() || OtpAuthStatus.BINDING == userBean.getAuthStatus()) {
-            GoogleAuthenticator gAuth = new GoogleAuthenticator();
-            final GoogleAuthenticatorKey key = gAuth.createCredentials();
-            userBean.setAuthSecret(key.getKey());
-            userDao.setUserSecret(userBean.getAuthSecret(), userBean.getToken(), userBean.getUserName());
-            return new Result<>(true, "success", userBean);
-        }
-        if (userDao.setUserToken(userName, userBean.getToken())) {
-            return new Result<>(true, "success", userBean);
-        }
-        return null;
+    /**
+     * 提交安全任务密码
+     * @param uuid 安全任务UUID
+     * @param newPass 新密码
+     * @return 任务信息
+     */
+    @Override
+    public Result<SecurityTaskInfo> submitSecurityTaskPassword(String uuid, String newPass) {
+        return userSecurityTaskService.submitPassword(uuid, newPass);
+    }
+
+    /**
+     * 创建安全任务OTP会话
+     * @param uuid 安全任务UUID
+     * @return 任务信息
+     */
+    @Override
+    public Result<SecurityTaskInfo> createSecurityTaskOtpSession(String uuid) {
+        return userSecurityTaskService.createOtpSession(uuid);
+    }
+
+    /**
+     * 安全任务绑定OTP
+     * @param uuid 安全任务UUID
+     * @param token OTP会话token
+     * @param otpPass 动态码
+     * @return 结果
+     */
+    @Override
+    public Result<String> bindSecurityTaskOtp(String uuid, String token, String otpPass) {
+        return userSecurityTaskService.bindOtp(uuid, token, otpPass);
     }
 
     /**
@@ -441,5 +460,22 @@ public class UserServiceImpl implements UserService {
         if (!PasswordUtils.isBcryptHash(user.getPassWord())) {
             userDao.changeUserPasswordByCode(user.getCode(), PasswordUtils.encode(rawPassword));
         }
+    }
+
+    private Result<UserBean> ensureAccountReadyForLogin(UserBean user) {
+        AccountStatus accountStatus = user.getAccountStatus();
+        if (accountStatus == null || accountStatus == AccountStatus.ACTIVE) {
+            return new Result<>(true, "success", user);
+        }
+        if (accountStatus == AccountStatus.PENDING_ACTIVATION) {
+            return new Result<>(false, ACCOUNT_PENDING_ACTIVATION_MESSAGE, null);
+        }
+        if (accountStatus == AccountStatus.PENDING_PASSWORD_RESET) {
+            return new Result<>(false, ACCOUNT_PENDING_PASSWORD_RESET_MESSAGE, null);
+        }
+        if (accountStatus == AccountStatus.PENDING_OTP_RESET) {
+            return new Result<>(false, ACCOUNT_PENDING_OTP_RESET_MESSAGE, null);
+        }
+        return new Result<>(false, "登录失败", null);
     }
 }

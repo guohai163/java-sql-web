@@ -14,6 +14,7 @@ public final class PasswordUtils {
     private static final String RANDOM_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private static final int TEMP_PASSWORD_LENGTH = 24;
+    private static final int MIN_COMPLEX_PASSWORD_LENGTH = 8;
 
     private PasswordUtils() {
     }
@@ -40,5 +41,31 @@ public final class PasswordUtils {
             builder.append(RANDOM_CHARS.charAt(SECURE_RANDOM.nextInt(RANDOM_CHARS.length())));
         }
         return builder.toString();
+    }
+
+    public static String validateComplexity(String rawPassword) {
+        if (rawPassword == null || rawPassword.trim().isEmpty()) {
+            return "密码不能为空";
+        }
+        if (rawPassword.length() < MIN_COMPLEX_PASSWORD_LENGTH) {
+            return "密码至少需要8位";
+        }
+        int categoryCount = 0;
+        if (rawPassword.chars().anyMatch(Character::isUpperCase)) {
+            categoryCount++;
+        }
+        if (rawPassword.chars().anyMatch(Character::isLowerCase)) {
+            categoryCount++;
+        }
+        if (rawPassword.chars().anyMatch(Character::isDigit)) {
+            categoryCount++;
+        }
+        if (rawPassword.chars().anyMatch(value -> !Character.isLetterOrDigit(value))) {
+            categoryCount++;
+        }
+        if (categoryCount < 3) {
+            return "密码至少需要包含大写字母、小写字母、数字、特殊字符中的3类";
+        }
+        return null;
     }
 }

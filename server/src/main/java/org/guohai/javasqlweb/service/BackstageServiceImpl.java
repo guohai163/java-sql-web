@@ -9,7 +9,6 @@ import org.guohai.javasqlweb.dao.UserManageDao;
 import org.guohai.javasqlweb.service.operation.DbOperation;
 import org.guohai.javasqlweb.service.operation.DbOperationFactory;
 import org.guohai.javasqlweb.util.AccessTokenUtils;
-import org.guohai.javasqlweb.util.PasswordUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,6 +42,9 @@ public class BackstageServiceImpl implements BackstageService{
 
     @Autowired
     HealthEndpoint healthEndpoint;
+
+    @Autowired
+    UserSecurityTaskService userSecurityTaskService;
 
     @org.springframework.beans.factory.annotation.Value("${project.legacy-tls-enabled:false}")
     private boolean legacyTlsEnabled;
@@ -178,13 +180,8 @@ public class BackstageServiceImpl implements BackstageService{
      * @return
      */
     @Override
-    public Result<String> addNewUser(UserBean user) {
-        // 检查用户是否存在
-        if(null != userDao.getUserByName(user.getUserName())){
-            return new Result<>(false, "","用户已存在" ) ;
-        }
-        userDao.addNewUser(user.getUserName(), PasswordUtils.encode(user.getPassWord()));
-        return new Result<>(true, "","成功" ) ;
+    public Result<LinkIssueResult> addNewUser(String token, UserBean user) {
+        return userSecurityTaskService.createActivationTask(token, user.getEmail());
     }
 
     /**
@@ -225,28 +222,30 @@ public class BackstageServiceImpl implements BackstageService{
      * @return
      */
     @Override
-    public Result<String> changeUserPass(String token, String newPass) {
-        UserBean user = userDao.getUserByToken(token);
-        if(null == user || user.getLoginStatus() != UserLoginStatus.LOGGED){
-            return new Result<>(false,"","用户token无效");
-        }
-        userDao.changeUserPasswordByCode(user.getCode(), PasswordUtils.encode(newPass));
-        return new Result<>(true, "","密码修改成功");
+    public Result<LinkIssueResult> reissueActivationLink(String token, String userName) {
+        return userSecurityTaskService.reissueActivationTask(token, userName);
     }
 
     /**
-     * 管理员为用户解绑OTP
-     *
-     * @param userName
-     * @return
+     * 管理员为用户发起密码重置
+     * @param token 管理员登录态
+     * @param userName 用户名
+     * @return 结果
      */
     @Override
-    public Result<String> unbindUserOtp(String userName) {
-        if(null == userDao.getUserByName(userName)){
-            return new Result<>(false, "","用户不存在" ) ;
-        }
-        userDao.unbindUserOtp(userName);
-        return new Result<>(true, "","解绑OTP成功");
+    public Result<LinkIssueResult> resetUserPassword(String token, String userName) {
+        return userSecurityTaskService.createPasswordResetTask(token, userName);
+    }
+
+    /**
+     * 管理员为用户发起OTP重绑
+     * @param token 管理员登录态
+     * @param userName 用户名
+     * @return 结果
+     */
+    @Override
+    public Result<LinkIssueResult> resetUserOtp(String token, String userName) {
+        return userSecurityTaskService.createOtpResetTask(token, userName);
     }
 
     /**

@@ -1,6 +1,7 @@
 package org.guohai.javasqlweb.service;
 
 import org.guohai.javasqlweb.beans.Result;
+import org.guohai.javasqlweb.beans.SecurityTaskInfo;
 import org.guohai.javasqlweb.beans.UserBean;
 
 /**
@@ -70,13 +71,43 @@ public interface UserService {
     Result<String> logoutUser(String token);
 
     /**
-     * 通过链接创建用户
-     * @param user
-     * @param time
-     * @param sign
-     * @return
+     * 已登录用户修改密码
+     * @param token 登录态
+     * @param newPass 新密码
+     * @return 结果
      */
-    Result<UserBean> createUserByLink(String user, String time, String sign);
+    Result<String> changePassword(String token, String newPass);
+
+    /**
+     * 查询安全任务信息
+     * @param uuid 任务UUID
+     * @return 任务信息
+     */
+    Result<SecurityTaskInfo> getSecurityTaskInfo(String uuid);
+
+    /**
+     * 提交安全任务密码
+     * @param uuid 任务UUID
+     * @param newPass 新密码
+     * @return 任务信息
+     */
+    Result<SecurityTaskInfo> submitSecurityTaskPassword(String uuid, String newPass);
+
+    /**
+     * 为安全任务创建OTP会话
+     * @param uuid 任务UUID
+     * @return 任务信息
+     */
+    Result<SecurityTaskInfo> createSecurityTaskOtpSession(String uuid);
+
+    /**
+     * 通过安全任务绑定OTP
+     * @param uuid 任务UUID
+     * @param token OTP会话token
+     * @param otpPass OTP口令
+     * @return 结果
+     */
+    Result<String> bindSecurityTaskOtp(String uuid, String token, String otpPass);
 
     /**
      * 获取访问令牌信息

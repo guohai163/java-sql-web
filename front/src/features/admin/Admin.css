@@ -56,3 +56,9 @@
     white-space: normal;
     word-break: break-all;
 }
+
+.admin-task-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}

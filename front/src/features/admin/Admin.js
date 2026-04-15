@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import cookie from 'react-cookies';
+import copy from 'copy-to-clipboard';
 import {
+  Alert,
   Button,
   Col,
   Form,
@@ -16,6 +18,7 @@ import {
   Statistic,
   Tag,
   Table,
+  message,
 } from 'antd';
 import {
   ConsoleSqlOutlined,
@@ -42,6 +45,35 @@ function showDialog(content, title = '提示') {
   });
 }
 
+function getAccountStatusMeta(status) {
+  if (status === 'ACTIVE') {
+    return { color: 'success', text: '正常' };
+  }
+  if (status === 'PENDING_ACTIVATION') {
+    return { color: 'processing', text: '待激活' };
+  }
+  if (status === 'PENDING_PASSWORD_RESET') {
+    return { color: 'warning', text: '待重置密码' };
+  }
+  if (status === 'PENDING_OTP_RESET') {
+    return { color: 'warning', text: '待重绑OTP' };
+  }
+  return { color: 'default', text: status || '未知' };
+}
+
+function getPendingTaskMeta(taskType) {
+  if (taskType === 'ACTIVATE') {
+    return { color: 'processing', text: '激活' };
+  }
+  if (taskType === 'RESET_PASSWORD') {
+    return { color: 'warning', text: '重置密码' };
+  }
+  if (taskType === 'RESET_OTP') {
+    return { color: 'warning', text: '重绑OTP' };
+  }
+  return { color: 'default', text: '无' };
+}
+
 function Admin() {
   const navigate = useNavigate();
   const [state, setState] = useState({
@@ -56,6 +88,9 @@ function Admin() {
     druidList: [],
     userList: [],
     userSearchKeyword: '',
+    linkVisible: false,
+    issuedLinkTitle: '',
+    issuedLinkData: null,
     userGroupList: [],
     dbPermissionList: [],
     userCount: 0,
@@ -246,16 +281,41 @@ function Admin() {
     });
 
     if (response.jsonData.status === true) {
-      showDialog('用户创建成功');
       setStatePatch({
         userAddVisible: false,
         inputData: {},
+        linkVisible: true,
+        issuedLinkTitle: '激活链接已生成',
+        issuedLinkData: response.jsonData.data,
       });
       await loadMenu('2');
       return;
     }
 
-    showDialog(response.jsonData.data);
+    showDialog(response.jsonData.message || response.jsonData.data);
+  };
+
+  const issueUserLink = async (url, userName, successTitle) => {
+    const client = createClient();
+    const response = await client.post(url, {
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Token': state.token,
+      },
+      body: JSON.stringify({ userName }),
+    });
+
+    if (response.jsonData.status === true) {
+      setStatePatch({
+        linkVisible: true,
+        issuedLinkTitle: successTitle,
+        issuedLinkData: response.jsonData.data,
+      });
+      await loadMenu('2');
+      return;
+    }
+
+    showDialog(response.jsonData.message || response.jsonData.data);
   };
 
   const userGroupHandleOk = async () => {
@@ -366,6 +426,9 @@ function Admin() {
       userAddVisible: false,
       userGroupAddVisible: false,
       permissionAddVisible: false,
+      linkVisible: false,
+      issuedLinkTitle: '',
+      issuedLinkData: null,
       inputData: {},
       userGroupEditUserList: [],
       permissionEditServerList: [],
@@ -465,23 +528,13 @@ function Admin() {
     showDialog(response.jsonData.data);
   };
 
-  const unbindOtp = async (userName) => {
-    const client = createClient();
-    const response = await client.post('/api/backstage/unbind_opt', {
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Token': state.token,
-      },
-      body: JSON.stringify({ userName }),
-    });
-
-    if (response.jsonData.status === true) {
-      showDialog('用户otp解绑成功');
-      await loadMenu('2');
+  const copyIssuedLink = () => {
+    if (!state.issuedLinkData?.linkUrl) {
+      showDialog('当前没有可复制的链接');
       return;
     }
-
-    showDialog(response.jsonData.data);
+    copy(state.issuedLinkData.linkUrl);
+    message.success('链接已复制');
   };
 
   const userGroupDeleteBtn = async (groupCode) => {
@@ -604,7 +657,32 @@ function Admin() {
   const userListColumns = [
     { title: '编号', dataIndex: 'code' },
     { title: '用户名', dataIndex: 'userName' },
+    { title: '邮箱', dataIndex: 'email' },
+    {
+      title: '账号状态',
+      dataIndex: 'accountStatus',
+      render: (value) => {
+        const meta = getAccountStatusMeta(value);
+        return <Tag color={meta.color}>{meta.text}</Tag>;
+      },
+    },
     { title: '二次验证绑定', dataIndex: 'authStatus' },
+    {
+      title: '待处理任务',
+      dataIndex: 'pendingSecurityTaskType',
+      render: (value, record) => {
+        if (!value) {
+          return <Tag>无</Tag>;
+        }
+        const meta = getPendingTaskMeta(value);
+        return (
+          <div className="admin-task-cell">
+            <Tag color={meta.color}>{meta.text}</Tag>
+            <span>{record.pendingSecurityTaskExpireTime || '-'}</span>
+          </div>
+        );
+      },
+    },
     {
       title: '访问令牌状态',
       dataIndex: 'accessTokenStatus',
@@ -627,8 +705,43 @@ function Admin() {
       title: '操作',
       render: (text, record) => (
         <Space size="middle">
-          <Button type="link" onClick={() => unbindOtp(record.userName)}>
-            解绑OTP
+          {record.accountStatus === 'PENDING_ACTIVATION' ? (
+            <Button
+              type="link"
+              onClick={() =>
+                issueUserLink(
+                  '/api/backstage/reissue_activation_link',
+                  record.userName,
+                  '激活链接已重新生成',
+                )
+              }
+            >
+              重发激活链接
+            </Button>
+          ) : null}
+          <Button
+            type="link"
+            onClick={() =>
+              issueUserLink(
+                '/api/backstage/reset_user_password',
+                record.userName,
+                '密码重置链接已生成',
+              )
+            }
+          >
+            重置密码链接
+          </Button>
+          <Button
+            type="link"
+            onClick={() =>
+              issueUserLink(
+                '/api/backstage/reset_user_otp',
+                record.userName,
+                'OTP重绑链接已生成',
+              )
+            }
+          >
+            重绑OTP链接
           </Button>
           <Button type="link" onClick={() => userDeleteBtn(record.userName)}>
             删除
@@ -681,7 +794,9 @@ function Admin() {
     normalizedUserSearchKeyword === ''
       ? state.userList
       : state.userList.filter((user) =>
-          (user.userName || '').toLowerCase().includes(normalizedUserSearchKeyword),
+          `${user.userName || ''} ${user.email || ''}`
+            .toLowerCase()
+            .includes(normalizedUserSearchKeyword),
         );
 
   const menuItems = [
@@ -739,7 +854,7 @@ function Admin() {
               <Input
                 allowClear
                 className="admin-search-input"
-                placeholder="按用户名搜索"
+                placeholder="按用户名或邮箱搜索"
                 value={state.userSearchKeyword}
                 onChange={(event) => {
                   setStatePatch({
@@ -756,11 +871,60 @@ function Admin() {
               onOk={userHandleOk}
             >
               <Form size="small" labelCol={{ span: 7 }}>
-                <Form.Item label="用户名">
-                  <Input id="userName" onChange={onInputChange} />
+                <Form.Item label="邮箱">
+                  <Input id="email" onChange={onInputChange} />
                 </Form.Item>
-                <Form.Item label="密码">
-                  <Input.Password id="passWord" onChange={onInputChange} />
+              </Form>
+            </Modal>
+            <Modal
+              open={state.linkVisible}
+              title={state.issuedLinkTitle || '链接已生成'}
+              onCancel={() => {
+                setStatePatch({
+                  linkVisible: false,
+                  issuedLinkTitle: '',
+                  issuedLinkData: null,
+                });
+              }}
+              footer={[
+                <Button key="copy" type="primary" onClick={copyIssuedLink}>
+                  复制链接
+                </Button>,
+                <Button
+                  key="close"
+                  onClick={() => {
+                    setStatePatch({
+                      linkVisible: false,
+                      issuedLinkTitle: '',
+                      issuedLinkData: null,
+                    });
+                  }}
+                >
+                  关闭
+                </Button>,
+              ]}
+            >
+              <Form size="small" labelCol={{ span: 6 }}>
+                <Form.Item label="用户名">
+                  <span>{state.issuedLinkData?.userName || '-'}</span>
+                </Form.Item>
+                <Form.Item label="邮箱">
+                  <span>{state.issuedLinkData?.email || '-'}</span>
+                </Form.Item>
+                <Form.Item label="任务类型">
+                  <Tag color={getPendingTaskMeta(state.issuedLinkData?.taskType).color}>
+                    {getPendingTaskMeta(state.issuedLinkData?.taskType).text}
+                  </Tag>
+                </Form.Item>
+                <Form.Item label="过期时间">
+                  <span>{state.issuedLinkData?.expireTime || '-'}</span>
+                </Form.Item>
+                <Form.Item label="激活链接">
+                  <Input.TextArea
+                    autoSize={{ minRows: 3, maxRows: 5 }}
+                    readOnly
+                    value={state.issuedLinkData?.linkUrl || ''}
+                  />
                 </Form.Item>
               </Form>
             </Modal>

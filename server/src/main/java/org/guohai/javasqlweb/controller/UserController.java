@@ -1,7 +1,9 @@
 package org.guohai.javasqlweb.controller;
 
 import org.guohai.javasqlweb.beans.Result;
+import org.guohai.javasqlweb.beans.SecurityTaskInfo;
 import org.guohai.javasqlweb.beans.UserBean;
+import org.guohai.javasqlweb.config.LoginRequired;
 import org.guohai.javasqlweb.service.UserService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -78,6 +80,20 @@ public class UserController {
     }
 
     /**
+     * 已登录用户修改密码
+     * @param token 登录令牌
+     * @param user 密码载体
+     * @return 结果
+     */
+    @LoginRequired
+    @ResponseBody
+    @RequestMapping(value = "/password", method = RequestMethod.POST)
+    public Result<String> changePassword(@RequestHeader(value = "User-Token", required = false) String token,
+                                         @RequestBody UserBean user) {
+        return userService.changePassword(token, user.getPassWord());
+    }
+
+    /**
      * 获取当前用户访问令牌信息
      * @param token 登录令牌
      * @return 访问令牌信息
@@ -126,18 +142,50 @@ public class UserController {
     }
 
     /**
-     *
-     * @param sign
-     * @param userName
-     * @param timestamp
-     * @return
+     * 查询安全任务信息
+     * @param uuid 任务UUID
+     * @return 任务信息
      */
     @ResponseBody
-    @RequestMapping(value = "/create_user/{user_name}")
-    public Result<UserBean> autoCreateUser(@RequestHeader(value = "sign", required =  true) String sign,
-                                           @PathVariable("user_name") String userName,
-                                           String timestamp) {
-        LOG.info(String.format("接收到参数 user: %s, time: %s, sign: %s", userName, timestamp, sign));
-        return userService.createUserByLink(userName, timestamp, sign);
+    @RequestMapping(value = "/security-task/{uuid}", method = RequestMethod.GET)
+    public Result<SecurityTaskInfo> getSecurityTask(@PathVariable("uuid") String uuid) {
+        return userService.getSecurityTaskInfo(uuid);
+    }
+
+    /**
+     * 提交安全任务密码
+     * @param uuid 任务UUID
+     * @param user 请求体
+     * @return 任务信息
+     */
+    @ResponseBody
+    @RequestMapping(value = "/security-task/{uuid}/password", method = RequestMethod.POST)
+    public Result<SecurityTaskInfo> submitSecurityTaskPassword(@PathVariable("uuid") String uuid,
+                                                               @RequestBody UserBean user) {
+        return userService.submitSecurityTaskPassword(uuid, user.getPassWord());
+    }
+
+    /**
+     * 创建安全任务OTP会话
+     * @param uuid 任务UUID
+     * @return 任务信息
+     */
+    @ResponseBody
+    @RequestMapping(value = "/security-task/{uuid}/otp-session", method = RequestMethod.POST)
+    public Result<SecurityTaskInfo> createSecurityTaskOtpSession(@PathVariable("uuid") String uuid) {
+        return userService.createSecurityTaskOtpSession(uuid);
+    }
+
+    /**
+     * 通过安全任务绑定OTP
+     * @param uuid 任务UUID
+     * @param user 请求体
+     * @return 结果
+     */
+    @ResponseBody
+    @RequestMapping(value = "/security-task/{uuid}/bind-otp", method = RequestMethod.POST)
+    public Result<String> bindSecurityTaskOtp(@PathVariable("uuid") String uuid,
+                                              @RequestBody UserBean user) {
+        return userService.bindSecurityTaskOtp(uuid, user.getToken(), user.getOtpPass());
     }
 }

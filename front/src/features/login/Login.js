@@ -58,45 +58,14 @@ function Login() {
     });
   };
 
-  const autoCreateUser = async (userName, timestamp, sign) => {
-    const requestUrl = `/user/create_user/${userName}?timestamp=${timestamp}`;
-    const client = createClient();
-    const response = await client.post(requestUrl, {
-      headers: { 'Content-Type': 'application/json', sign },
-      body: JSON.stringify({ token: state.token, otpPass: state.otpPass }),
-    });
-
-    if (response.jsonData.status) {
-      if (response.jsonData.data.authStatus === 'BINDING') {
-        updateState({
-          authSecret: response.jsonData.data.authSecret,
-          loginStep: 'BIND',
-          qrCode: buildOtpUrl(
-            response.jsonData.data.userName,
-            response.jsonData.data.authSecret,
-          ),
-          token: response.jsonData.data.token,
-        });
-      } else if (response.jsonData.data.authStatus === 'BIND') {
-        updateState({
-          loginStep: 'VERIFY',
-          token: response.jsonData.data.token,
-        });
-      }
-      return;
-    }
-
-    showDialog(`自动激活账号失败: ${response.jsonData.message}`);
-  };
-
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
-    const userName = searchParams.get('user_name');
-    const timestamp = searchParams.get('timestamp');
-    const sign = searchParams.get('sign');
+    const userName = searchParams.get('username');
 
     if (userName) {
-      void autoCreateUser(userName, timestamp, sign);
+      updateState({
+        userName,
+      });
     }
   }, [location.search]);
 

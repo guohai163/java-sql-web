@@ -429,12 +429,12 @@ function Navigation() {
       return;
     }
     const client = createClient();
-    const response = await client.post('/api/backstage/change_new_pass', {
+    const response = await client.post('/user/password', {
       headers: {
         'Content-Type': 'application/json',
         'User-Token': state.token,
       },
-      body: state.inputData.userNewPassword || '',
+      body: JSON.stringify({ passWord: state.inputData.userNewPassword || '' }),
     });
 
     if (response.jsonData.status === true) {
@@ -445,7 +445,7 @@ function Navigation() {
       return;
     }
 
-    showDialog(response.jsonData.data);
+    showDialog(response.jsonData.message || response.jsonData.data);
   };
 
   const passKeyBind = async () => {
@@ -941,6 +941,9 @@ function Navigation() {
             />
           </Form.Item>
         </Form>
+        <div className="security-help">
+          密码至少 8 位，且需包含大写字母、小写字母、数字、特殊字符中的 3 类。
+        </div>
         <div className="security-section">
           <div className="security-section-title">访问令牌</div>
           {state.accessTokenLoading ? (

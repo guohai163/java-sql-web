@@ -1,6 +1,7 @@
 package org.guohai.javasqlweb.service;
 
 import org.guohai.javasqlweb.beans.ConnectConfigBean;
+import org.guohai.javasqlweb.beans.LinkIssueResult;
 import org.guohai.javasqlweb.beans.PoolStatBean;
 import org.guohai.javasqlweb.beans.QueryLogBean;
 import org.guohai.javasqlweb.beans.Result;
@@ -65,7 +66,7 @@ public interface BackstageService {
      * @param user 用户
      * @return
      */
-    Result<String> addNewUser(UserBean user);
+    Result<LinkIssueResult> addNewUser(String token, UserBean user);
 
     /**
      * 删除指定用户
@@ -87,14 +88,23 @@ public interface BackstageService {
      * @param newPass
      * @return
      */
-    Result<String> changeUserPass(String token, String newPass);
+    Result<LinkIssueResult> reissueActivationLink(String token, String userName);
 
     /**
-     * 管理员为用户解绑OTP
-     * @param userName
-     * @return
+     * 管理员为用户发起密码重置
+     * @param token 管理员登录态
+     * @param userName 用户名
+     * @return 链接签发结果
      */
-    Result<String> unbindUserOtp(String userName);
+    Result<LinkIssueResult> resetUserPassword(String token, String userName);
+
+    /**
+     * 管理员为用户发起OTP重绑
+     * @param token 管理员登录态
+     * @param userName 用户名
+     * @return 链接签发结果
+     */
+    Result<LinkIssueResult> resetUserOtp(String token, String userName);
 
     /**
      * 更新服务器数据

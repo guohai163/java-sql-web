@@ -48,6 +48,11 @@ jest.mock('@/features/login/Login', () => ({
   default: () => <div>login shell</div>,
 }));
 
+jest.mock('@/features/security-task/SecurityTask', () => ({
+  __esModule: true,
+  default: () => <div>security task shell</div>,
+}));
+
 jest.mock('@/features/admin/Admin', () => ({
   __esModule: true,
   default: () => <div>admin shell</div>,
@@ -95,5 +100,14 @@ describe('App routes', () => {
 
     expect(screen.getByText('navigation shell')).toBeInTheDocument();
     expect(screen.getByText('page content shell')).toBeInTheDocument();
+  });
+
+  test('renders the security task route', async () => {
+    mockCookie.load.mockReturnValue(undefined);
+    window.history.pushState({}, '', '/security-task?uuid=task-123');
+
+    render(<App />);
+
+    expect(await screen.findByText('security task shell')).toBeInTheDocument();
   });
 });

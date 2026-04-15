@@ -20,6 +20,11 @@ public class UserBean {
      * 用户名
      */
     private String userName;
+
+    /**
+     * 邮箱
+     */
+    private String email;
     /**
      * 密码，创建用户时使用
      */
@@ -43,6 +48,11 @@ public class UserBean {
      * 用户登录状态
      */
     private UserLoginStatus loginStatus;
+
+    /**
+     * 账号状态
+     */
+    private AccountStatus accountStatus;
 
     /**
      * 一次密码
@@ -69,6 +79,16 @@ public class UserBean {
      * 访问令牌状态
      */
     private String accessTokenStatus;
+
+    /**
+     * 待处理安全任务类型
+     */
+    private UserSecurityTaskType pendingSecurityTaskType;
+
+    /**
+     * 待处理安全任务过期时间
+     */
+    private Date pendingSecurityTaskExpireTime;
 
     /**
      * 是否已有访问令牌

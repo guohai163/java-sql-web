@@ -93,8 +93,9 @@ public class BackstageController {
      */
     @ResponseBody
     @RequestMapping(value = "/adduser", method = RequestMethod.POST)
-    public Result<String> addNewUser(@RequestBody UserBean user){
-        return backstageService.addNewUser(user);
+    public Result<LinkIssueResult> addNewUser(@RequestHeader(value = "User-Token", required = false) String token,
+                                              @RequestBody UserBean user){
+        return backstageService.addNewUser(token, user);
     }
 
     /**
@@ -142,28 +143,45 @@ public class BackstageController {
     }
 
     /**
-     * 修改用户密码
-     * @param token
-     * @param newPass
+     * 重发用户激活链接
+     * @param token 管理员登录态
+     * @param user 用户
      * @return
      */
     @ResponseBody
-    @RequestMapping(value = "/change_new_pass", method = RequestMethod.POST)
-    public Result<String> changeNewPass(@RequestHeader(value = "User-Token", required =  false) String token,
-                                        @RequestBody String newPass){
-        LOG.debug(String.format("将为用户token为%s的修改密码", token));
-        return backstageService.changeUserPass(token,newPass);
+    @RequestMapping(value = "/reissue_activation_link", method = RequestMethod.POST)
+    public Result<LinkIssueResult> reissueActivationLink(
+            @RequestHeader(value = "User-Token", required = false) String token,
+            @RequestBody UserBean user){
+        return backstageService.reissueActivationLink(token, user.getUserName());
     }
 
     /**
-     * 为指定用户解绑OTP
+     * 为指定用户生成密码重置链接
+     * @param token 管理员登录态
      * @param user 用户名
      * @return
      */
     @ResponseBody
-    @RequestMapping(value = "/unbind_opt", method = RequestMethod.POST)
-    public Result<String> unbindUserOtp(@RequestBody UserBean user){
-        return backstageService.unbindUserOtp(user.getUserName());
+    @RequestMapping(value = "/reset_user_password", method = RequestMethod.POST)
+    public Result<LinkIssueResult> resetUserPassword(
+            @RequestHeader(value = "User-Token", required = false) String token,
+            @RequestBody UserBean user){
+        return backstageService.resetUserPassword(token, user.getUserName());
+    }
+
+    /**
+     * 为指定用户生成OTP重绑链接
+     * @param token 管理员登录态
+     * @param user 用户名
+     * @return
+     */
+    @ResponseBody
+    @RequestMapping(value = "/reset_user_otp", method = RequestMethod.POST)
+    public Result<LinkIssueResult> resetUserOtp(
+            @RequestHeader(value = "User-Token", required = false) String token,
+            @RequestBody UserBean user){
+        return backstageService.resetUserOtp(token, user.getUserName());
     }
 
     /**

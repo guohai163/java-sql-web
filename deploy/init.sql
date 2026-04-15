@@ -45,19 +45,43 @@ ALTER TABLE `db_query_log`
 CREATE TABLE `user_tb` (
   `code` int(11) NOT NULL COMMENT '自增值',
   `user_name` varchar(45) NOT NULL COMMENT '用户名',
+  `email` varchar(100) NOT NULL COMMENT '用户邮箱',
   `pass_word` varchar(100) NOT NULL COMMENT '密码',
   `token` varchar(45) NOT NULL COMMENT '登录临时令牌',
   `auth_secret` VARCHAR(45) NULL COMMENT '二次验证密钥',
   `auth_status` varchar(45) NOT NULL DEFAULT 'UNBIND' COMMENT '密保绑定状态',
   `login_status` VARCHAR(45) NOT NULL DEFAULT 'LOGGING',
+  `account_status` VARCHAR(45) NOT NULL DEFAULT 'ACTIVE' COMMENT '账号状态',
   `access_token_hash` VARCHAR(64) NULL COMMENT '长期访问令牌哈希',
   `access_token_expire_time` datetime NULL COMMENT '访问令牌过期时间'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 ALTER TABLE `user_tb`
-  ADD PRIMARY KEY (`code`);
+  ADD PRIMARY KEY (`code`),
+  ADD UNIQUE KEY `uk_user_name` (`user_name`),
+  ADD UNIQUE KEY `uk_email` (`email`);
 
 ALTER TABLE `user_tb`
+  MODIFY `code` int(11) NOT NULL AUTO_INCREMENT;
+
+CREATE TABLE `user_security_task_tb` (
+  `code` int(11) NOT NULL COMMENT '自增值',
+  `task_uuid_hash` varchar(64) NOT NULL COMMENT '任务UUID哈希',
+  `user_code` int(11) NOT NULL COMMENT '用户编号',
+  `task_type` varchar(45) NOT NULL COMMENT '任务类型',
+  `task_status` varchar(45) NOT NULL COMMENT '任务状态',
+  `expire_time` datetime NOT NULL COMMENT '过期时间',
+  `used_time` datetime NULL COMMENT '使用时间',
+  `created_by` varchar(45) NOT NULL COMMENT '创建人',
+  `created_time` datetime NOT NULL COMMENT '创建时间'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+ALTER TABLE `user_security_task_tb`
+  ADD PRIMARY KEY (`code`),
+  ADD UNIQUE KEY `uk_task_uuid_hash` (`task_uuid_hash`),
+  ADD KEY `idx_user_task_pending` (`user_code`,`task_status`,`created_time`);
+
+ALTER TABLE `user_security_task_tb`
   MODIFY `code` int(11) NOT NULL AUTO_INCREMENT;
 
 -- 用户组表

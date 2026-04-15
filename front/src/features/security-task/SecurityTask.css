@@ -1,0 +1,24 @@
+.security-task-container {
+    width: 34em;
+}
+
+.security-task-summary {
+    display: grid;
+    gap: 8px;
+    text-align: left;
+}
+
+.security-task-help {
+    width: 280px;
+    margin: 0 auto 12px;
+    color: #666;
+    font-size: 12px;
+    line-height: 1.5;
+    text-align: left;
+}
+
+.security-task-loading {
+    display: flex;
+    justify-content: center;
+    padding: 24px 0;
+}
