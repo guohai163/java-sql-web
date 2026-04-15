@@ -44,12 +44,12 @@ ALTER TABLE `db_query_log`
 CREATE TABLE `user_tb` (
   `code` int(11) NOT NULL COMMENT '自增值',
   `user_name` varchar(45) NOT NULL COMMENT '用户名',
-  `pass_word` varchar(45) NOT NULL COMMENT '密码',
+  `pass_word` varchar(100) NOT NULL COMMENT '密码',
   `token` varchar(45) NOT NULL COMMENT '登录临时令牌',
   `auth_secret` VARCHAR(45) NULL COMMENT '二次验证密钥',
   `auth_status` varchar(45) NOT NULL DEFAULT 'UNBIND' COMMENT '密保绑定状态',
   `login_status` VARCHAR(45) NOT NULL DEFAULT 'LOGGING',
-  `access_token` VARCHAR(44) NULL COMMENT '长期访问令牌',
+  `access_token_hash` VARCHAR(64) NULL COMMENT '长期访问令牌哈希',
   `access_token_expire_time` datetime NULL COMMENT '访问令牌过期时间'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -92,9 +92,11 @@ CREATE TABLE `guid_sql_tb` (
     `create_date` datetime NOT NULL COMMENT '时间',
         PRIMARY KEY (`code`));
 
-
-INSERT INTO `user_tb` (`user_name`,`pass_word`,`token`) VALUES
-('admin',md5(CONCAT(md5('admin'),'jsa')),'');
+-- 安全起见，不再默认创建弱口令管理员账号。
+-- 首次部署后请手动创建管理员，并使用 BCrypt 哈希写入 pass_word 字段。
+-- 示例：
+-- INSERT INTO `user_tb` (`user_name`,`pass_word`,`token`,`auth_status`,`login_status`)
+-- VALUES ('admin','<bcrypt-hash>','','UNBIND','LOGOUT');
 
 COMMIT;
 
@@ -121,5 +123,6 @@ CREATE TABLE `passkey_auths_tb` (
 -- ADD COLUMN `db_group` VARCHAR(45) NOT NULL DEFAULT 'default' AFTER `create_time`;
 
 -- ALTER TABLE `javasqlweb_db`.`user_tb`
--- ADD COLUMN `access_token` VARCHAR(44) NULL COMMENT '长期访问令牌' AFTER `login_status`,
--- ADD COLUMN `access_token_expire_time` datetime NULL COMMENT '访问令牌过期时间' AFTER `access_token`;
+-- MODIFY COLUMN `pass_word` VARCHAR(100) NOT NULL COMMENT '密码',
+-- ADD COLUMN `access_token_hash` VARCHAR(64) NULL COMMENT '长期访问令牌哈希' AFTER `login_status`,
+-- ADD COLUMN `access_token_expire_time` datetime NULL COMMENT '访问令牌过期时间' AFTER `access_token_hash`;

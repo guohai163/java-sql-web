@@ -30,8 +30,6 @@ ARCHIVE_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}/archive/refs/tags/${V
 TEMP_DIR="$(mktemp -d)"
 ARCHIVE_FILE="${TEMP_DIR}/${REPO_NAME}-${VERSION}.tar.gz"
 EXTRACT_DIR="${TEMP_DIR}/extract"
-ARCHIVE_ROOT="${REPO_NAME}-${VERSION}"
-SKILL_SOURCE_DIR="${EXTRACT_DIR}/${ARCHIVE_ROOT}/skills/${SKILL_NAME}"
 
 cleanup() {
   rm -rf "${TEMP_DIR}"
@@ -44,8 +42,24 @@ curl -fsSL "${ARCHIVE_URL}" -o "${ARCHIVE_FILE}"
 mkdir -p "${EXTRACT_DIR}"
 tar -xzf "${ARCHIVE_FILE}" -C "${EXTRACT_DIR}"
 
+mapfile -t ARCHIVE_ROOTS < <(find "${EXTRACT_DIR}" -mindepth 1 -maxdepth 1 -type d | sort)
+if [[ "${#ARCHIVE_ROOTS[@]}" -ne 1 ]]; then
+  echo "Expected exactly one archive root directory after extraction, found ${#ARCHIVE_ROOTS[@]}:" >&2
+  printf '  %s\n' "${ARCHIVE_ROOTS[@]}" >&2
+  exit 1
+fi
+
+ARCHIVE_ROOT_DIR="${ARCHIVE_ROOTS[0]}"
+SKILL_SOURCE_DIR="${ARCHIVE_ROOT_DIR}/skills/${SKILL_NAME}"
+
+echo "Resolved archive root: ${ARCHIVE_ROOT_DIR}"
+
 if [[ ! -d "${SKILL_SOURCE_DIR}" ]]; then
   echo "Skill directory not found in archive: ${SKILL_SOURCE_DIR}" >&2
+  if [[ -d "${ARCHIVE_ROOT_DIR}/skills" ]]; then
+    echo "Available skills in archive:" >&2
+    find "${ARCHIVE_ROOT_DIR}/skills" -mindepth 1 -maxdepth 1 -type d | sort >&2
+  fi
   exit 1
 fi
 

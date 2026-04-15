@@ -80,6 +80,42 @@ docker compose up -d
 - `jsw-server`：Spring Boot API 服务
 - `jsw-db`：MariaDB 数据库，首次启动会执行 `deploy/init.sql`
 
+### 2.1 使用 Kubernetes 部署
+
+仓库提供了一套基于原生 YAML 的 K8s 部署清单：
+
+- `deploy/k8s/base/`
+- `deploy/k8s/env/prod.env.example`
+- `scripts/deploy-k8s.sh`
+
+使用前先复制环境变量模板：
+
+```shell
+cp deploy/k8s/env/prod.env.example deploy/k8s/env/prod.env
+```
+
+至少需要确认：
+
+- `TAG`
+- `DB_PASSWORD`
+- `PUBLIC_DOMAIN`
+- `PUBLIC_HOST`
+- `INGRESS_HOST`
+- `DB_STORAGE_CLASS`（如果集群没有默认 StorageClass）
+
+部署：
+
+```shell
+bash scripts/deploy-k8s.sh
+```
+
+该方案默认部署：
+
+- `jsw-db`：单实例 MariaDB（StatefulSet + PVC）
+- `jsw-server`：Spring Boot API（Deployment + ClusterIP Service）
+- `jsw-front`：前端 Nginx（Deployment + ClusterIP Service）
+- `Ingress`：将外部流量转到 `jsw-front`
+
 ### 3. 本地构建镜像
 
 ```shell
