@@ -110,6 +110,33 @@ npm run dev
 VITE_BACKEND_ORIGIN=http://your-server:8002 npm run dev
 ```
 
+## 部署到 OpenClaw
+
+仓库内置了一个给 OpenClaw 使用的查询 skill：
+
+- `skills/java-sql-web-query/`
+
+推荐用一键安装脚本把它安装到全局 `~/.openclaw/skills/`：
+
+```shell
+curl -fsSL https://raw.githubusercontent.com/guohai163/java-sql-web/v2.1.1/scripts/install-openclaw-skill.sh | VERSION=v2.1.1 bash
+```
+
+也可以先下载后执行：
+
+```shell
+curl -fsSL https://raw.githubusercontent.com/guohai163/java-sql-web/v2.1.1/scripts/install-openclaw-skill.sh -o install-openclaw-skill.sh
+bash install-openclaw-skill.sh v2.1.1
+```
+
+安装完成后，刷新或重启 OpenClaw 的 skills 加载，然后可通过：
+
+```text
+$java-sql-web-query
+```
+
+显式调用该 skill。
+
 ### 系统使用
 
 1. 使用浏览器打开上一步容器安装的机器IP。默认用户名密码为admin/admin。点击登录  

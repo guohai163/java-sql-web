@@ -1,0 +1,7 @@
+interface:
+  display_name: "JavaSqlWeb Query"
+  short_description: "通过 JavaSqlWeb API 做安全只读查询"
+  default_prompt: "Use $java-sql-web-query with JSW_BASE_URL and JSW_ACCESS_TOKEN to inspect accessible servers, databases, and run permission-aware read-only queries through the JavaSqlWeb backend API."
+
+policy:
+  allow_implicit_invocation: true
