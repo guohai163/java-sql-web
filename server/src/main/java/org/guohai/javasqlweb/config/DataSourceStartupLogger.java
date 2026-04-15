@@ -7,6 +7,8 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
+import java.security.Security;
+
 /**
  * Print the platform datasource configuration after the application is ready.
  * Sensitive values are masked before they are written to logs.
@@ -27,6 +29,9 @@ public class DataSourceStartupLogger {
         LOG.info("Platform datasource ready. url={}, username={}",
                 sanitizeJdbcUrl(dataSourceUrl),
                 maskValue(dataSourceUsername));
+        LOG.info("JAVA_TOOL_OPTIONS={}", System.getenv("JAVA_TOOL_OPTIONS"));
+        LOG.info("jdk.tls.client.protocols={}", System.getProperty("jdk.tls.client.protocols"));
+        LOG.info("jdk.tls.disabledAlgorithms={}", Security.getProperty("jdk.tls.disabledAlgorithms"));
     }
 
     private String sanitizeJdbcUrl(String jdbcUrl) {
