@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Alert, Button, Input, Modal, Spin, Tag } from 'antd';
 import {
@@ -6,7 +6,6 @@ import {
   AppleOutlined,
   LockOutlined,
   UserOutlined,
-  VerifiedOutlined,
 } from '@ant-design/icons';
 import QRCode from 'qrcode.react';
 import { createClient } from '@/shared/api/apiClient';
@@ -14,6 +13,8 @@ import '@/features/login/Login.css';
 import './SecurityTask.css';
 
 const { confirm } = Modal;
+const OTP_LENGTH = 6;
+const EMPTY_OTP_DIGITS = Array.from({ length: OTP_LENGTH }, () => '');
 
 const initialState = {
   loading: true,
@@ -22,7 +23,7 @@ const initialState = {
   taskInfo: null,
   password: '',
   confirmPassword: '',
-  otpPass: '',
+  otpDigits: [...EMPTY_OTP_DIGITS],
   errorMessage: '',
 };
 
@@ -39,10 +40,22 @@ function buildOtpUrl(userName, authSecret) {
   return `otpauth://totp/${userName}@${window.location.host}?secret=${authSecret}&issuer=JavaSqlWeb`;
 }
 
+function getTaskTypeLabel(taskType) {
+  if (taskType === 'ACTIVATE') {
+    return '激活账号';
+  }
+  if (taskType === 'RESET_PASSWORD') {
+    return '重置密码';
+  }
+  return '重绑OTP';
+}
+
 function SecurityTask() {
   const location = useLocation();
   const navigate = useNavigate();
   const [state, setState] = useState(initialState);
+  const loginLogo = '/jsw_logo.png';
+  const otpInputRefs = useRef([]);
 
   const setStatePatch = (patch) => {
     setState((previous) => ({
@@ -53,6 +66,102 @@ function SecurityTask() {
 
   const searchParams = new URLSearchParams(location.search);
   const uuid = searchParams.get('uuid') || '';
+
+  const focusOtpInput = (index) => {
+    window.requestAnimationFrame(() => {
+      otpInputRefs.current[index]?.focus();
+      otpInputRefs.current[index]?.select();
+    });
+  };
+
+  const updateOtpDigits = (updater) => {
+    setState((previous) => {
+      const nextDigits =
+        typeof updater === 'function' ? updater([...previous.otpDigits]) : updater;
+      return {
+        ...previous,
+        otpDigits: nextDigits,
+      };
+    });
+  };
+
+  const getOtpValue = () => state.otpDigits.join('');
+
+  const handleOtpDigitChange = (index, event) => {
+    const incomingDigits = event.target.value.replace(/\D/g, '');
+
+    if (incomingDigits === '') {
+      updateOtpDigits((previousDigits) => {
+        previousDigits[index] = '';
+        return previousDigits;
+      });
+      return;
+    }
+
+    updateOtpDigits((previousDigits) => {
+      let nextIndex = index;
+      incomingDigits.split('').forEach((digit) => {
+        if (nextIndex < OTP_LENGTH) {
+          previousDigits[nextIndex] = digit;
+          nextIndex += 1;
+        }
+      });
+      return previousDigits;
+    });
+
+    focusOtpInput(Math.min(index + incomingDigits.length, OTP_LENGTH - 1));
+  };
+
+  const handleOtpKeyDown = (index, event) => {
+    if (event.key === 'Backspace') {
+      if (state.otpDigits[index]) {
+        event.preventDefault();
+        updateOtpDigits((previousDigits) => {
+          previousDigits[index] = '';
+          return previousDigits;
+        });
+        return;
+      }
+
+      if (index > 0) {
+        event.preventDefault();
+        updateOtpDigits((previousDigits) => {
+          previousDigits[index - 1] = '';
+          return previousDigits;
+        });
+        focusOtpInput(index - 1);
+      }
+      return;
+    }
+
+    if (event.key === 'ArrowLeft' && index > 0) {
+      event.preventDefault();
+      focusOtpInput(index - 1);
+      return;
+    }
+
+    if (event.key === 'ArrowRight' && index < OTP_LENGTH - 1) {
+      event.preventDefault();
+      focusOtpInput(index + 1);
+    }
+  };
+
+  const handleOtpPaste = (event) => {
+    const pastedDigits = event.clipboardData.getData('text').replace(/\D/g, '').slice(0, OTP_LENGTH);
+    if (pastedDigits === '') {
+      return;
+    }
+
+    event.preventDefault();
+    updateOtpDigits(() => {
+      const nextDigits = [...EMPTY_OTP_DIGITS];
+      pastedDigits.split('').forEach((digit, index) => {
+        nextDigits[index] = digit;
+      });
+      return nextDigits;
+    });
+    focusOtpInput(Math.min(pastedDigits.length, OTP_LENGTH) - 1);
+  };
 
   const loadTask = async () => {
     if (!uuid) {
@@ -78,6 +187,7 @@ function SecurityTask() {
         loading: false,
         taskInfo: response.jsonData.data,
         errorMessage: '',
+        otpDigits: [...EMPTY_OTP_DIGITS],
       });
       return;
     }
@@ -106,6 +216,7 @@ function SecurityTask() {
       setStatePatch({
         otpSessionLoading: false,
         taskInfo: response.jsonData.data,
+        otpDigits: [...EMPTY_OTP_DIGITS],
       });
       return;
     }
@@ -132,6 +243,12 @@ function SecurityTask() {
     }
     void createOtpSession();
   }, [state.loading, state.otpSessionLoading, state.taskInfo]);
+
+  useEffect(() => {
+    if (state.taskInfo?.taskStatus === 'PENDING_OTP') {
+      focusOtpInput(0);
+    }
+  }, [state.taskInfo?.taskStatus]);
 
   const submitPassword = async () => {
     if (!state.password.trim()) {
@@ -162,6 +279,7 @@ function SecurityTask() {
           taskInfo: nextTaskInfo,
           password: '',
           confirmPassword: '',
+          otpDigits: [...EMPTY_OTP_DIGITS],
         });
         return;
       }
@@ -178,8 +296,9 @@ function SecurityTask() {
   };
 
   const bindOtp = async () => {
-    if (!state.otpPass.trim()) {
-      showDialog('请输入动态码');
+    const otpPass = getOtpValue();
+    if (otpPass.length !== OTP_LENGTH) {
+      showDialog('请输入完整的 6 位动态码');
       return;
     }
 
@@ -192,7 +311,7 @@ function SecurityTask() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         token: state.taskInfo?.token || '',
-        otpPass: state.otpPass,
+        otpPass,
       }),
     });
 
@@ -209,62 +328,86 @@ function SecurityTask() {
     });
   };
 
+  const renderOtpInputs = () => (
+    <div className="login-otp-group">
+      <div className="login-otp-grid">
+        {state.otpDigits.map((digit, index) => (
+          <input
+            key={`security-task-otp-${index}`}
+            ref={(element) => {
+              otpInputRefs.current[index] = element;
+            }}
+            className="login-otp-input"
+            inputMode="numeric"
+            autoComplete={index === 0 ? 'one-time-code' : 'off'}
+            maxLength={1}
+            value={digit}
+            onChange={(event) => handleOtpDigitChange(index, event)}
+            onKeyDown={(event) => handleOtpKeyDown(index, event)}
+            onPaste={handleOtpPaste}
+          />
+        ))}
+      </div>
+      <div className="login-otp-help">输入 6 位动态码后会自动跳转，也支持直接粘贴整段验证码。</div>
+    </div>
+  );
+
   const renderPasswordStep = () => (
-    <fieldset>
-      <legend>
-        <LockOutlined /> 设置密码
-      </legend>
-      <div className="item">
-        <Input
-          prefix={<UserOutlined />}
-          value={state.taskInfo?.userName || ''}
-          disabled
-        />
+    <section className="login-panel security-task-panel-section">
+      <div className="login-panel-head">
+        <h1>设置密码</h1>
+        <p>为账号设置新的登录密码，完成后即可继续后续安全流程。</p>
       </div>
-      <div className="item">
-        <Input.Password
-          prefix={<LockOutlined />}
-          placeholder="请输入新密码"
-          value={state.password}
-          onChange={(event) => {
-            setStatePatch({
-              password: event.target.value,
-            });
-          }}
-          onPressEnter={submitPassword}
-        />
-      </div>
-      <div className="item">
-        <Input.Password
-          prefix={<LockOutlined />}
-          placeholder="请再次输入新密码"
-          value={state.confirmPassword}
-          onChange={(event) => {
-            setStatePatch({
-              confirmPassword: event.target.value,
-            });
-          }}
-          onPressEnter={submitPassword}
-        />
+      <div className="login-form">
+        <div className="item">
+          <Input prefix={<UserOutlined />} value={state.taskInfo?.userName || ''} disabled />
+        </div>
+        <div className="item">
+          <Input.Password
+            prefix={<LockOutlined />}
+            placeholder="请输入新密码"
+            value={state.password}
+            onChange={(event) => {
+              setStatePatch({
+                password: event.target.value,
+              });
+            }}
+            onPressEnter={submitPassword}
+          />
+        </div>
+        <div className="item">
+          <Input.Password
+            prefix={<LockOutlined />}
+            placeholder="请再次输入新密码"
+            value={state.confirmPassword}
+            onChange={(event) => {
+              setStatePatch({
+                confirmPassword: event.target.value,
+              });
+            }}
+            onPressEnter={submitPassword}
+          />
+        </div>
       </div>
       <div className="security-task-help">
         密码至少 8 位，且需包含大写字母、小写字母、数字、特殊字符中的 3 类。
       </div>
-      <fieldset className="tblFooters">
+      <div className="login-actions security-task-actions">
         <Button loading={state.submitting} type="primary" onClick={submitPassword}>
           提交密码
         </Button>
-      </fieldset>
-    </fieldset>
+      </div>
+    </section>
   );
 
   const renderOtpStep = () => (
-    <fieldset>
-      <legend>
-        <VerifiedOutlined /> 绑定OTP
-      </legend>
+    <section className="login-panel security-task-panel-section">
+      <div className="login-panel-head">
+        <h1>绑定 OTP</h1>
+        <p>完成双因子绑定后，这个账号就可以重新恢复安全登录。</p>
+      </div>
       <div className="item qrcode">
-        <label>
+        <div className="login-qrcode-copy">
           使用手机 Google Authenticator 应用扫描以下二维码
           <br />
           <Tag icon={<AppleOutlined />} color="#000">
@@ -285,32 +428,18 @@ function SecurityTask() {
               安卓版本
             </a>
           </Tag>
-        </label>
-        <br />
+        </div>
         {state.taskInfo?.authSecret ? (
           <>
             <QRCode value={buildOtpUrl(state.taskInfo?.userName, state.taskInfo?.authSecret)} />
-            <br />
-            <label>Secret: {state.taskInfo?.authSecret}</label>
+            <div className="login-secret">Secret: {state.taskInfo?.authSecret}</div>
           </>
         ) : (
           <Spin />
         )}
       </div>
-      <div className="item">
-        <Input
-          prefix={<VerifiedOutlined />}
-          placeholder="双因子动态码"
-          value={state.otpPass}
-          onChange={(event) => {
-            setStatePatch({
-              otpPass: event.target.value,
-            });
-          }}
-          onPressEnter={bindOtp}
-        />
-      </div>
-      <fieldset className="tblFooters">
+      <div className="security-task-otp-shell">{renderOtpInputs()}</div>
+      <div className="login-actions security-task-actions">
         <Button
           loading={state.submitting || state.otpSessionLoading}
           type="primary"
@@ -318,20 +447,37 @@ function SecurityTask() {
         >
           绑定OTP
         </Button>
-      </fieldset>
-    </fieldset>
+      </div>
+    </section>
   );
 
   return (
-    <div className="center">
-      <div className="container security-task-container">
-        <fieldset>
-          <legend>安全任务</legend>
+    <div className="login-page security-task-page">
+      <div className="login-card security-task-card">
+        <div className="login-brand">
+          <img src={loginLogo} alt="JavaSqlWeb" />
+          <div className="login-brand-copy">
+            <div className="login-brand-wordmark">
+              <span className="tone-java">Java</span>
+              <span className="tone-sql">Sql</span>
+              <span className="tone-web">Web</span>
+            </div>
+            <span className="login-brand-subtitle">安全任务</span>
+          </div>
+        </div>
+
+        <div className="login-panel security-task-panel">
+          <div className="login-panel-head">
+            <h1>安全任务</h1>
+            <p>通过一次性的安全链接完成密码重置、账号激活或 OTP 重绑。</p>
+          </div>
+
           {state.loading ? (
             <div className="security-task-loading">
               <Spin />
             </div>
           ) : null}
+
           {!state.loading && state.errorMessage ? (
             <Alert
               message={state.errorMessage}
@@ -344,30 +490,37 @@ function SecurityTask() {
               }
             />
           ) : null}
+
           {!state.loading && !state.errorMessage && state.taskInfo ? (
             <div className="security-task-summary">
-              <div>用户名：{state.taskInfo.userName}</div>
-              <div>邮箱：{state.taskInfo.email}</div>
-              <div>
-                当前任务：
+              <div className="security-task-summary-row">
+                <span className="security-task-summary-label">用户名</span>
+                <span className="security-task-summary-value">{state.taskInfo.userName}</span>
+              </div>
+              <div className="security-task-summary-row">
+                <span className="security-task-summary-label">邮箱</span>
+                <span className="security-task-summary-value">{state.taskInfo.email}</span>
+              </div>
+              <div className="security-task-summary-row">
+                <span className="security-task-summary-label">当前任务</span>
                 <Tag color={state.taskInfo.taskType === 'ACTIVATE' ? 'processing' : 'warning'}>
-                  {state.taskInfo.taskType === 'ACTIVATE'
-                    ? '激活账号'
-                    : state.taskInfo.taskType === 'RESET_PASSWORD'
-                      ? '重置密码'
-                      : '重绑OTP'}
+                  {getTaskTypeLabel(state.taskInfo.taskType)}
                 </Tag>
               </div>
-              <div>过期时间：{state.taskInfo.expireTime || '-'}</div>
+              <div className="security-task-summary-row">
+                <span className="security-task-summary-label">过期时间</span>
+                <span className="security-task-summary-value">{state.taskInfo.expireTime || '-'}</span>
+              </div>
             </div>
           ) : null}
-        </fieldset>
-        {!state.loading && !state.errorMessage && state.taskInfo?.taskStatus === 'PENDING_PASSWORD'
-          ? renderPasswordStep()
-          : null}
-        {!state.loading && !state.errorMessage && state.taskInfo?.taskStatus === 'PENDING_OTP'
-          ? renderOtpStep()
-          : null}
+
+          {!state.loading && !state.errorMessage && state.taskInfo?.taskStatus === 'PENDING_PASSWORD'
+            ? renderPasswordStep()
+            : null}
+          {!state.loading && !state.errorMessage && state.taskInfo?.taskStatus === 'PENDING_OTP'
+            ? renderOtpStep()
+            : null}
+        </div>
       </div>
     </div>
   );
