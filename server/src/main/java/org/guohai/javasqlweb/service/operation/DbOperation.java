@@ -102,4 +102,10 @@ public interface DbOperation {
      * @throws SQLException
      */
     Boolean serverHealth() throws SQLException;
+
+    /**
+     * 释放底层资源，默认无操作。
+     */
+    default void close() {
+    }
 }

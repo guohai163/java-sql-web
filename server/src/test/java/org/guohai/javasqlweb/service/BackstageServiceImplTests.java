@@ -5,21 +5,31 @@ import org.guohai.javasqlweb.beans.*;
 import org.guohai.javasqlweb.dao.BaseConfigDao;
 import org.guohai.javasqlweb.dao.DashboardDao;
 import org.guohai.javasqlweb.dao.UserManageDao;
+import org.guohai.javasqlweb.service.operation.DbOperation;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.actuate.health.Health;
 import org.springframework.boot.actuate.health.HealthEndpoint;
 
 import javax.sql.DataSource;
+import java.sql.SQLTransientConnectionException;
 import java.util.Collections;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -43,6 +53,7 @@ class BackstageServiceImplTests {
     @Mock
     private UserSecurityTaskService userSecurityTaskService;
 
+    @Spy
     @InjectMocks
     private BackstageServiceImpl backstageService;
 
@@ -89,5 +100,38 @@ class BackstageServiceImplTests {
         assertEquals(2, result.getData().getSummary().getNewUsers());
         assertEquals(5L, result.getData().getSummary().getQueryCount());
         assertEquals(50L, result.getData().getSummary().getTotalReturnedRows());
+        verify(baseConfigDao, never()).getConnectConfig(anyInt());
+    }
+
+    @Test
+    void testServerConnectClosesTemporaryOperationOnSuccess() throws Exception {
+        ConnectConfigBean server = new ConnectConfigBean();
+        server.setCode(7);
+        server.setDbServerType("mysql");
+        DbOperation operation = mock(DbOperation.class);
+
+        doReturn(operation).when(backstageService).createTemporaryDbOperation(server);
+        when(operation.serverHealth()).thenReturn(true);
+
+        Result<String> result = backstageService.testServerConnect(server);
+
+        assertTrue(result.getStatus());
+        verify(operation).close();
+    }
+
+    @Test
+    void testServerConnectClosesTemporaryOperationOnFailure() throws Exception {
+        ConnectConfigBean server = new ConnectConfigBean();
+        server.setCode(8);
+        server.setDbServerType("mysql");
+        DbOperation operation = mock(DbOperation.class);
+
+        doReturn(operation).when(backstageService).createTemporaryDbOperation(server);
+        doThrow(new SQLTransientConnectionException("connect failed")).when(operation).serverHealth();
+
+        Result<String> result = backstageService.testServerConnect(server);
+
+        assertFalse(result.getStatus());
+        verify(operation).close();
     }
 }

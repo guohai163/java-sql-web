@@ -332,5 +332,10 @@ public class DbOperationMysqlDruid implements DbOperation {
         return true;
     }
 
+    @Override
+    public void close() {
+        HikariDataSourceUtils.closeDataSource(sqlDs);
+    }
+
 
 }

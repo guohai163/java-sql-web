@@ -69,18 +69,25 @@ public interface DashboardDao {
                                                          @Param("endTime") Date endTime,
                                                          @Param("limit") Integer limit);
 
-    @Select("SELECT CONCAT(COALESCE(t.database_name, l.query_database), '.', t.table_name) AS object_name, " +
-            "c.db_server_name AS server_name, " +
-            "COALESCE(t.database_name, l.query_database) AS database_name, " +
+    @Select("SELECT CONCAT(h.database_name, '.', h.table_name) AS object_name, " +
+            "h.server_name AS server_name, " +
+            "h.database_name AS database_name, " +
+            "h.table_name AS table_name, " +
+            "h.query_count AS query_count, " +
+            "h.total_returned_rows AS total_returned_rows " +
+            "FROM (" +
+            "SELECT COALESCE(t.database_name, l.query_database) AS database_name, " +
             "t.table_name AS table_name, " +
+            "c.db_server_name AS server_name, " +
             "COUNT(DISTINCT l.code) AS query_count, " +
             "COALESCE(SUM(l.result_row_count), 0) AS total_returned_rows " +
             "FROM db_query_log_target_tb t " +
             "JOIN db_query_log l ON l.code = t.query_log_code " +
             "LEFT JOIN db_connect_config_tb c ON c.code = l.server_code " +
             "WHERE l.query_time >= #{startTime} AND l.query_time < #{endTime} " +
-            "GROUP BY c.db_server_name, COALESCE(t.database_name, l.query_database), t.table_name " +
-            "ORDER BY query_count DESC, total_returned_rows DESC " +
+            "GROUP BY c.db_server_name, COALESCE(t.database_name, l.query_database), t.table_name" +
+            ") h " +
+            "ORDER BY h.query_count DESC, h.total_returned_rows DESC " +
             "LIMIT #{limit}")
     List<DashboardObjectHotspotItem> getTableHotspots(@Param("startTime") Date startTime,
                                                       @Param("endTime") Date endTime,

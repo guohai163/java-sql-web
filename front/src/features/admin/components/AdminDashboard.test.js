@@ -86,6 +86,7 @@ describe('AdminDashboard', () => {
     expect(screen.getByText('查询趋势')).toBeInTheDocument();
     expect(screen.getByText('用户查询排行')).toBeInTheDocument();
     expect(screen.getByText('最近 10 条查询')).toBeInTheDocument();
+    expect(screen.getByText('未探活')).toBeInTheDocument();
     expect(screen.getAllByText('alice').length).toBeGreaterThan(0);
     expect(screen.getAllByText('order_db.orders').length).toBeGreaterThan(0);
   });

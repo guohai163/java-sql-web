@@ -2,8 +2,7 @@
     background: #fff;
 }
 
-.ant-layout-header {
-
+.sql-guide-layout .ant-layout-header {
     position: fixed;
     z-index: 1;
     width: 100%;

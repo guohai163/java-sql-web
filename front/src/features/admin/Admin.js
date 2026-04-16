@@ -28,7 +28,6 @@ import {
 } from '@ant-design/icons';
 import AdminDashboard from '@/features/admin/components/AdminDashboard';
 import { createClient } from '@/shared/api/apiClient';
-import logo from '@/shared/assets/brand/logo.svg';
 import './Admin.css';
 
 const { confirm } = Modal;
@@ -72,10 +71,32 @@ function getPendingTaskMeta(taskType) {
   return { color: 'default', text: '无' };
 }
 
+function getAuthStatusMeta(status) {
+  if (status === 'BIND') {
+    return { color: 'success', text: '已绑定' };
+  }
+  if (status === 'BINDING') {
+    return { color: 'processing', text: '绑定中' };
+  }
+  return { color: 'default', text: status || '未绑定' };
+}
+
+function createEmptyQueryLogCursor(pageSize = 25) {
+  return {
+    items: [],
+    pageSize,
+    firstCode: null,
+    lastCode: null,
+    hasOlder: false,
+    hasNewer: false,
+  };
+}
+
 function Admin() {
   const navigate = useNavigate();
   const [state, setState] = useState({
     menuSelect: '1',
+    version: '',
     dashboardData: null,
     dashboardLoading: false,
     dashboardUpdatedAt: '',
@@ -83,7 +104,7 @@ function Admin() {
       range: '24h',
       grain: 'hour',
     },
-    queryLog: [],
+    queryLogCursor: createEmptyQueryLogCursor(),
     connList: [],
     configVisible: false,
     userAddVisible: false,
@@ -105,6 +126,8 @@ function Admin() {
     userGroupEditUserList: [],
     token: cookie.load('token') || '',
   });
+
+  const adminLogo = '/jsw_logo.png';
 
   const setStatePatch = (patch) => {
     setState((previous) => ({
@@ -173,6 +196,37 @@ function Admin() {
     showDialog(response.jsonData.message || '首页统计数据加载失败');
   };
 
+  const loadQueryLog = async (options = {}) => {
+    const client = createClient();
+    const query = new URLSearchParams({
+      pageSize: String(options.pageSize || state.queryLogCursor.pageSize || 25),
+      direction: options.direction || 'older',
+    });
+
+    if (options.cursorCode != null) {
+      query.set('cursorCode', String(options.cursorCode));
+    }
+
+    const response = await client.get(`/api/backstage/querylog?${query.toString()}`, {
+      headers: {
+        'Content-Type': 'text/plain',
+        'User-Token': state.token,
+      },
+    });
+
+    if (response.jsonData.status === true) {
+      setStatePatch({
+        queryLogCursor: response.jsonData.data || createEmptyQueryLogCursor(),
+      });
+      return;
+    }
+
+    setStatePatch({
+      queryLogCursor: createEmptyQueryLogCursor(),
+    });
+    showDialog(response.jsonData.message || '查询日志加载失败');
+  };
+
   const loadMenu = async (menuKey) => {
     setStatePatch({
       menuSelect: menuKey,
@@ -211,10 +265,7 @@ function Admin() {
         break;
       }
       case '4': {
-        const response = await client.get('/api/backstage/querylog', headers);
-        setStatePatch({
-          queryLog: response.jsonData.data,
-        });
+        await loadQueryLog();
         break;
       }
       case '6': {
@@ -251,6 +302,15 @@ function Admin() {
       navigate('/login', { replace: true });
       return;
     }
+
+    const client = createClient();
+    void client.get('/version').then((response) => {
+      if (response.jsonData.status === true) {
+        setStatePatch({
+          version: response.jsonData.data || '',
+        });
+      }
+    });
 
     void loadMenu('1');
   }, []);
@@ -645,10 +705,10 @@ function Admin() {
     { title: '查询者IP', dataIndex: 'queryIp' },
     { title: '实例', dataIndex: 'serverName', width: 150 },
     { title: '查询数据库', dataIndex: 'queryDatabase' },
-    { title: '涉及表', dataIndex: 'targetTables', ellipsis: true },
+    { title: '涉及表', dataIndex: 'targetTables', ellipsis: true, width: 240 },
     { title: '返回条数', dataIndex: 'resultRowCount', width: 110 },
     { title: '耗时(ms)', dataIndex: 'queryConsuming', width: 110 },
-    { title: '查询脚本', dataIndex: 'querySqlscript' },
+    { title: '查询脚本', dataIndex: 'querySqlscript', ellipsis: true },
   ];
 
   const connListColumns = [
@@ -691,30 +751,60 @@ function Admin() {
   ];
 
   const userListColumns = [
-    { title: '编号', dataIndex: 'code' },
-    { title: '用户名', dataIndex: 'userName' },
-    { title: '邮箱', dataIndex: 'email' },
+    {
+      title: '编号',
+      dataIndex: 'code',
+      width: 82,
+      render: (value) => <span className="admin-user-code">{value}</span>,
+    },
+    {
+      title: '用户名',
+      dataIndex: 'userName',
+      width: 164,
+      render: (value) => (
+        <div className="admin-identity-cell">
+          <strong>{value || '-'}</strong>
+          <span>平台账号</span>
+        </div>
+      ),
+    },
+    {
+      title: '邮箱',
+      dataIndex: 'email',
+      width: 280,
+      render: (value) => <span className="admin-email-text">{value || '-'}</span>,
+    },
     {
       title: '账号状态',
       dataIndex: 'accountStatus',
+      width: 132,
       render: (value) => {
         const meta = getAccountStatusMeta(value);
         return <Tag color={meta.color}>{meta.text}</Tag>;
       },
     },
-    { title: '二次验证绑定', dataIndex: 'authStatus' },
+    {
+      title: '二次验证绑定',
+      dataIndex: 'authStatus',
+      width: 140,
+      render: (value) => {
+        const meta = getAuthStatusMeta(value);
+        return <Tag color={meta.color}>{meta.text}</Tag>;
+      },
+    },
     {
       title: '待处理任务',
       dataIndex: 'pendingSecurityTaskType',
+      width: 188,
       render: (value, record) => {
         if (!value) {
-          return <Tag>无</Tag>;
+          return <Tag borderless className="admin-soft-tag">无</Tag>;
         }
         const meta = getPendingTaskMeta(value);
         return (
           <div className="admin-task-cell">
             <Tag color={meta.color}>{meta.text}</Tag>
-            <span>{record.pendingSecurityTaskExpireTime || '-'}</span>
+            <span className="admin-task-time">{record.pendingSecurityTaskExpireTime || '-'}</span>
           </div>
         );
       },
@@ -722,6 +812,7 @@ function Admin() {
     {
       title: '访问令牌状态',
       dataIndex: 'accessTokenStatus',
+      width: 122,
       render: (value) => {
         if (value === 'ACTIVE') {
           return <Tag color="success">有效</Tag>;
@@ -729,20 +820,25 @@ function Admin() {
         if (value === 'EXPIRED') {
           return <Tag color="warning">已过期</Tag>;
         }
-        return <Tag>未申请</Tag>;
+        return <Tag borderless className="admin-soft-tag">未申请</Tag>;
       },
     },
     {
       title: '令牌到期时间',
       dataIndex: 'accessTokenExpireTime',
-      render: (value) => value || '-',
+      width: 188,
+      render: (value) => (
+        <span className={`admin-token-expire ${value ? '' : 'empty'}`}>{value || '-'}</span>
+      ),
     },
     {
       title: '操作',
+      width: 360,
       render: (text, record) => (
-        <Space size="middle">
+        <Space className="admin-action-group" size={[8, 8]} wrap>
           {record.accountStatus === 'PENDING_ACTIVATION' ? (
             <Button
+              className="admin-action-button"
               type="link"
               onClick={() =>
                 issueUserLink(
@@ -756,6 +852,7 @@ function Admin() {
             </Button>
           ) : null}
           <Button
+            className="admin-action-button"
             type="link"
             onClick={() =>
               issueUserLink(
@@ -768,6 +865,7 @@ function Admin() {
             重置密码链接
           </Button>
           <Button
+            className="admin-action-button"
             type="link"
             onClick={() =>
               issueUserLink(
@@ -779,7 +877,7 @@ function Admin() {
           >
             重绑OTP链接
           </Button>
-          <Button type="link" onClick={() => userDeleteBtn(record.userName)}>
+          <Button className="admin-action-button danger" type="link" onClick={() => userDeleteBtn(record.userName)}>
             删除
           </Button>
         </Space>
@@ -901,11 +999,15 @@ function Admin() {
       <Sider className="admin-sider" theme="light" width={252}>
         <div className="admin-brand">
           <div className="admin-brand-mark">
-            <img src={logo} alt="logo" />
+            <img src={adminLogo} alt="JavaSqlWeb logo" />
           </div>
           <div className="admin-brand-copy">
-            <strong>JavaSqlWeb</strong>
-            <span>Admin cockpit</span>
+            <strong className="admin-brand-wordmark">
+              <span className="tone-java">Java</span>
+              <span className="tone-sql">Sql</span>
+              <span className="tone-web">Web</span>
+            </strong>
+            <span>v{state.version || '0.9.0'}</span>
           </div>
         </div>
         <Menu
@@ -970,6 +1072,7 @@ function Admin() {
                   />
                 </div>,
                 <Table
+                  className="admin-users-table"
                   columns={userListColumns}
                   dataSource={filteredUserList}
                   pagination={{ pageSize: 25 }}
@@ -998,12 +1101,46 @@ function Admin() {
           {state.menuSelect === '4'
             ? renderPageSection(
                 '查询日志',
-                null,
+                <div className="admin-toolbar">
+                  <Button onClick={() => {
+                    void loadQueryLog();
+                  }}
+                  >
+                    刷新最新
+                  </Button>
+                  <Button
+                    disabled={!state.queryLogCursor.hasNewer || state.queryLogCursor.firstCode == null}
+                    onClick={() => {
+                      void loadQueryLog({
+                        cursorCode: state.queryLogCursor.firstCode,
+                        direction: 'newer',
+                        pageSize: state.queryLogCursor.pageSize,
+                      });
+                    }}
+                  >
+                    更新
+                  </Button>
+                  <Button
+                    disabled={!state.queryLogCursor.hasOlder || state.queryLogCursor.lastCode == null}
+                    onClick={() => {
+                      void loadQueryLog({
+                        cursorCode: state.queryLogCursor.lastCode,
+                        direction: 'older',
+                        pageSize: state.queryLogCursor.pageSize,
+                      });
+                    }}
+                  >
+                    更多
+                  </Button>
+                  <span className="admin-dashboard-meta">
+                    当前窗口 {state.queryLogCursor.items.length} 条
+                  </span>
+                </div>,
                 <Table
                   columns={queryLogColumns}
-                  dataSource={state.queryLog}
-                  pagination={{ pageSize: 25 }}
-                  rowKey={(record, index) => `query-log-${record.queryTime}-${index}`}
+                  dataSource={state.queryLogCursor.items}
+                  pagination={false}
+                  rowKey={(record) => `query-log-${record.code}`}
                   size="small"
                 />,
               )
@@ -1286,7 +1423,7 @@ function Admin() {
             </Form>
           </Modal>
         </Content>
-        <Footer className="admin-footer">JavaSqlWeb admin cockpit</Footer>
+        <Footer className="admin-footer">JavaSqlWeb v{state.version || '0.9.0'}</Footer>
       </Layout>
     </Layout>
   );

@@ -65,7 +65,7 @@ export default function DataDisplayFast(props) {
     },[props.dataAreaRefresh])
     return(
         <>
-             <table className="table_results ajax pma_table">
+             <table className="table_results ajax pma_table workbench-results-table">
                  <thead>
                 {printTableHead()}
 

@@ -37,24 +37,22 @@
 }
 
 .admin-brand-mark {
-    width: 54px;
-    height: 54px;
-    border-radius: 18px;
-    display: grid;
-    place-items: center;
-    background: linear-gradient(135deg, #0f766e, #0ea5e9);
-    box-shadow: 0 16px 30px rgba(14, 165, 233, 0.25);
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .admin-brand-mark img {
-    width: 32px;
-    height: 32px;
+    width: 64px;
+    height: 64px;
+    object-fit: contain;
 }
 
 .admin-brand-copy {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
 }
 
 .admin-brand-copy strong {
@@ -64,11 +62,29 @@
     letter-spacing: 0.02em;
 }
 
+.admin-brand-wordmark {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0;
+}
+
+.admin-brand-wordmark .tone-java {
+    color: #d92d20;
+}
+
+.admin-brand-wordmark .tone-sql {
+    color: #16a34a;
+}
+
+.admin-brand-wordmark .tone-web {
+    color: #3f3f46;
+}
+
 .admin-brand-copy span {
     color: var(--admin-text-soft);
-    font-size: 0.86rem;
-    text-transform: uppercase;
-    letter-spacing: 0.18em;
+    font-size: 0.84rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
 }
 
 .admin-menu {
@@ -96,11 +112,14 @@
     background: transparent !important;
 }
 
-.admin-header {
+.admin-header.ant-layout-header {
     height: auto;
     min-height: 128px;
     margin: 22px 22px 0;
     padding: 26px 30px;
+    line-height: normal;
+    width: auto;
+    position: static;
     border: 1px solid rgba(255, 255, 255, 0.5);
     border-radius: var(--admin-radius);
     background: linear-gradient(135deg, rgba(255, 255, 255, 0.88), rgba(245, 251, 250, 0.92));
@@ -501,6 +520,151 @@
 .admin-panel-card .ant-table-tbody > tr > td,
 .admin-dashboard-card .ant-table-tbody > tr > td {
     background: rgba(255, 255, 255, 0.78);
+}
+
+.admin-users-table {
+    margin-top: 6px;
+}
+
+.admin-users-table .ant-table-container {
+    overflow: hidden;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 24px;
+}
+
+.admin-users-table .ant-table-thead > tr > th {
+    background: linear-gradient(135deg, rgba(239, 248, 255, 0.96), rgba(232, 245, 247, 0.98));
+    border-bottom: none;
+    color: #22395a;
+    font-size: 0.96rem;
+    font-weight: 800;
+    padding: 18px 14px;
+}
+
+.admin-users-table .ant-table-thead > tr > th::before {
+    display: none !important;
+}
+
+.admin-users-table .ant-table-tbody > tr > td {
+    background: rgba(255, 255, 255, 0.92);
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+    color: var(--admin-text);
+    padding: 18px 14px;
+    vertical-align: top;
+}
+
+.admin-users-table .ant-table-tbody > tr:nth-child(even) > td {
+    background: rgba(248, 252, 253, 0.94);
+}
+
+.admin-users-table .ant-table-tbody > tr:hover > td {
+    background: rgba(232, 246, 248, 0.96) !important;
+}
+
+.admin-users-table .ant-table-pagination {
+    margin: 18px 4px 4px;
+}
+
+.admin-user-code {
+    min-width: 38px;
+    height: 38px;
+    border-radius: 12px;
+    display: inline-grid;
+    place-items: center;
+    background: linear-gradient(135deg, rgba(15, 118, 110, 0.12), rgba(14, 165, 233, 0.14));
+    color: #155e75;
+    font-size: 0.92rem;
+    font-weight: 800;
+}
+
+.admin-identity-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.admin-identity-cell strong {
+    color: var(--admin-text);
+    font-size: 1.02rem;
+    font-weight: 800;
+}
+
+.admin-identity-cell span {
+    color: var(--admin-text-soft);
+    font-size: 0.8rem;
+    letter-spacing: 0.06em;
+}
+
+.admin-email-text {
+    color: #334155;
+    font-size: 0.95rem;
+    word-break: break-all;
+}
+
+.admin-soft-tag {
+    background: rgba(241, 245, 249, 0.92) !important;
+    border: 1px solid rgba(148, 163, 184, 0.28) !important;
+    border-radius: 999px !important;
+    color: #475569 !important;
+    font-weight: 700;
+}
+
+.admin-task-time {
+    color: var(--admin-text-soft);
+    font-size: 0.8rem;
+    line-height: 1.5;
+}
+
+.admin-token-expire {
+    display: inline-block;
+    max-width: 100%;
+    padding: 9px 12px;
+    border: 1px solid rgba(14, 165, 233, 0.16);
+    border-radius: 14px;
+    background: rgba(248, 250, 252, 0.92);
+    color: #334155;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 0.84rem;
+    line-height: 1.45;
+}
+
+.admin-token-expire.empty {
+    border-style: dashed;
+    border-color: rgba(148, 163, 184, 0.26);
+    background: rgba(248, 250, 252, 0.5);
+    color: #94a3b8;
+}
+
+.admin-action-group {
+    row-gap: 8px;
+}
+
+.admin-action-button.ant-btn-link {
+    height: auto;
+    padding: 6px 12px;
+    border: 1px solid rgba(59, 130, 246, 0.12);
+    border-radius: 999px;
+    background: rgba(239, 246, 255, 0.92);
+    color: #2563eb;
+    font-size: 0.84rem;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.admin-action-button.ant-btn-link:hover {
+    background: rgba(219, 234, 254, 0.96) !important;
+    color: #1d4ed8 !important;
+}
+
+.admin-action-button.danger.ant-btn-link {
+    border-color: rgba(244, 63, 94, 0.14);
+    background: rgba(255, 241, 242, 0.94);
+    color: #e11d48;
+}
+
+.admin-action-button.danger.ant-btn-link:hover {
+    background: rgba(255, 228, 230, 0.98) !important;
+    color: #be123c !important;
 }
 
 @media (max-width: 1500px) {

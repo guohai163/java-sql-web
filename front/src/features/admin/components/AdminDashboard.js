@@ -93,7 +93,7 @@ function buildSummaryCards(summary) {
       title: '数据实例',
       icon: <DatabaseOutlined />,
       value: formatInteger(summary?.totalInstances),
-      helper: `健康 ${formatInteger(summary?.healthyInstances)}`,
+      helper: '未探活',
       accent: 'amber',
     },
     {

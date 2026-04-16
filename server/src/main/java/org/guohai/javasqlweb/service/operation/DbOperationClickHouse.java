@@ -27,7 +27,11 @@ public class DbOperationClickHouse implements DbOperation{
     DbOperationClickHouse(ConnectConfigBean conn) throws Exception {
         sqlDs = HikariDataSourceUtils.createDataSource(
                 "jsw-clickhouse-" + conn.getCode(),
-                String.format("jdbc:clickhouse://%s:%s", conn.getDbServerHost(), conn.getDbServerPort()),
+                String.format(
+                        "jdbc:clickhouse://%s:%s?retry=0&client_retry_on_failures=None",
+                        conn.getDbServerHost(),
+                        conn.getDbServerPort()
+                ),
                 conn.getDbServerUsername(),
                 conn.getDbServerPassword(),
                 "select now()"
@@ -246,5 +250,10 @@ public class DbOperationClickHouse implements DbOperation{
     @Override
     public Boolean serverHealth() throws SQLException {
         return null;
+    }
+
+    @Override
+    public void close() {
+        HikariDataSourceUtils.closeDataSource(sqlDs);
     }
 }

@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 基础信息DAO
@@ -89,18 +90,47 @@ public interface BaseConfigDao {
                                   @Param("time") Integer time,
                                   @Param("resultRowCount") Integer resultRowCount);
 
-    /**
-     * 倒序查询日志
-     * @return
-     */
-    @Select("SELECT l.*, c.db_server_name AS server_name, " +
-            "COALESCE(GROUP_CONCAT(DISTINCT CONCAT(COALESCE(t.database_name, l.query_database), '.', t.table_name) ORDER BY t.table_name SEPARATOR ', '), '-') AS target_tables " +
+    @Select("<script>" +
+            "SELECT l.*, c.db_server_name AS server_name " +
             "FROM db_query_log l " +
             "LEFT JOIN db_connect_config_tb c ON c.code = l.server_code " +
-            "LEFT JOIN db_query_log_target_tb t ON t.query_log_code = l.code " +
-            "GROUP BY l.code, l.query_ip, l.query_name, l.query_database, l.server_code, l.query_sqlscript, l.query_consuming, l.result_row_count, l.query_time, c.db_server_name " +
-            "ORDER BY l.code DESC LIMIT 2000;")
-    List<QueryLogBean> getQueryLog();
+            "<if test='cursorCode != null'>" +
+            "WHERE l.code &lt; #{cursorCode} " +
+            "</if>" +
+            "ORDER BY l.code DESC " +
+            "LIMIT #{limit}" +
+            "</script>")
+    List<QueryLogBean> getQueryLogWindowOlder(@Param("cursorCode") Integer cursorCode,
+                                              @Param("limit") Integer limit);
+
+    @Select("<script>" +
+            "SELECT l.*, c.db_server_name AS server_name " +
+            "FROM db_query_log l " +
+            "LEFT JOIN db_connect_config_tb c ON c.code = l.server_code " +
+            "WHERE l.code &gt; #{cursorCode} " +
+            "ORDER BY l.code ASC " +
+            "LIMIT #{limit}" +
+            "</script>")
+    List<QueryLogBean> getQueryLogWindowNewer(@Param("cursorCode") Integer cursorCode,
+                                              @Param("limit") Integer limit);
+
+    @Select("<script>" +
+            "SELECT query_log_code, " +
+            "GROUP_CONCAT(DISTINCT CONCAT(database_name, '.', table_name) ORDER BY table_name SEPARATOR ', ') AS target_tables " +
+            "FROM db_query_log_target_tb " +
+            "WHERE query_log_code IN " +
+            "<foreach collection='queryLogCodes' item='queryLogCode' open='(' separator=',' close=')'>" +
+            "#{queryLogCode}" +
+            "</foreach> " +
+            "GROUP BY query_log_code" +
+            "</script>")
+    List<Map<String, Object>> getQueryLogTargetSummaries(@Param("queryLogCodes") List<Integer> queryLogCodes);
+
+    @Select("SELECT EXISTS(SELECT 1 FROM db_query_log WHERE code < #{code})")
+    Boolean existsOlderQueryLog(@Param("code") Integer code);
+
+    @Select("SELECT EXISTS(SELECT 1 FROM db_query_log WHERE code > #{code})")
+    Boolean existsNewerQueryLog(@Param("code") Integer code);
 
     /**
      * 获取所有的连接配置

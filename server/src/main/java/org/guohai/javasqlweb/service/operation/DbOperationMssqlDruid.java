@@ -328,6 +328,11 @@ public class DbOperationMssqlDruid implements DbOperation {
         return true;
     }
 
+    @Override
+    public void close() {
+        HikariDataSourceUtils.closeDataSource(sqlDs);
+    }
+
     private String buildJdbcUrl(ConnectConfigBean conn) {
         String sslMode = conn.getDbSslMode() == null ? SSL_MODE_DEFAULT : conn.getDbSslMode();
         if (SSL_MODE_DISABLE_ENCRYPTION.equalsIgnoreCase(sslMode)) {

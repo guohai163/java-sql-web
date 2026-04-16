@@ -19,9 +19,12 @@ import org.springframework.stereotype.Service;
 
 import javax.sql.DataSource;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -33,6 +36,10 @@ import java.util.Map;
 public class BackstageServiceImpl implements BackstageService{
 
     private static final String LEGACY_TLS_MODE = "LEGACY_TLS";
+    private static final String QUERY_LOG_DIRECTION_NEWER = "newer";
+    private static final String QUERY_LOG_DIRECTION_OLDER = "older";
+    private static final int QUERY_LOG_DEFAULT_PAGE_SIZE = 25;
+    private static final int QUERY_LOG_MAX_PAGE_SIZE = 100;
     @Autowired
     BaseConfigDao baseConfigDao;
 
@@ -61,9 +68,39 @@ public class BackstageServiceImpl implements BackstageService{
      * @return
      */
     @Override
-    public Result<List<QueryLogBean>> getQueryLog() {
+    public Result<QueryLogCursorResponse> getQueryLog(Integer pageSize, Integer cursorCode, String direction) {
+        int normalizedPageSize = normalizeQueryLogPageSize(pageSize);
+        String normalizedDirection = normalizeQueryLogDirection(direction);
+        List<QueryLogBean> windowRows = QUERY_LOG_DIRECTION_NEWER.equals(normalizedDirection)
+                ? baseConfigDao.getQueryLogWindowNewer(cursorCode, normalizedPageSize + 1)
+                : baseConfigDao.getQueryLogWindowOlder(cursorCode, normalizedPageSize + 1);
 
-        return new Result<>(true,"", baseConfigDao.getQueryLog());
+        boolean hasBoundaryRows = windowRows.size() > normalizedPageSize;
+        List<QueryLogBean> pageItems = new ArrayList<>(
+                hasBoundaryRows ? windowRows.subList(0, normalizedPageSize) : windowRows
+        );
+
+        if (QUERY_LOG_DIRECTION_NEWER.equals(normalizedDirection)) {
+            pageItems.sort(Comparator.comparing(QueryLogBean::getCode).reversed());
+        }
+
+        fillQueryLogTargetTables(pageItems);
+
+        QueryLogCursorResponse response = new QueryLogCursorResponse();
+        response.setItems(pageItems);
+        response.setPageSize(normalizedPageSize);
+        response.setFirstCode(pageItems.isEmpty() ? null : pageItems.get(0).getCode());
+        response.setLastCode(pageItems.isEmpty() ? null : pageItems.get(pageItems.size() - 1).getCode());
+
+        if (QUERY_LOG_DIRECTION_NEWER.equals(normalizedDirection)) {
+            response.setHasNewer(hasBoundaryRows);
+            response.setHasOlder(hasExistingOlderQueryLog(response.getLastCode()));
+        } else {
+            response.setHasOlder(hasBoundaryRows);
+            response.setHasNewer(cursorCode != null && hasExistingNewerQueryLog(response.getFirstCode() == null ? cursorCode : response.getFirstCode()));
+        }
+
+        return new Result<>(true, "", response);
     }
 
     /**
@@ -116,8 +153,9 @@ public class BackstageServiceImpl implements BackstageService{
                     "当前服务器配置为 LEGACY_TLS，但应用未启用 project.legacy-tls-enabled。请先在部署层显式开启遗留 TLS 模式。",
                     "当前服务器配置为 LEGACY_TLS，但应用未启用 project.legacy-tls-enabled。请先在部署层显式开启遗留 TLS 模式。");
         }
+        DbOperation dbOperation = null;
         try {
-            DbOperation dbOperation  = DbOperationFactory.createDbOperation(server);
+            dbOperation = createTemporaryDbOperation(server);
             dbOperation.serverHealth();
         } catch (Exception e) {
             LOG.error(e.getMessage());
@@ -134,6 +172,8 @@ public class BackstageServiceImpl implements BackstageService{
                 return new Result<>(false, message, message);
             }
             return new Result<>(false,e.getMessage(),e.getMessage());
+        } finally {
+            closeOperationQuietly(server.getCode(), dbOperation);
         }
         return new Result<>(true,"连接成功","");
     }
@@ -362,7 +402,6 @@ public class BackstageServiceImpl implements BackstageService{
         }
         List<ConnectConfigBean> connectConfigs = baseConfigDao.getConnData();
         summary.setTotalInstances(connectConfigs.size());
-        summary.setHealthyInstances(resolveHealthyInstanceCount(connectConfigs));
         summary.setActivePoolConnections(defaultInteger(pool.getActiveConnections()));
         summary.setIdlePoolConnections(defaultInteger(pool.getIdleConnections()));
         summary.setTotalPoolConnections(defaultInteger(pool.getTotalConnections()));
@@ -373,22 +412,6 @@ public class BackstageServiceImpl implements BackstageService{
         summary.setTotalUsers(defaultInteger(summary.getTotalUsers()));
         summary.setNewUsers(defaultInteger(summary.getNewUsers()));
         return summary;
-    }
-
-    private Integer resolveHealthyInstanceCount(List<ConnectConfigBean> connectConfigs) {
-        int healthyCount = 0;
-        for (ConnectConfigBean config : connectConfigs) {
-            try {
-                ConnectConfigBean fullConfig = baseConfigDao.getConnectConfig(config.getCode());
-                DbOperation dbOperation = DbOperationFactory.createDbOperation(fullConfig);
-                if (dbOperation != null && Boolean.TRUE.equals(dbOperation.serverHealth())) {
-                    healthyCount++;
-                }
-            } catch (Exception e) {
-                LOG.warn("Dashboard health check failed for server {}", config.getCode(), e);
-            }
-        }
-        return healthyCount;
     }
 
     private String buildBucketExpr(String grain) {
@@ -415,5 +438,81 @@ public class BackstageServiceImpl implements BackstageService{
 
     private Double defaultDouble(Double value) {
         return value == null ? 0D : value;
+    }
+
+    private int normalizeQueryLogPageSize(Integer pageSize) {
+        if (pageSize == null || pageSize < 1) {
+            return QUERY_LOG_DEFAULT_PAGE_SIZE;
+        }
+        return Math.min(pageSize, QUERY_LOG_MAX_PAGE_SIZE);
+    }
+
+    private String normalizeQueryLogDirection(String direction) {
+        return QUERY_LOG_DIRECTION_NEWER.equalsIgnoreCase(direction)
+                ? QUERY_LOG_DIRECTION_NEWER
+                : QUERY_LOG_DIRECTION_OLDER;
+    }
+
+    private void fillQueryLogTargetTables(List<QueryLogBean> queryLogs) {
+        if (queryLogs.isEmpty()) {
+            return;
+        }
+
+        List<Integer> queryLogCodes = queryLogs.stream()
+                .map(QueryLogBean::getCode)
+                .filter(code -> code != null)
+                .toList();
+
+        if (queryLogCodes.isEmpty()) {
+            queryLogs.forEach(queryLog -> queryLog.setTargetTables("-"));
+            return;
+        }
+
+        Map<Integer, String> targetSummaryMap = new LinkedHashMap<>();
+        for (Map<String, Object> row : baseConfigDao.getQueryLogTargetSummaries(queryLogCodes)) {
+            Integer queryLogCode = parseInteger(row.get("query_log_code"));
+            if (queryLogCode == null) {
+                continue;
+            }
+            targetSummaryMap.put(queryLogCode, String.valueOf(row.get("target_tables")));
+        }
+
+        for (QueryLogBean queryLog : queryLogs) {
+            queryLog.setTargetTables(targetSummaryMap.getOrDefault(queryLog.getCode(), "-"));
+        }
+    }
+
+    private boolean hasExistingOlderQueryLog(Integer code) {
+        return code != null && Boolean.TRUE.equals(baseConfigDao.existsOlderQueryLog(code));
+    }
+
+    private boolean hasExistingNewerQueryLog(Integer code) {
+        return code != null && Boolean.TRUE.equals(baseConfigDao.existsNewerQueryLog(code));
+    }
+
+    DbOperation createTemporaryDbOperation(ConnectConfigBean server) throws Exception {
+        return DbOperationFactory.createDbOperation(server);
+    }
+
+    private void closeOperationQuietly(Integer serverCode, DbOperation operation) {
+        if (operation == null) {
+            return;
+        }
+        try {
+            operation.close();
+        } catch (Exception e) {
+            LOG.warn("Failed to close temporary operation for server {}", serverCode, e);
+        }
+    }
+
+    private Integer parseInteger(Object value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return Integer.parseInt(value.toString());
+        } catch (Exception e) {
+            return null;
+        }
     }
 }

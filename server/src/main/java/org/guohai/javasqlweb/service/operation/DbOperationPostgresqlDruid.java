@@ -270,6 +270,15 @@ public class DbOperationPostgresqlDruid implements DbOperation {
         return true;
     }
 
+    @Override
+    public void close() {
+        HikariDataSourceUtils.closeDataSource(sqlDs);
+        for (DataSource dataSource : postgresMap.values()) {
+            HikariDataSourceUtils.closeDataSource(dataSource);
+        }
+        postgresMap.clear();
+    }
+
 
     /**
      * 通过库名制造一个连接串

@@ -41,9 +41,12 @@ public class BackstageController {
      * @return
      */
     @ResponseBody
-    @RequestMapping(value = "/querylog")
-    public Result<List<QueryLogBean>> getQueryLog(){
-        return backstageService.getQueryLog();
+    @RequestMapping(value = "/querylog", method = RequestMethod.GET)
+    public Result<QueryLogCursorResponse> getQueryLog(
+            @RequestParam(value = "pageSize", required = false) Integer pageSize,
+            @RequestParam(value = "cursorCode", required = false) Integer cursorCode,
+            @RequestParam(value = "direction", defaultValue = "older") String direction){
+        return backstageService.getQueryLog(pageSize, cursorCode, direction);
     }
 
     /**

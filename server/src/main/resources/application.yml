@@ -14,7 +14,7 @@ mybatis:
   configuration:
     map-underscore-to-camel-case: true
 project:
-  version: ${PROJECT_VERSION:0.9.0}
+  version: ${PROJECT_VERSION:2.2.0}
   limit: ${PROJECT_LIMIT:20000}
   signkey: ${PROJECT_SIGNKEY:jsw}
   domain: ${PROJECT_DOMAIN:localhost}

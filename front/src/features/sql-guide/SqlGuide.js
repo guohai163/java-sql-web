@@ -32,7 +32,7 @@ function SqlGuide() {
   ];
 
   return (
-    <Layout>
+    <Layout className="sql-guide-layout">
       <Header className="header">
         <Menu
           defaultSelectedKeys={['stage']}

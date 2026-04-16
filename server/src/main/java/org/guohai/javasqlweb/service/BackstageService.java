@@ -5,6 +5,7 @@ import org.guohai.javasqlweb.beans.DashboardResponse;
 import org.guohai.javasqlweb.beans.LinkIssueResult;
 import org.guohai.javasqlweb.beans.PoolStatBean;
 import org.guohai.javasqlweb.beans.QueryLogBean;
+import org.guohai.javasqlweb.beans.QueryLogCursorResponse;
 import org.guohai.javasqlweb.beans.Result;
 import org.guohai.javasqlweb.beans.UserBean;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -22,7 +23,7 @@ public interface BackstageService {
      * 获取查询日志
      * @return
      */
-    Result<List<QueryLogBean>> getQueryLog();
+    Result<QueryLogCursorResponse> getQueryLog(Integer pageSize, Integer cursorCode, String direction);
 
     /**
      * 获取连接表

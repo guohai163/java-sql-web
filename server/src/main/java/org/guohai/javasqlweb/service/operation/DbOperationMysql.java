@@ -275,6 +275,16 @@ public class DbOperationMysql implements DbOperation {
         return null;
     }
 
+    @Override
+    public void close() {
+        if (sqlConn != null) {
+            try {
+                sqlConn.close();
+            } catch (SQLException ignored) {
+            }
+        }
+    }
+
 
     /**
      * 检查连接状态后再使用

@@ -1,5 +1,6 @@
 package org.guohai.javasqlweb.service;
 
+import jakarta.annotation.PreDestroy;
 import org.guohai.javasqlweb.beans.*;
 import org.guohai.javasqlweb.dao.BaseConfigDao;
 import org.guohai.javasqlweb.dao.QueryLogTargetDao;
@@ -14,12 +15,18 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import javax.net.ssl.SSLHandshakeException;
+import java.net.ConnectException;
+import java.net.SocketTimeoutException;
+import java.sql.SQLNonTransientConnectionException;
 import java.sql.SQLException;
+import java.sql.SQLTransientConnectionException;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 基础数据操作服务类
@@ -44,12 +51,30 @@ public class BaseDataServiceImpl implements BaseDataService{
     /**
      * 服务器实例集合
      */
-    private static Map<Integer, DbOperation> operationMap = new HashMap<>();
+    private static final Map<Integer, DbOperation> operationMap = new ConcurrentHashMap<>();
+
+    /**
+     * 目标库失败状态
+     */
+    private static final Map<Integer, Integer> connectionFailureCountMap = new ConcurrentHashMap<>();
+
+    private static final Map<Integer, Long> connectionCooldownUntilMap = new ConcurrentHashMap<>();
+
+    private static final Map<Integer, String> connectionLastErrorMap = new ConcurrentHashMap<>();
 
     /**
      * sql最大保存长度
      */
     private static final Integer SAVE_SQL_LENGTH_LIMIT = 8000;
+
+    private static final int CONNECTION_FAILURE_THRESHOLD = 3;
+
+    private static final long CONNECTION_FAILURE_COOLDOWN_MILLIS = 5 * 60 * 1000L;
+
+    @FunctionalInterface
+    private interface OperationAction<T> {
+        T execute(DbOperation operation) throws Exception;
+    }
 
     @Override
     public Result<List<ConnectConfigBean>> getAllDataConnect() {
@@ -85,19 +110,7 @@ public class BaseDataServiceImpl implements BaseDataService{
         if (permissionCheck != null) {
             return permissionCheck;
         }
-
-        DbOperation operation = createDbOperation(serverCode);
-        if(null != operation){
-            try{
-                return new Result<>(true,"", operation.getDbList());
-            } catch (Exception e) {
-                e.printStackTrace();
-                return new Result<>(false,e.toString(),null);
-            }
-        }else{
-            return new Result<>(false,"没有找到对应 的数据库",null);
-        }
-
+        return executeServerOperation(serverCode, DbOperation::getDbList);
     }
 
     /**
@@ -113,17 +126,7 @@ public class BaseDataServiceImpl implements BaseDataService{
         if (permissionCheck != null) {
             return permissionCheck;
         }
-        DbOperation operation = createDbOperation(serverCode);
-        if(null != operation){
-            try{
-                return new Result<>(true,"", operation.getTableList(dbName));
-            } catch (Exception e) {
-                e.printStackTrace();
-                return new Result<>(false,"",null);
-            }
-        }else{
-            return new Result<>(false,"",null);
-        }
+        return executeServerOperation(serverCode, operation -> operation.getTableList(dbName));
     }
 
 
@@ -141,18 +144,7 @@ public class BaseDataServiceImpl implements BaseDataService{
         if (permissionCheck != null) {
             return permissionCheck;
         }
-        
-        DbOperation operation = createDbOperation(serverCode);
-        if(null != operation){
-            try{
-                return new Result<>(true,"", operation.getColumnsList(dbName, tableName));
-            } catch (Exception e) {
-                e.printStackTrace();
-                return new Result<>(false,"",null);
-            }
-        }else{
-            return new Result<>(false,"",null);
-        }
+        return executeServerOperation(serverCode, operation -> operation.getColumnsList(dbName, tableName));
     }
 
     /**
@@ -168,18 +160,7 @@ public class BaseDataServiceImpl implements BaseDataService{
         if (permissionCheck != null) {
             return permissionCheck;
         }
-        DbOperation operation = createDbOperation(serverCode);
-        if(null != operation){
-            try {
-                return new Result<>(true, "", operation.getTablesColumnsMap(dbName));
-            } catch (SQLException e) {
-                return new Result<>(false,"",null);
-            }
-        }
-        else{
-            return new Result<>(false,"",null);
-
-        }
+        return executeServerOperation(serverCode, operation -> operation.getTablesColumnsMap(dbName));
     }
 
     /**
@@ -196,17 +177,7 @@ public class BaseDataServiceImpl implements BaseDataService{
         if (permissionCheck != null) {
             return permissionCheck;
         }
-        DbOperation operation = createDbOperation(serverCode);
-        if(null != operation){
-            try{
-                return new Result<>(true,"", operation.getIndexesList(dbName, tableName));
-            } catch (Exception e) {
-                e.printStackTrace();
-                return new Result<>(false,"",null);
-            }
-        }else{
-            return new Result<>(false,"",null);
-        }
+        return executeServerOperation(serverCode, operation -> operation.getIndexesList(dbName, tableName));
     }
 
     /**
@@ -222,17 +193,7 @@ public class BaseDataServiceImpl implements BaseDataService{
         if (permissionCheck != null) {
             return permissionCheck;
         }
-        DbOperation operation = createDbOperation(serverCode);
-        if(null != operation){
-            try{
-                return new Result<>(true,"", operation.getViewsList(dbName));
-            } catch (Exception e) {
-                e.printStackTrace();
-                return new Result<>(false,"",null);
-            }
-        }else{
-            return new Result<>(false,"",null);
-        }
+        return executeServerOperation(serverCode, operation -> operation.getViewsList(dbName));
     }
 
     /**
@@ -249,17 +210,7 @@ public class BaseDataServiceImpl implements BaseDataService{
         if (permissionCheck != null) {
             return permissionCheck;
         }
-        DbOperation operation = createDbOperation(serverCode);
-        if(null != operation){
-            try{
-                return new Result<>(true,"", operation.getView(dbName, viewName));
-            } catch (Exception e) {
-                e.printStackTrace();
-                return new Result<>(false,"",null);
-            }
-        }else{
-            return new Result<>(false,"",null);
-        }
+        return executeServerOperation(serverCode, operation -> operation.getView(dbName, viewName));
     }
 
     /**
@@ -275,17 +226,7 @@ public class BaseDataServiceImpl implements BaseDataService{
         if (permissionCheck != null) {
             return permissionCheck;
         }
-        DbOperation operation = createDbOperation(serverCode);
-        if(null != operation){
-            try{
-                return new Result<>(true,"", operation.getStoredProceduresList(dbName));
-            } catch (Exception e) {
-                e.printStackTrace();
-                return new Result<>(false,"",null);
-            }
-        }else{
-            return new Result<>(false,"",null);
-        }
+        return executeServerOperation(serverCode, operation -> operation.getStoredProceduresList(dbName));
     }
 
     /**
@@ -302,17 +243,7 @@ public class BaseDataServiceImpl implements BaseDataService{
         if (permissionCheck != null) {
             return permissionCheck;
         }
-        DbOperation operation = createDbOperation(serverCode);
-        if(null != operation){
-            try{
-                return new Result<>(true,"", operation.getStoredProcedure(dbName, spName));
-            } catch (Exception e) {
-                e.printStackTrace();
-                return new Result<>(false,"",null);
-            }
-        }else{
-            return new Result<>(false,"",null);
-        }
+        return executeServerOperation(serverCode, operation -> operation.getStoredProcedure(dbName, spName));
     }
 
     /**
@@ -335,6 +266,10 @@ public class BaseDataServiceImpl implements BaseDataService{
         if (guardResult != null) {
             return new Result<>(false, guardResult, null);
         }
+        Result<Object> cooldownResult = buildCooldownResultIfPresent(serverCode);
+        if (cooldownResult != null) {
+            return cooldownResult;
+        }
         DbOperation operation = createDbOperation(serverCode);
         if(null != operation){
             try{
@@ -354,13 +289,17 @@ public class BaseDataServiceImpl implements BaseDataService{
                 Long endTime = System.currentTimeMillis()-startTime;
                 baseConfigDao.updateQueryLogMetrics(queryLog.getCode(), endTime.intValue(), resultRowCount);
                 saveQueryTargets(queryLog.getCode(), dbName, sql);
+                clearConnectionFailureState(serverCode);
                 return new Result<>(true, returnResult, result[2]);
             } catch (Exception e) {
-                e.printStackTrace();
-                return new Result<>(false,e.getMessage(),null);
+                LOG.warn("SQL query failed for server {}", serverCode, e);
+                if (isConnectionFailure(e)) {
+                    return buildConnectionFailureResult(serverCode, e);
+                }
+                return new Result<>(false, extractExceptionMessage(e), null);
             }
         }else{
-            return new Result<>(false,"",null);
+            return new Result<>(false,"没有找到对应的数据库",null);
         }
     }
 
@@ -372,20 +311,30 @@ public class BaseDataServiceImpl implements BaseDataService{
     @Override
     public Result<String> serverHealth() {
         StringBuilder returnMessage = new StringBuilder();
-        Integer serverCode = 1;
         Boolean serverHealth = true;
-        for(DbOperation value : operationMap.values()){
+        for (Map.Entry<Integer, DbOperation> entry : operationMap.entrySet()) {
+            Integer serverCode = entry.getKey();
+            Result<String> cooldownResult = buildCooldownResultIfPresent(serverCode);
+            if (cooldownResult != null) {
+                returnMessage.append(String.format("在健康检查中服务器[%d]处于冷却期：%s\n", serverCode, cooldownResult.getMessage()));
+                serverHealth = false;
+                continue;
+            }
             try {
-                value.serverHealth();
+                entry.getValue().serverHealth();
+                clearConnectionFailureState(serverCode);
                 returnMessage.append(String.format("在健康检查中服务器[%d]正常\n",serverCode));
                 LOG.info(String.format("在健康检查中服务器[%d]正常",serverCode));
             } catch (SQLException throwables) {
-                returnMessage.append(String.format("在健康检查中服务器[%d]发生异常%s\n",serverCode,throwables.toString()));
-                LOG.error(String.format("在健康检查中服务器[%d]发生异常%s",serverCode,throwables.toString()));
-                throwables.printStackTrace();
+                if (isConnectionFailure(throwables)) {
+                    Result<String> failureResult = buildConnectionFailureResult(serverCode, throwables);
+                    returnMessage.append(String.format("在健康检查中服务器[%d]发生连接异常：%s\n", serverCode, failureResult.getMessage()));
+                } else {
+                    returnMessage.append(String.format("在健康检查中服务器[%d]发生异常%s\n",serverCode,throwables));
+                }
+                LOG.error(String.format("在健康检查中服务器[%d]发生异常%s",serverCode,throwables));
                 serverHealth = false;
             }
-            serverCode++;
         }
         return new Result<String>(serverHealth,"",returnMessage.toString());
     }
@@ -451,6 +400,17 @@ public class BaseDataServiceImpl implements BaseDataService{
         return dbOperation;
     }
 
+    @PreDestroy
+    void closeCachedOperations() {
+        for (Map.Entry<Integer, DbOperation> entry : operationMap.entrySet()) {
+            closeOperationQuietly(entry.getKey(), entry.getValue());
+        }
+        operationMap.clear();
+        connectionFailureCountMap.clear();
+        connectionCooldownUntilMap.clear();
+        connectionLastErrorMap.clear();
+    }
+
     private <T> Result<T> validateServerPermission(Integer serverCode, UserBean user) {
         if (user == null || user.getCode() == null) {
             return new Result<>(false, "未认证用户", null);
@@ -486,6 +446,144 @@ public class BaseDataServiceImpl implements BaseDataService{
         for (QueryLogTargetBean target : targets) {
             target.setQueryLogCode(queryLogCode);
             queryLogTargetDao.saveTarget(target);
+        }
+    }
+
+    private <T> Result<T> executeServerOperation(Integer serverCode, OperationAction<T> action) {
+        Result<T> cooldownResult = buildCooldownResultIfPresent(serverCode);
+        if (cooldownResult != null) {
+            return cooldownResult;
+        }
+
+        DbOperation operation = createDbOperation(serverCode);
+        if (operation == null) {
+            return new Result<>(false, "没有找到对应的数据库", null);
+        }
+
+        try {
+            T data = action.execute(operation);
+            clearConnectionFailureState(serverCode);
+            return new Result<>(true, "", data);
+        } catch (Exception e) {
+            LOG.warn("Server operation failed for server {}", serverCode, e);
+            if (isConnectionFailure(e)) {
+                return buildConnectionFailureResult(serverCode, e);
+            }
+            return new Result<>(false, extractExceptionMessage(e), null);
+        }
+    }
+
+    private void clearConnectionFailureState(Integer serverCode) {
+        connectionFailureCountMap.remove(serverCode);
+        connectionCooldownUntilMap.remove(serverCode);
+        connectionLastErrorMap.remove(serverCode);
+    }
+
+    private <T> Result<T> buildCooldownResultIfPresent(Integer serverCode) {
+        Long cooldownUntilMillis = connectionCooldownUntilMap.get(serverCode);
+        if (cooldownUntilMillis == null) {
+            return null;
+        }
+
+        long now = System.currentTimeMillis();
+        if (cooldownUntilMillis <= now) {
+            clearConnectionFailureState(serverCode);
+            return null;
+        }
+
+        long remainingSeconds = Math.max(1L, (cooldownUntilMillis - now + 999L) / 1000L);
+        String lastErrorMessage = connectionLastErrorMap.get(serverCode);
+        String suffix = lastErrorMessage == null ? "" : String.format(" 最近错误：%s", lastErrorMessage);
+        return new Result<>(false,
+                String.format("目标数据库当前处于冷却期，请在约 %d 秒后重试。%s", remainingSeconds, suffix).trim(),
+                null);
+    }
+
+    private <T> Result<T> buildConnectionFailureResult(Integer serverCode, Exception exception) {
+        String errorMessage = extractExceptionMessage(exception);
+        long now = System.currentTimeMillis();
+        int failureCount = connectionFailureCountMap.merge(serverCode, 1, Integer::sum);
+        connectionLastErrorMap.put(serverCode, errorMessage);
+
+        if (failureCount >= CONNECTION_FAILURE_THRESHOLD) {
+            connectionCooldownUntilMap.put(serverCode, now + CONNECTION_FAILURE_COOLDOWN_MILLIS);
+            return new Result<>(false,
+                    String.format("目标数据库连接连续失败 %d 次，已进入冷却期。最近错误：%s",
+                            CONNECTION_FAILURE_THRESHOLD,
+                            errorMessage),
+                    null);
+        }
+
+        return new Result<>(false,
+                String.format("目标数据库连接失败（%d/%d）：%s",
+                        failureCount,
+                        CONNECTION_FAILURE_THRESHOLD,
+                        errorMessage),
+                null);
+    }
+
+    private boolean isConnectionFailure(Throwable throwable) {
+        Throwable current = throwable;
+        while (current != null) {
+            if (current instanceof SQLTransientConnectionException
+                    || current instanceof SQLNonTransientConnectionException
+                    || current instanceof ConnectException
+                    || current instanceof SocketTimeoutException
+                    || current instanceof SSLHandshakeException) {
+                return true;
+            }
+            if (current instanceof SQLException sqlException) {
+                String sqlState = sqlException.getSQLState();
+                if (sqlState != null && sqlState.startsWith("08")) {
+                    return true;
+                }
+            }
+            String className = current.getClass().getName();
+            if (className.contains("CommunicationsException") || className.contains("HttpHostConnectException")) {
+                return true;
+            }
+            String message = current.getMessage();
+            if (message != null) {
+                String normalizedMessage = message.toLowerCase(Locale.ROOT);
+                if (normalizedMessage.contains("connect failed")
+                        || normalizedMessage.contains("connect timed out")
+                        || normalizedMessage.contains("connection refused")
+                        || normalizedMessage.contains("communications link failure")
+                        || normalizedMessage.contains("tcp/ip connection")
+                        || normalizedMessage.contains("operation timed out")
+                        || normalizedMessage.contains("tls10 is not accepted")
+                        || message.contains("尝试连线已失败")) {
+                    return true;
+                }
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    private String extractExceptionMessage(Throwable throwable) {
+        Throwable current = throwable;
+        String message = null;
+        while (current != null) {
+            if (current.getMessage() != null && !current.getMessage().isBlank()) {
+                message = current.getMessage();
+            }
+            current = current.getCause();
+        }
+        if (message != null) {
+            return message;
+        }
+        return throwable == null ? "目标数据库连接失败" : throwable.toString();
+    }
+
+    private void closeOperationQuietly(Integer serverCode, DbOperation operation) {
+        if (operation == null) {
+            return;
+        }
+        try {
+            operation.close();
+        } catch (Exception e) {
+            LOG.warn("Failed to close cached operation for server {}", serverCode, e);
         }
     }
 }

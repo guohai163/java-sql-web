@@ -7,7 +7,6 @@ import { Button, Input, Form, Modal, Select, Spin, Tag, message } from 'antd';
 import { LoadingOutlined } from '@ant-design/icons';
 import * as webauthnJson from '@github/webauthn-json';
 import { createClient } from '@/shared/api/apiClient';
-import logo from '@/shared/assets/brand/logo.svg';
 import cache from '@/shared/lib/cache';
 import config from '@/shared/config/runtimeConfig';
 import dot from '@/features/workbench/assets/dot.gif';
@@ -16,6 +15,7 @@ import '@/features/workbench/styles/Navigation.css';
 const { confirm } = Modal;
 const antIcon = <LoadingOutlined style={{ fontSize: 24 }} spin />;
 const CACHE_TTL = 1000 * 60 * 60 * 24;
+const workbenchLogo = '/jsw_logo.png';
 
 let tableResult = false;
 
@@ -600,45 +600,58 @@ function Navigation() {
   };
 
   return (
-    <div id="navigation">
+    <div id="navigation" className="workbench-navigation">
       <div id="navigation_resizer"></div>
       <div id="navigation_content">
         <div id="navigation_header">
-          <div id="logo">
-            <img src={logo} alt="logo" />
-            {config.version}
+          <div id="logo" className="workbench-brand">
+            <img src={workbenchLogo} alt="JavaSqlWeb logo" />
+            <div className="workbench-brand-copy">
+              <strong className="workbench-brand-wordmark">
+                <span className="tone-java">Java</span>
+                <span className="tone-sql">Sql</span>
+                <span className="tone-web">Web</span>
+              </strong>
+              <span className="workbench-brand-version">v{config.version || '0.9.0'}</span>
+            </div>
           </div>
-          <div id="navipanellinks">
-            <a href="/guid" rel="noreferrer" target="_blank" title="常用SQL">
+          <div id="navipanellinks" className="workbench-quick-actions">
+            <a className="workbench-action-link" href="/guid" rel="noreferrer" target="_blank" title="常用SQL">
               <img src={dot} alt="常用SQL" className="icon ic_s_sqlguid" />
             </a>
-            <a href="/" title="刷新" onClick={(event) => handleLink(event, getServerList)}>
+            <a className="workbench-action-link" href="/" title="刷新" onClick={(event) => handleLink(event, getServerList)}>
               <img src={dot} alt="刷新" className="icon ic_s_reload" />
             </a>
-            <a href="/" title="修改密码" onClick={(event) => handleLink(event, showPassModal)}>
+            <a className="workbench-action-link" href="/" title="修改密码" onClick={(event) => handleLink(event, showPassModal)}>
               <img src={dot} alt="修改密码" className="icon ic_u_pass" />
             </a>
-            <a href="/" title="passkey" onClick={(event) => handleLink(event, passKeyBind)}>
+            <a className="workbench-action-link" href="/" title="passkey" onClick={(event) => handleLink(event, passKeyBind)}>
               <img src={dot} alt="passkey" className="icon ic_w_authn" />
             </a>
-            <a href="/" title="设置" onClick={(event) => handleLink(event, jumpAdmin)}>
+            <a
+              className={config.userName === 'admin' ? 'workbench-action-link' : 'hide'}
+              href="/"
+              title="设置"
+              onClick={(event) => handleLink(event, jumpAdmin)}
+            >
               <img
                 src={dot}
                 alt="setting"
-                className={config.userName === 'admin' ? 'icon ic_s_cog' : 'hide'}
+                className="icon ic_s_cog"
               />
             </a>
-            <a href="/" title="退出" onClick={(event) => handleLink(event, logout)}>
+            <a className="workbench-action-link" href="/" title="退出" onClick={(event) => handleLink(event, logout)}>
               <img src={dot} alt="exit" className="icon ic_s_loggoff" />
             </a>
           </div>
         </div>
         <div id="navigation_tree">
           <div className="navigation_server">
-            <label>服务器：</label>
+            <label className="navigation_server_label">服务器</label>
             <Select
               placeholder="请选择服务器"
-              style={{ width: 200 }}
+              className="workbench-server-select"
+              style={{ width: '100%' }}
               value={state.selectServer === '0' ? undefined : state.selectServer}
               onChange={serverChange}
             >
@@ -754,7 +767,7 @@ function Navigation() {
                                 </a>
                               </div>
                               <a
-                                className="hover_show_full"
+                                className="hover_show_full workbench-tree-link"
                                 href="/"
                                 title=""
                                 onClick={(event) => handleLink(event, () => sendTableName(table.tableName))}
@@ -851,7 +864,7 @@ function Navigation() {
                                   </a>
                                 </div>
                                 <a
-                                  className="hover_show_full"
+                                  className="hover_show_full workbench-tree-link"
                                   href="/"
                                   title=""
                                   onClick={(event) => handleLink(event, () => spChange(sp.procedureName))}
@@ -902,7 +915,7 @@ function Navigation() {
                                   </a>
                                 </div>
                                 <a
-                                  className="hover_show_full"
+                                  className="hover_show_full workbench-tree-link"
                                   href="/"
                                   title=""
                                   onClick={(event) => handleLink(event, () => viewChange(view.viewName))}
