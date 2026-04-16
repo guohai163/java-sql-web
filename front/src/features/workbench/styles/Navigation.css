@@ -222,7 +222,10 @@
     display: inline-block;
     padding: 2px 0 2px 4px;
     color: #20344f;
-    font-size: 0.9rem;
+    font-size: 0.82rem;
+    white-space: nowrap;
+    word-break: normal;
+    overflow-wrap: normal;
 }
 
 .workbench-tree-link {
