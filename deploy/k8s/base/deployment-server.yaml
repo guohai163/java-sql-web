@@ -1,0 +1,96 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jsw-server
+  namespace: ${NAMESPACE}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jsw-server
+  template:
+    metadata:
+      labels:
+        app: jsw-server
+    spec:
+      containers:
+        - name: jsw-server
+          image: ${JSW_SERVER_IMAGE}:${TAG}
+          ports:
+            - containerPort: 8002
+              name: http
+          env:
+            - name: DB_HOST
+              value: jsw-db
+            - name: DB_PORT
+              value: "3306"
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: jsw-app-secret
+                  key: DB_NAME
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: jsw-app-secret
+                  key: DB_USERNAME
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: jsw-app-secret
+                  key: DB_PASSWORD
+            - name: PROJECT_VERSION
+              value: ${TAG}
+            - name: PROJECT_DOMAIN
+              valueFrom:
+                secretKeyRef:
+                  name: jsw-app-secret
+                  key: PROJECT_DOMAIN
+            - name: PROJECT_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: jsw-app-secret
+                  key: PROJECT_HOST
+            - name: PROJECT_LIMIT
+              valueFrom:
+                secretKeyRef:
+                  name: jsw-app-secret
+                  key: PROJECT_LIMIT
+            - name: PROJECT_SIGNKEY
+              valueFrom:
+                secretKeyRef:
+                  name: jsw-app-secret
+                  key: PROJECT_SIGNKEY
+            - name: PROJECT_LEGACY_TLS_ENABLED
+              value: "${PROJECT_LEGACY_TLS_ENABLED}"
+            - name: JAVA_TOOL_OPTIONS
+              value: "${JAVA_TOOL_OPTIONS}"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8002
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8002
+            initialDelaySeconds: 40
+            periodSeconds: 15
+            timeoutSeconds: 5
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "512Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+          volumeMounts:
+            - name: legacy-tls-security
+              mountPath: /opt/jsw/legacy-tls.security
+              subPath: legacy-tls.security
+      volumes:
+        - name: legacy-tls-security
+          configMap:
+            name: jsw-legacy-tls-security

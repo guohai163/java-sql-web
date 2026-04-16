@@ -1,0 +1,10 @@
+.site-layout .site-layout-background {
+    background: #fff;
+}
+
+.sql-guide-layout .ant-layout-header {
+    position: fixed;
+    z-index: 1;
+    width: 100%;
+    height: 65px;
+}

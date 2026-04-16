@@ -27,27 +27,221 @@
 6. 存储过程查看。
 7. 用户权限分组。数据库服务器分组
 
+## 目录结构
+
+```text
+.
+├── front/                 # React 前端 + Nginx 镜像
+├── server/                # Spring Boot 服务端 + Maven 构建
+├── deploy/                # 部署相关文件，例如数据库初始化 SQL
+├── docker-compose.yml     # 运行数据库、服务端、前端三个容器
+└── .github/workflows/     # Git tag 触发的镜像发布流程
+```
+
 ## 项目部署
 
-### 环境安装
+### 1. 发布镜像
 
-本项目使用Reactjs+Springboot+mysql的组合。最简项目运行可以使用Docker来运行。
+推送 Git tag 后，GitHub Actions 会自动构建并推送两个镜像到 GHCR：
 
 ```shell
-# 首先下载数据库初始化脚本 
-mkdir -p /opt/java-sql-web/script
-cd /opt/java-sql-web/script
-curl -O https://raw.githubusercontent.com/guohai163/java-sql-web/master/script/init.sql
-# 按初始化脚本编辑修改.sql文件。
-vim init.sql
-
-# 启动数据库容器,把刚下载好的init.sql文件映射到容器里的docker-entrypoint-initdb.d目录下。为了启动容器自动创建我们需要的库和表。参数MYSQL_ROOT_PASSWORD后为数据库root用户密码，请更换成更安全的
-docker run --name jswdb -v /opt/java-sql-web/script:/docker-entrypoint-initdb.d -e  MYSQL_ROOT_PASSWORD=my-secret-pw -d mariadb:10
-# 启动javasqladmin容器，如dockerhub无法连接可以使用备用的地址 docker.pkg.github.com/guohai163/java-sql-web/javasqlweb:0.5.0
-docker run --name jsw_web --link jswdb:db -p 80:8002 -e MARIADB_PORT_3306_TCP_ADDR=db -e MARIADB_ENV_MYSQL_ROOT_PASSWORD=my-secret-pw gcontainer/java-sql-web:0.8.5
-# 使用浏览器访问 
-open http://localhost
+git tag v0.9.0
+git push origin v0.9.0
 ```
+
+默认镜像名：
+
+- `ghcr.io/guohai163/java-sql-web-front:<tag>`
+- `ghcr.io/guohai163/java-sql-web-server:<tag>`
+
+### 2. 使用 docker compose 部署
+
+复制环境变量模板并按需修改：
+
+```shell
+cp .env.example .env
+```
+
+至少需要确认：
+
+- `TAG`：要部署的镜像版本，例如 `v0.9.0`
+- `DB_PASSWORD`：MariaDB root 密码
+- `PUBLIC_DOMAIN` / `PUBLIC_HOST`：对外访问域名与完整 URL
+
+启动服务：
+
+```shell
+docker compose up -d
+```
+
+容器职责如下：
+
+- `jsw-front`：唯一对外入口，提供静态页面并将后端请求代理到 `jsw-server`
+- `jsw-server`：Spring Boot API 服务
+- `jsw-db`：MariaDB 数据库，首次启动会执行 `deploy/init.sql`
+
+如需兼容极少数仅支持 TLS 1.0 且强制加密的老 MSSQL，可在部署层为 `jsw-server` 增加：
+
+```shell
+PROJECT_LEGACY_TLS_ENABLED=true
+JAVA_TOOL_OPTIONS="-Djdk.tls.client.protocols=TLSv1,TLSv1.1,TLSv1.2 -Djava.security.properties=/opt/jsw/legacy-tls.security"
+```
+
+该模式仅建议用于可信内网环境，且需要同时把对应服务器的“连接安全”配置改为 `LEGACY_TLS`。
+
+`docker-compose.yml` 已默认把本地文件挂载到容器内：
+
+```text
+./deploy/java-security/legacy-tls.security -> /opt/jsw/legacy-tls.security
+```
+
+### 2.1 使用 Kubernetes 部署
+
+仓库提供了一套基于原生 YAML 的 K8s 部署清单：
+
+- `deploy/k8s/base/`
+- `deploy/k8s/env/prod.env.example`
+- `scripts/deploy-k8s.sh`
+
+使用前先复制环境变量模板：
+
+```shell
+cp deploy/k8s/env/prod.env.example deploy/k8s/env/prod.env
+```
+
+至少需要确认：
+
+- `TAG`
+- `DB_PASSWORD`
+- `PUBLIC_DOMAIN`
+- `PUBLIC_HOST`
+- `INGRESS_HOST`
+- `DB_STORAGE_CLASS`（如果集群没有默认 StorageClass）
+
+部署：
+
+```shell
+bash scripts/deploy-k8s.sh
+```
+
+该方案默认部署：
+
+- `jsw-db`：单实例 MariaDB（StatefulSet + PVC）
+- `jsw-server`：Spring Boot API（Deployment + ClusterIP Service）
+- `jsw-front`：前端 Nginx（Deployment + ClusterIP Service）
+- `Ingress`：将外部流量转到 `jsw-front`
+
+如需兼容旧 MSSQL 的 `LEGACY_TLS` 模式，需要在 `jsw-server` 的部署环境变量里显式加入：
+
+```text
+PROJECT_LEGACY_TLS_ENABLED=true
+JAVA_TOOL_OPTIONS=-Djdk.tls.client.protocols=TLSv1,TLSv1.1,TLSv1.2 -Djava.security.properties=/opt/jsw/legacy-tls.security
+```
+
+注意：这会降低当前进程里的 MSSQL TLS 安全基线，仅适用于可信内网老库。
+
+K8s 部署脚本会把：
+
+```text
+deploy/java-security/legacy-tls.security
+```
+
+渲染为 ConfigMap 并挂载到：
+
+```text
+/opt/jsw/legacy-tls.security
+```
+
+### 3. 本地构建镜像
+
+```shell
+nvm use
+
+cd front
+npm ci
+npm run build
+cd ..
+
+cd server
+mvn -DskipTests package
+cd ..
+
+docker build -t jsw-front:local ./front
+docker build -t jsw-server:local ./server
+```
+
+前端默认使用仓库根目录的 `.nvmrc`，目标 Node 版本为 `24`。本地开发前端时请在 `front/` 目录执行：
+
+```shell
+npm run dev
+```
+
+如果本地后端不是跑在 `http://localhost:8002`，可以在启动前设置：
+
+```shell
+VITE_BACKEND_ORIGIN=http://your-server:8002 npm run dev
+```
+
+如果是直接用 `java -jar` 启动服务端，可按下面方式启用旧 MSSQL 的 `LEGACY_TLS` 模式：
+
+```shell
+PROJECT_LEGACY_TLS_ENABLED=true \
+JAVA_TOOL_OPTIONS="-Djdk.tls.client.protocols=TLSv1,TLSv1.1,TLSv1.2 -Djava.security.properties=/absolute/path/legacy-tls.security" \
+java -jar /opt/jsw/program.jar
+```
+
+## 部署到 OpenClaw
+
+仓库内置了一个给 OpenClaw 使用的查询 skill：
+
+- `skills/java-sql-web-query/`
+
+推荐用一键安装脚本把它安装到全局 `~/.openclaw/skills/`：
+
+```shell
+curl -fsSL https://raw.githubusercontent.com/guohai163/java-sql-web/v2.1.1/scripts/install-openclaw-skill.sh | VERSION=v2.1.1 bash
+```
+
+也可以先下载后执行：
+
+```shell
+curl -fsSL https://raw.githubusercontent.com/guohai163/java-sql-web/v2.1.1/scripts/install-openclaw-skill.sh -o install-openclaw-skill.sh
+bash install-openclaw-skill.sh v2.1.1
+```
+
+如果 OpenClaw 实际运行时使用的 home 目录和你当前 shell 的 `$HOME` 不一致，可以显式指定：
+
+```shell
+OPENCLAW_HOME=/actual/openclaw/home bash install-openclaw-skill.sh v2.1.1
+```
+
+安装脚本只负责把 Skill 文件复制到 `OPENCLAW_HOME/skills/`，还需要在 `OPENCLAW_HOME/openclaw.json` 里启用并注入运行时变量：
+
+```json
+{
+  "skills": {
+    "entries": {
+      "java-sql-web-query": {
+        "enabled": true,
+        "env": {
+          "JSW_BASE_URL": "https://your-jsw.example.com",
+          "JSW_ACCESS_TOKEN": "jsw_xxx"
+        }
+      }
+    }
+  }
+}
+```
+
+配置完成后，刷新或重启 OpenClaw 的 skills 加载，然后可通过：
+
+```text
+$java-sql-web-query
+```
+
+显式调用该 skill。
+
+提示：不要只靠“你有什么 skill”这类泛化提问来验证安装结果，模型的自述不一定会实时枚举新装 skill。最稳妥的验证方式是直接显式调用 `$java-sql-web-query`。
 
 ### 系统使用
 

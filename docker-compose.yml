@@ -1,0 +1,51 @@
+services:
+  jsw-db:
+    image: mariadb:10.11
+    container_name: jsw-db
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${DB_PASSWORD:-my-secret-pw}
+      MARIADB_DATABASE: ${DB_NAME:-javasqlweb_db}
+    volumes:
+      - jsw-db-data:/var/lib/mysql
+      - ./deploy/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD", "mariadb-admin", "ping", "-h", "127.0.0.1", "-uroot", "-p${DB_PASSWORD:-my-secret-pw}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  jsw-server:
+    image: ${JSW_SERVER_IMAGE:-ghcr.io/guohai163/java-sql-web-server}:${TAG}
+    container_name: jsw-server
+    restart: unless-stopped
+    depends_on:
+      jsw-db:
+        condition: service_healthy
+    environment:
+      DB_HOST: jsw-db
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME:-javasqlweb_db}
+      DB_USERNAME: ${DB_USERNAME:-root}
+      DB_PASSWORD: ${DB_PASSWORD:-my-secret-pw}
+      PROJECT_VERSION: ${TAG}
+      PROJECT_DOMAIN: ${PUBLIC_DOMAIN:-localhost}
+      PROJECT_HOST: ${PUBLIC_HOST:-http://localhost}
+      PROJECT_LEGACY_TLS_ENABLED: ${PROJECT_LEGACY_TLS_ENABLED:-false}
+      JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:-}
+    volumes:
+      - ./deploy/java-security/legacy-tls.security:/opt/jsw/legacy-tls.security:ro
+    expose:
+      - "8002"
+
+  jsw-front:
+    image: ${JSW_FRONT_IMAGE:-ghcr.io/guohai163/java-sql-web-front}:${TAG}
+    container_name: jsw-front
+    restart: unless-stopped
+    depends_on:
+      - jsw-server
+    ports:
+      - "${FRONT_PORT:-80}:80"
+
+volumes:
+  jsw-db-data:

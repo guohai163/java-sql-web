@@ -1,0 +1,17 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: jsw-front
+  namespace: ${NAMESPACE}
+spec:
+  rules:
+    - host: ${INGRESS_HOST}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: jsw-front
+                port:
+                  number: 80
