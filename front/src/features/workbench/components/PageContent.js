@@ -107,6 +107,10 @@ function createExportFileName(pane) {
   return `${database}-${timestamp}.csv`;
 }
 
+function quotePostgresqlIdentifier(identifier) {
+  return `"${String(identifier || '').replace(/"/g, '""')}"`;
+}
+
 function PageContent() {
   const initialPanes = [createPane()];
   const [state, setState] = useState({
@@ -190,6 +194,8 @@ function PageContent() {
         sql = `SELECT top 100 * FROM [${data.selectTable}]`;
       } else if (response.jsonData.data.dbServerType === 'mysql') {
         sql = `SELECT * FROM \`${data.selectDatabase}\`.\`${data.selectTable}\` limit 100`;
+      } else if (response.jsonData.data.dbServerType === 'postgresql') {
+        sql = `SELECT * FROM public.${quotePostgresqlIdentifier(data.selectTable)} LIMIT 100`;
       }
 
       setState((previous) => ({
@@ -316,7 +322,13 @@ function PageContent() {
           mode: { name: 'text/x-mysql' },
           extraKeys: { Ctrl: 'autocomplete' },
           hintOptions: {
-            tables: tableColumnResponse.jsonData.data,
+            tables:
+              tableColumnResponse.jsonData.status &&
+              tableColumnResponse.jsonData.data &&
+              typeof tableColumnResponse.jsonData.data === 'object' &&
+              !Array.isArray(tableColumnResponse.jsonData.data)
+                ? tableColumnResponse.jsonData.data
+                : {},
           },
           theme: 'idea',
         },

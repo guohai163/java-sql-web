@@ -3,24 +3,15 @@ package org.guohai.javasqlweb.service.operation;
 import org.guohai.javasqlweb.beans.*;
 import org.guohai.javasqlweb.service.BaseDataServiceImpl;
 import org.guohai.javasqlweb.util.HikariDataSourceUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
-import java.sql.Connection;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
+import java.sql.*;
 import java.util.*;
 
 import static org.guohai.javasqlweb.util.Utils.closeResource;
 
 public class DbOperationPostgresqlDruid implements DbOperation {
-
-    /**
-     * 日志
-     */
-    private static final Logger LOG  = LoggerFactory.getLogger(DbOperationPostgresqlDruid.class);
+    private static final String PUBLIC_SCHEMA = "public";
 
     /**
      * 数据源
@@ -120,7 +111,27 @@ public class DbOperationPostgresqlDruid implements DbOperation {
      */
     @Override
     public List<ViewNameBean> getViewsList(String dbName) throws SQLException {
-        return null;
+        List<ViewNameBean> viewList = new ArrayList<>();
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = getRequiredDataSource(dbName).getConnection();
+            ps = conn.prepareStatement(
+                    "SELECT viewname " +
+                            "FROM pg_catalog.pg_views " +
+                            "WHERE schemaname = ? " +
+                            "ORDER BY viewname"
+            );
+            ps.setString(1, PUBLIC_SCHEMA);
+            rs = ps.executeQuery();
+            while (rs.next()) {
+                viewList.add(new ViewNameBean(rs.getString("viewname")));
+            }
+        } finally {
+            closeResource(rs, ps, conn);
+        }
+        return viewList;
     }
 
     /**
@@ -133,7 +144,33 @@ public class DbOperationPostgresqlDruid implements DbOperation {
      */
     @Override
     public ViewNameBean getView(String dbName, String viewName) throws SQLException {
-        return null;
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = getRequiredDataSource(dbName).getConnection();
+            ps = conn.prepareStatement(
+                    "SELECT COALESCE(definition, '') AS view_definition " +
+                            "FROM pg_catalog.pg_views " +
+                            "WHERE schemaname = ? AND viewname = ?"
+            );
+            ps.setString(1, PUBLIC_SCHEMA);
+            ps.setString(2, viewName);
+            rs = ps.executeQuery();
+            if (rs.next()) {
+                String definition = rs.getString("view_definition");
+                return new ViewNameBean(
+                        viewName,
+                        String.format("CREATE OR REPLACE VIEW %s.%s AS%n%s",
+                                quoteIdentifier(PUBLIC_SCHEMA),
+                                quoteIdentifier(viewName),
+                                definition == null ? "" : definition)
+                );
+            }
+            return new ViewNameBean(viewName, "");
+        } finally {
+            closeResource(rs, ps, conn);
+        }
     }
 
     /**
@@ -146,7 +183,56 @@ public class DbOperationPostgresqlDruid implements DbOperation {
      */
     @Override
     public List<ColumnsNameBean> getColumnsList(String dbName, String tableName) throws SQLException {
-        return null;
+        List<ColumnsNameBean> columnList = new ArrayList<>();
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = getRequiredDataSource(dbName).getConnection();
+            ps = conn.prepareStatement(
+                    "SELECT c.column_name, " +
+                            "       CASE " +
+                            "           WHEN c.data_type = 'USER-DEFINED' THEN c.udt_name " +
+                            "           WHEN c.data_type = 'ARRAY' THEN c.udt_name " +
+                            "           ELSE c.data_type " +
+                            "       END AS column_type, " +
+                            "       CASE " +
+                            "           WHEN c.character_maximum_length IS NOT NULL THEN c.character_maximum_length::text " +
+                            "           WHEN c.numeric_precision IS NOT NULL AND c.numeric_scale IS NOT NULL THEN c.numeric_precision::text || ',' || c.numeric_scale::text " +
+                            "           WHEN c.numeric_precision IS NOT NULL THEN c.numeric_precision::text " +
+                            "           WHEN c.datetime_precision IS NOT NULL THEN c.datetime_precision::text " +
+                            "           ELSE '' " +
+                            "       END AS column_length, " +
+                            "       COALESCE(pd.description, '') AS column_comment, " +
+                            "       CASE WHEN c.is_nullable = 'NO' THEN 'not null' ELSE 'null' END AS column_is_null " +
+                            "FROM information_schema.columns c " +
+                            "LEFT JOIN pg_catalog.pg_namespace pn " +
+                            "       ON pn.nspname = c.table_schema " +
+                            "LEFT JOIN pg_catalog.pg_class pc " +
+                            "       ON pc.relname = c.table_name AND pc.relnamespace = pn.oid " +
+                            "LEFT JOIN pg_catalog.pg_attribute pa " +
+                            "       ON pa.attrelid = pc.oid AND pa.attname = c.column_name " +
+                            "LEFT JOIN pg_catalog.pg_description pd " +
+                            "       ON pd.objoid = pc.oid AND pd.objsubid = pa.attnum " +
+                            "WHERE c.table_schema = ? AND c.table_name = ? " +
+                            "ORDER BY c.ordinal_position"
+            );
+            ps.setString(1, PUBLIC_SCHEMA);
+            ps.setString(2, tableName);
+            rs = ps.executeQuery();
+            while (rs.next()) {
+                columnList.add(new ColumnsNameBean(
+                        rs.getString("column_name"),
+                        rs.getString("column_type"),
+                        rs.getString("column_length"),
+                        rs.getString("column_comment"),
+                        rs.getString("column_is_null")
+                ));
+            }
+        } finally {
+            closeResource(rs, ps, conn);
+        }
+        return columnList;
     }
 
     /**
@@ -159,7 +245,47 @@ public class DbOperationPostgresqlDruid implements DbOperation {
      */
     @Override
     public List<TableIndexesBean> getIndexesList(String dbName, String tableName) throws SQLException {
-        return null;
+        List<TableIndexesBean> indexList = new ArrayList<>();
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = getRequiredDataSource(dbName).getConnection();
+            ps = conn.prepareStatement(
+                    "SELECT ci.relname AS index_name, " +
+                            "       pg_get_indexdef(i.indexrelid) AS index_description, " +
+                            "       COALESCE(string_agg(a.attname, ', ' ORDER BY k.ordinality), '') AS index_keys " +
+                            "FROM pg_catalog.pg_class ct " +
+                            "JOIN pg_catalog.pg_namespace nt " +
+                            "  ON nt.oid = ct.relnamespace " +
+                            "JOIN pg_catalog.pg_index i " +
+                            "  ON i.indrelid = ct.oid " +
+                            "JOIN pg_catalog.pg_class ci " +
+                            "  ON ci.oid = i.indexrelid " +
+                            "LEFT JOIN LATERAL unnest(i.indkey) WITH ORDINALITY AS k(attnum, ordinality) " +
+                            "  ON TRUE " +
+                            "LEFT JOIN pg_catalog.pg_attribute a " +
+                            "  ON a.attrelid = ct.oid AND a.attnum = k.attnum " +
+                            "WHERE nt.nspname = ? " +
+                            "  AND ct.relname = ? " +
+                            "  AND ct.relkind = 'r' " +
+                            "GROUP BY ci.relname, i.indexrelid " +
+                            "ORDER BY ci.relname"
+            );
+            ps.setString(1, PUBLIC_SCHEMA);
+            ps.setString(2, tableName);
+            rs = ps.executeQuery();
+            while (rs.next()) {
+                indexList.add(new TableIndexesBean(
+                        rs.getString("index_name"),
+                        rs.getString("index_description"),
+                        rs.getString("index_keys")
+                ));
+            }
+        } finally {
+            closeResource(rs, ps, conn);
+        }
+        return indexList;
     }
 
     /**
@@ -171,7 +297,27 @@ public class DbOperationPostgresqlDruid implements DbOperation {
      */
     @Override
     public List<StoredProceduresBean> getStoredProceduresList(String dbName) throws SQLException {
-        return null;
+        List<StoredProceduresBean> procedureList = new ArrayList<>();
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = getRequiredDataSource(dbName).getConnection();
+            ps = conn.prepareStatement(
+                    "SELECT DISTINCT routine_name " +
+                            "FROM information_schema.routines " +
+                            "WHERE specific_schema = ? " +
+                            "ORDER BY routine_name"
+            );
+            ps.setString(1, PUBLIC_SCHEMA);
+            rs = ps.executeQuery();
+            while (rs.next()) {
+                procedureList.add(new StoredProceduresBean(rs.getString("routine_name")));
+            }
+        } finally {
+            closeResource(rs, ps, conn);
+        }
+        return procedureList;
     }
 
     /**
@@ -184,7 +330,31 @@ public class DbOperationPostgresqlDruid implements DbOperation {
      */
     @Override
     public StoredProceduresBean getStoredProcedure(String dbName, String spName) throws SQLException {
-        return null;
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = getRequiredDataSource(dbName).getConnection();
+            ps = conn.prepareStatement(
+                    "SELECT COALESCE(pg_get_functiondef(p.oid), '') AS routine_definition " +
+                            "FROM pg_catalog.pg_proc p " +
+                            "JOIN pg_catalog.pg_namespace n " +
+                            "  ON n.oid = p.pronamespace " +
+                            "WHERE n.nspname = ? " +
+                            "  AND p.proname = ? " +
+                            "ORDER BY p.oid " +
+                            "LIMIT 1"
+            );
+            ps.setString(1, PUBLIC_SCHEMA);
+            ps.setString(2, spName);
+            rs = ps.executeQuery();
+            if (rs.next()) {
+                return new StoredProceduresBean(spName, rs.getString("routine_definition"));
+            }
+            return new StoredProceduresBean(spName, "");
+        } finally {
+            closeResource(rs, ps, conn);
+        }
     }
 
     /**
@@ -252,7 +422,31 @@ public class DbOperationPostgresqlDruid implements DbOperation {
      */
     @Override
     public Map<String, String[]> getTablesColumnsMap(String dbName) throws SQLException {
-        return null;
+        Map<String, String[]> tables = new HashMap<>(16);
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = getRequiredDataSource(dbName).getConnection();
+            ps = conn.prepareStatement(
+                    "SELECT table_name, string_agg(column_name, ',' ORDER BY ordinal_position) AS column_names " +
+                            "FROM information_schema.columns " +
+                            "WHERE table_schema = ? " +
+                            "GROUP BY table_name"
+            );
+            ps.setString(1, PUBLIC_SCHEMA);
+            rs = ps.executeQuery();
+            while (rs.next()) {
+                String columnNames = rs.getString("column_names");
+                tables.put(
+                        rs.getString("table_name"),
+                        columnNames == null || columnNames.isEmpty() ? new String[0] : columnNames.split(",")
+                );
+            }
+        } finally {
+            closeResource(rs, ps, conn);
+        }
+        return tables;
     }
 
     /**
@@ -294,6 +488,26 @@ public class DbOperationPostgresqlDruid implements DbOperation {
                 connect.getDbServerPassword(),
                 "select now()"
         );
+    }
+
+    private DataSource getRequiredDataSource(String dbName) {
+        DataSource dataSource = postgresMap.get(dbName);
+        if (dataSource != null) {
+            return dataSource;
+        }
+        synchronized (BaseDataServiceImpl.class) {
+            DataSource existing = postgresMap.get(dbName);
+            if (existing != null) {
+                return existing;
+            }
+            DataSource created = createDataSource(dbName);
+            postgresMap.put(dbName, created);
+            return created;
+        }
+    }
+
+    private String quoteIdentifier(String identifier) {
+        return "\"" + identifier.replace("\"", "\"\"") + "\"";
     }
 
 }

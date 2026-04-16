@@ -73,6 +73,10 @@ function matchServerKeyword(server, keyword) {
   return host.includes(normalizedKeyword) || name.includes(normalizedKeyword);
 }
 
+function normalizeArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
 function Navigation() {
   const navigate = useNavigate();
   const [state, setState] = useState({
@@ -280,14 +284,15 @@ function Navigation() {
     });
 
     if (response.jsonData.status) {
-      if (response.jsonData.data.length === 0) {
+      const nextViews = normalizeArray(response.jsonData.data);
+      if (nextViews.length === 0) {
         showDialog('该库无视图');
       }
 
       setStatePatch({
-        viewList: response.jsonData.data,
+        viewList: nextViews,
       });
-      cache.set(requestKey, response.jsonData.data, CACHE_TTL);
+      cache.set(requestKey, nextViews, CACHE_TTL);
       return;
     }
 
@@ -318,15 +323,16 @@ function Navigation() {
     });
 
     if (response.jsonData.status) {
-      if (response.jsonData.data.length === 0) {
+      const nextProcedures = normalizeArray(response.jsonData.data);
+      if (nextProcedures.length === 0) {
         showDialog('该库无存储过程');
       }
 
       setStatePatch({
-        spList: response.jsonData.data,
-        filterSpList: response.jsonData.data,
+        spList: nextProcedures,
+        filterSpList: nextProcedures,
       });
-      cache.set(requestKey, response.jsonData.data, CACHE_TTL);
+      cache.set(requestKey, nextProcedures, CACHE_TTL);
       return;
     }
 
@@ -420,8 +426,8 @@ function Navigation() {
     ]);
 
     setStatePatch({
-      columntData: columnResponse.jsonData.status ? columnResponse.jsonData.data : [],
-      indexData: indexResponse.jsonData.status ? indexResponse.jsonData.data : [],
+      columntData: columnResponse.jsonData.status ? normalizeArray(columnResponse.jsonData.data) : [],
+      indexData: indexResponse.jsonData.status ? normalizeArray(indexResponse.jsonData.data) : [],
     });
   };
 
