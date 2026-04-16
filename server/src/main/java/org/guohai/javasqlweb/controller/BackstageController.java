@@ -157,6 +157,17 @@ public class BackstageController {
     }
 
     /**
+     * 测试已保存的服务器连接性
+     * @param code 服务器编号
+     * @return
+     */
+    @ResponseBody
+    @RequestMapping(value = "/testserver/{code}", method = RequestMethod.POST)
+    public Result<String> testSavedServerConnect(@PathVariable("code") Integer code){
+        return backstageService.testSavedServerConnect(code);
+    }
+
+    /**
      * 删除服务器
      * @param code
      * @return

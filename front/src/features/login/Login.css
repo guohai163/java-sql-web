@@ -80,6 +80,10 @@
     gap: 18px;
 }
 
+.login-notice {
+    border-radius: 16px;
+}
+
 .login-panel-head h1 {
     margin: 0;
     color: #102033;

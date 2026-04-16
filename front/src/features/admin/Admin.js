@@ -106,6 +106,7 @@ function Admin() {
     },
     queryLogCursor: createEmptyQueryLogCursor(),
     connList: [],
+    testingServerCode: null,
     configVisible: false,
     userAddVisible: false,
     confirmLoading: false,
@@ -326,11 +327,56 @@ function Admin() {
     });
 
     if (response.jsonData.status === true) {
-      showDialog('数据库连接成功', '提示');
+      showDialog('数据库连通性和账号可用性校验成功', '提示');
       return;
     }
 
     showDialog(response.jsonData.data, '连接失败');
+  };
+
+  const testServerRowBtn = async (serverCode) => {
+    const serverData = state.connList.find((item) => item.code === serverCode);
+    if (!serverData) {
+      showDialog('未找到对应的服务器配置', '测试失败');
+      return;
+    }
+
+    setStatePatch({
+      testingServerCode: serverCode,
+    });
+
+    const hideMessage = message.loading({
+      content: `正在测试 ${serverData.dbServerName} 的连通性和账号可用性...`,
+      duration: 0,
+    });
+
+    try {
+      const client = createClient();
+      const response = await client.post(`/api/backstage/testserver/${serverCode}`, {
+        headers: {
+          'Content-Type': 'text/plain',
+          'User-Token': state.token,
+        },
+      });
+
+      if (response.jsonData.status === true) {
+        showDialog(
+          `${serverData.dbServerName} 连通性正常，账号凭据可用。`,
+          '测试成功',
+        );
+        return;
+      }
+
+      showDialog(
+        response.jsonData.data || response.jsonData.message || '测试失败，请检查服务器配置。',
+        `测试失败 · ${serverData.dbServerName}`,
+      );
+    } finally {
+      hideMessage();
+      setStatePatch({
+        testingServerCode: null,
+      });
+    }
   };
 
   const connHandleOk = async () => {
@@ -724,6 +770,13 @@ function Admin() {
       title: '操作',
       render: (text, record) => (
         <Space size="middle">
+          <Button
+            type="link"
+            loading={state.testingServerCode === record.code}
+            onClick={() => testServerRowBtn(record.code)}
+          >
+            测试
+          </Button>
           <Button type="link" onClick={() => showEditServerBtn(record.code)}>
             编辑
           </Button>

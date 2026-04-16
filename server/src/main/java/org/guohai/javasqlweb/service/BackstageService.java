@@ -43,6 +43,13 @@ public interface BackstageService {
      * @return
      */
     Result<String> testServerConnect(@RequestBody ConnectConfigBean server);
+
+    /**
+     * 测试已保存服务器配置的数据库连接性
+     * @param code 服务器编号
+     * @return
+     */
+    Result<String> testSavedServerConnect(Integer code);
     /**
      * 增加服务器
      * @param server

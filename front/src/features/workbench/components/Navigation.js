@@ -38,6 +38,41 @@ function getAccessTokenStatusMeta(status) {
   return { color: 'default', text: '未申请' };
 }
 
+function isRpIdCompatible(rpId) {
+  if (!rpId) {
+    return true;
+  }
+
+  const hostname = window.location.hostname;
+  return hostname === rpId || hostname.endsWith(`.${rpId}`);
+}
+
+function buildPasskeyDomainMessage(rpId) {
+  const currentHost = window.location.host;
+  return `当前页面域名 ${currentHost} 与 passkey 依赖域 ${rpId} 不一致，浏览器不会拉起系统 passkey。请切换到 ${rpId} 对应站点再使用 passkey。`;
+}
+
+function formatServerLabel(server) {
+  const host = (server?.dbServerHost || '').trim();
+  const name = (server?.dbServerName || '').trim();
+
+  if (host && name) {
+    return `${host}@${name}`;
+  }
+  return host || name || '未命名服务器';
+}
+
+function matchServerKeyword(server, keyword) {
+  const normalizedKeyword = (keyword || '').trim().toLowerCase();
+  if (!normalizedKeyword) {
+    return true;
+  }
+
+  const host = (server?.dbServerHost || '').toLowerCase();
+  const name = (server?.dbServerName || '').toLowerCase();
+  return host.includes(normalizedKeyword) || name.includes(normalizedKeyword);
+}
+
 function Navigation() {
   const navigate = useNavigate();
   const [state, setState] = useState({
@@ -391,26 +426,24 @@ function Navigation() {
   };
 
   const logout = async () => {
-    const client = createClient();
-    const response = await client.get('/user/logout', {
-      headers: { 'User-Token': state.token },
-    });
+    try {
+      const client = createClient();
+      const response = await client.get('/user/logout', {
+        headers: { 'User-Token': state.token },
+      });
 
-    if (response.jsonData.status) {
+      if (!response.jsonData.status) {
+        showDialog(response.jsonData.message || response.jsonData.data || '注销失败');
+        return;
+      }
+
+      message.success(response.jsonData.message || '注销成功');
+    } finally {
       cookie.remove('token', { path: '/' });
       setStatePatch({
         token: '',
       });
-      confirm({
-        title: '提示',
-        content: response.jsonData.message,
-        onOk() {
-          navigate('/login');
-        },
-        onCancel() {
-          navigate('/login');
-        },
-      });
+      navigate('/login', { replace: true });
     }
   };
 
@@ -468,9 +501,14 @@ function Navigation() {
     }
 
     try {
-      const publicKeyCredential = await webauthnJson.create(
-        JSON.parse(response.jsonData.data),
-      );
+      const requestJson = JSON.parse(response.jsonData.data);
+      const rpId = requestJson?.publicKey?.rp?.id;
+      if (!isRpIdCompatible(rpId)) {
+        showDialog(buildPasskeyDomainMessage(rpId), 'passkey 域名不匹配');
+        return;
+      }
+
+      const publicKeyCredential = await webauthnJson.create(requestJson);
       const registerResponse = await client.post('/webauthn/register', {
         headers: {
           'Content-Type': 'application/json',
@@ -489,7 +527,7 @@ function Navigation() {
 
       showDialog(registerResponse.jsonData.data);
     } catch (error) {
-      showDialog('passKey绑定失败');
+      showDialog(error?.message || 'passKey绑定失败');
     }
   };
 
@@ -653,6 +691,9 @@ function Navigation() {
               className="workbench-server-select"
               style={{ width: '100%' }}
               value={state.selectServer === '0' ? undefined : state.selectServer}
+              showSearch
+              optionFilterProp="children"
+              filterOption={(input, option) => matchServerKeyword(option?.server, input)}
               onChange={serverChange}
             >
               {state.dbGroup.map((group) => (
@@ -660,8 +701,8 @@ function Navigation() {
                   {state.serverList
                     .filter((item) => item.dbGroup === group)
                     .map((server) => (
-                      <Select.Option key={server.code} value={server.code}>
-                        {server.dbServerName}
+                      <Select.Option key={server.code} value={server.code} server={server}>
+                        {formatServerLabel(server)}
                       </Select.Option>
                     ))}
                 </Select.OptGroup>

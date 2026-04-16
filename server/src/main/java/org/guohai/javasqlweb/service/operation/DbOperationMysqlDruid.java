@@ -6,6 +6,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -21,6 +23,9 @@ import static org.guohai.javasqlweb.util.Utils.closeResource;
  * @date 2021-1-1
  */
 public class DbOperationMysqlDruid implements DbOperation {
+
+    private static final DateTimeFormatter MYSQL_DATETIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private static final DateTimeFormatter MYSQL_DATETIME_MILLIS_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS");
 
     /**
      * 日志
@@ -295,10 +300,16 @@ public class DbOperationMysqlDruid implements DbOperation {
                 dataCount++;
                 Map<String, Object> rowData = new LinkedHashMap<>();
                 for(int i=1;i<=columnCount;i++){
-                    Object object = rs.getObject(i);
-                    //时间类型特殊处理
-                    if (md.getColumnType(i) == Types.TIMESTAMP) {
+                    String columnTypeName = md.getColumnTypeName(i);
+                    Object object;
+                    // MySQL DATETIME 不带时区语义，避免走 Timestamp 触发 8 小时换算
+                    if (isMysqlDateTimeColumn(columnTypeName)) {
+                        object = formatMysqlDateTime(rs, i);
+                    } else if (md.getColumnType(i) == Types.TIMESTAMP) {
+                        object = rs.getObject(i);
                         object = object == null ? "NULL" : String.valueOf(rs.getTimestamp(i));
+                    } else {
+                        object = rs.getObject(i);
                     }
                     rowData.put(md.getColumnLabel(i), object);
                 }
@@ -313,6 +324,37 @@ public class DbOperationMysqlDruid implements DbOperation {
 
 
         return result;
+    }
+
+    private boolean isMysqlDateTimeColumn(String columnTypeName) {
+        if (columnTypeName == null) {
+            return false;
+        }
+        String normalizedTypeName = columnTypeName.trim().toLowerCase();
+        return normalizedTypeName.contains("datetime");
+    }
+
+    private String formatMysqlDateTime(ResultSet rs, int columnIndex) throws SQLException {
+        try {
+            LocalDateTime localDateTime = rs.getObject(columnIndex, LocalDateTime.class);
+            if (localDateTime == null) {
+                return "NULL";
+            }
+            return formatLocalDateTime(localDateTime);
+        } catch (SQLException ex) {
+            String rawValue = rs.getString(columnIndex);
+            if (rawValue == null) {
+                return "NULL";
+            }
+            return rawValue;
+        }
+    }
+
+    private String formatLocalDateTime(LocalDateTime localDateTime) {
+        if (localDateTime.getNano() == 0) {
+            return localDateTime.format(MYSQL_DATETIME_FORMATTER);
+        }
+        return localDateTime.format(MYSQL_DATETIME_MILLIS_FORMATTER);
     }
 
 

@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import './Login.css';
 import cookie from 'react-cookies';
-import { Button, Modal, Input, Tag } from 'antd';
+import { Alert, Button, Modal, Input, Tag } from 'antd';
 import {
   AndroidOutlined,
   AppleOutlined,
@@ -25,6 +25,7 @@ const initialState = {
   qrCode: '',
   otpDigits: [...EMPTY_OTP_DIGITS],
   token: '',
+  notice: null,
 };
 
 function showDialog(content, title = '提示') {
@@ -38,6 +39,20 @@ function showDialog(content, title = '提示') {
 
 function buildOtpUrl(userName, authSecret) {
   return `otpauth://totp/${userName}@${window.location.host}?secret=${authSecret}&issuer=JavaSqlWeb`;
+}
+
+function isRpIdCompatible(rpId) {
+  if (!rpId) {
+    return true;
+  }
+
+  const hostname = window.location.hostname;
+  return hostname === rpId || hostname.endsWith(`.${rpId}`);
+}
+
+function buildPasskeyDomainMessage(rpId) {
+  const currentHost = window.location.host;
+  return `当前页面域名 ${currentHost} 与 passkey 依赖域 ${rpId} 不一致，浏览器不会拉起系统 passkey。请切换到 ${rpId} 对应站点再使用 passkey。`;
 }
 
 function Login() {
@@ -58,6 +73,18 @@ function Login() {
     const { name, value } = event.target;
     updateState({
       [name === 'username' ? 'userName' : name === 'password' ? 'passWord' : name]: value,
+      notice: null,
+    });
+  };
+
+  const setNotice = (message, type = 'error') => {
+    updateState({
+      notice: message
+        ? {
+            type,
+            message,
+          }
+        : null,
     });
   };
 
@@ -179,6 +206,7 @@ function Login() {
 
   const passkey = async () => {
     if (!webauthnJson.supported()) {
+      setNotice('当前系统环境无法开启 passkey 功能');
       showDialog('当前系统环境无法开启passKey功能');
       return;
     }
@@ -189,9 +217,24 @@ function Login() {
       const response = await client.get('/webauthn/get', {
         headers: { 'Content-Type': 'application/json', 'Session-key': sessionKey },
       });
-      const publicKeyCredential = await webauthnJson.get(
-        JSON.parse(response.jsonData.data),
-      );
+
+      if (response.jsonData.status !== true) {
+        const message = response.jsonData.message || response.jsonData.data || 'passKey 登录准备失败';
+        setNotice(message);
+        showDialog(message);
+        return;
+      }
+
+      const requestJson = JSON.parse(response.jsonData.data);
+      const rpId = requestJson?.publicKey?.rpId;
+      if (!isRpIdCompatible(rpId)) {
+        const message = buildPasskeyDomainMessage(rpId);
+        setNotice(message);
+        showDialog(message, 'passkey 域名不匹配');
+        return;
+      }
+
+      const publicKeyCredential = await webauthnJson.get(requestJson);
       const signInResponse = await client.post('/webauthn/signin', {
         headers: { 'Content-Type': 'application/json', 'Session-key': sessionKey },
         body: JSON.stringify(publicKeyCredential),
@@ -203,9 +246,12 @@ function Login() {
         return;
       }
 
-      showDialog(signInResponse.jsonData.message);
+      setNotice(signInResponse.jsonData.message || 'passKey 登录失败');
+      showDialog(signInResponse.jsonData.message || 'passKey 登录失败');
     } catch (error) {
-      showDialog('passKey 登录失败');
+      const message = error?.message || 'passKey 登录失败';
+      setNotice(message);
+      showDialog(message);
     }
   };
 
@@ -221,6 +267,7 @@ function Login() {
       });
 
       if (response.status !== 200) {
+        setNotice('服务器连接失败');
         showDialog('服务器连接失败');
         return;
       }
@@ -236,6 +283,7 @@ function Login() {
             ),
             otpDigits: [...EMPTY_OTP_DIGITS],
             token: response.jsonData.data.token,
+            notice: null,
           });
           return;
         }
@@ -245,13 +293,16 @@ function Login() {
             loginStep: 'VERIFY',
             otpDigits: [...EMPTY_OTP_DIGITS],
             token: response.jsonData.data.token,
+            notice: null,
           });
         }
         return;
       }
 
-      showDialog(response.jsonData.message);
+      setNotice(response.jsonData.message || response.jsonData.data || '登录失败');
+      showDialog(response.jsonData.message || response.jsonData.data || '登录失败');
     } catch (error) {
+      setNotice('服务器连接失败');
       showDialog('服务器连接失败');
     }
   };
@@ -259,6 +310,7 @@ function Login() {
   const bindOtp = async () => {
     const otpPass = getOtpValue();
     if (otpPass.length !== OTP_LENGTH) {
+      setNotice('请输入完整的 6 位双因子动态码');
       showDialog('请输入完整的 6 位双因子动态码');
       return;
     }
@@ -272,12 +324,17 @@ function Login() {
     if (response.jsonData.status) {
       cookie.save('token', state.token, { path: '/' });
       navigate('/');
+      return;
     }
+
+    setNotice(response.jsonData.message || response.jsonData.data || 'OTP 绑定失败');
+    showDialog(response.jsonData.message || response.jsonData.data || 'OTP 绑定失败');
   };
 
   const verifyOtp = async () => {
     const otpPass = getOtpValue();
     if (otpPass.length !== OTP_LENGTH) {
+      setNotice('请输入完整的 6 位双因子动态码');
       showDialog('请输入完整的 6 位双因子动态码');
       return;
     }
@@ -294,7 +351,8 @@ function Login() {
       return;
     }
 
-    showDialog(response.jsonData.message);
+    setNotice(response.jsonData.message || response.jsonData.data || 'OTP 校验失败');
+    showDialog(response.jsonData.message || response.jsonData.data || 'OTP 校验失败');
   };
 
   const renderOtpInputs = () => (
@@ -340,6 +398,14 @@ function Login() {
             <h1>登录</h1>
             <p>使用账号密码或 passkey 进入 JavaSqlWeb 工作台。</p>
           </div>
+          {state.notice ? (
+            <Alert
+              className="login-notice"
+              showIcon
+              type={state.notice.type}
+              message={state.notice.message}
+            />
+          ) : null}
           <div className="login-form">
             <div className="item">
             <Input
@@ -373,6 +439,14 @@ function Login() {
             <h1>绑定 OTP</h1>
             <p>首次登录需要完成双因子绑定，保护你的账号安全。</p>
           </div>
+          {state.notice ? (
+            <Alert
+              className="login-notice"
+              showIcon
+              type={state.notice.type}
+              message={state.notice.message}
+            />
+          ) : null}
           <div className="login-form">
             <div className="item qrcode">
               <div className="login-qrcode-copy">
@@ -415,6 +489,14 @@ function Login() {
             <h1>验证 OTP</h1>
             <p>输入当前双因子动态码，继续进入系统。</p>
           </div>
+          {state.notice ? (
+            <Alert
+              className="login-notice"
+              showIcon
+              type={state.notice.type}
+              message={state.notice.message}
+            />
+          ) : null}
           <div className="login-form">{renderOtpInputs()}</div>
           <div className="login-actions">
             <Button type="primary" onClick={verifyOtp}>

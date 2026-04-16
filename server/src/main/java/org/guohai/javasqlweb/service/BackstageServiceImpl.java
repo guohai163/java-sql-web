@@ -178,6 +178,15 @@ public class BackstageServiceImpl implements BackstageService{
         return new Result<>(true,"连接成功","");
     }
 
+    @Override
+    public Result<String> testSavedServerConnect(Integer code) {
+        ConnectConfigBean savedServer = baseConfigDao.getConnectConfig(code);
+        if (savedServer == null) {
+            return new Result<>(false, "服务器不存在", "服务器不存在");
+        }
+        return testServerConnect(savedServer);
+    }
+
     /**
      * 增加服务器
      *

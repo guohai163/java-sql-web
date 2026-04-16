@@ -135,11 +135,9 @@ CREATE TABLE `guid_sql_tb` (
     `create_date` datetime NOT NULL COMMENT '时间',
         PRIMARY KEY (`code`));
 
--- 安全起见，不再默认创建弱口令管理员账号。
--- 首次部署后请手动创建管理员，并使用 BCrypt 哈希写入 pass_word 字段。
--- 示例：
--- INSERT INTO `user_tb` (`user_name`,`pass_word`,`token`,`auth_status`,`login_status`)
--- VALUES ('admin','<bcrypt-hash>','','UNBIND','LOGOUT');
+-- 应用启动时若 user_tb 中不存在 admin 用户，
+-- server 会自动创建 admin@local.invalid / 随机密码 的管理员账号，
+-- 并将明文随机密码打印到 server 控制台日志中，便于通过 docker logs 查看。
 
 COMMIT;
 
