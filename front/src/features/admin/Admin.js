@@ -38,10 +38,56 @@ const { Content, Footer, Header, Sider } = Layout;
 function showDialog(content, title = '提示') {
   confirm({
     title,
-    content,
+    content:
+      typeof content === 'string'
+        ? <div className="admin-dialog-content">{content}</div>
+        : content,
     onOk() {},
     onCancel() {},
   });
+}
+
+function getServerTestDetail(response, fallback = '测试失败，请检查服务器配置。') {
+  const candidate = response?.jsonData?.data || response?.jsonData?.message || fallback;
+  if (typeof candidate !== 'string') {
+    return fallback;
+  }
+
+  const normalized = candidate.trim();
+  return normalized || fallback;
+}
+
+function summarizeServerTestMessage(detail, fallback) {
+  const normalized = (detail || fallback || '').replace(/\s+/g, ' ').trim();
+  if (!normalized) {
+    return fallback || '';
+  }
+  if (normalized.length <= 28) {
+    return normalized;
+  }
+  return `${normalized.slice(0, 28)}...`;
+}
+
+function createServerTestResult(status, messageText, detail) {
+  return {
+    status,
+    message: messageText,
+    detail,
+    testedAt:
+      status === 'testing'
+        ? ''
+        : new Date().toLocaleString('zh-CN', { hour12: false }),
+  };
+}
+
+function pruneServerTestResults(connList, serverTestResults) {
+  const validCodes = new Set((connList || []).map((item) => item.code));
+  return Object.entries(serverTestResults || {}).reduce((accumulator, [serverCode, result]) => {
+    if (validCodes.has(Number(serverCode)) || validCodes.has(serverCode)) {
+      accumulator[serverCode] = result;
+    }
+    return accumulator;
+  }, {});
 }
 
 function getAccountStatusMeta(status) {
@@ -108,7 +154,9 @@ function Admin() {
     },
     queryLogCursor: createEmptyQueryLogCursor(),
     connList: [],
+    serverTestResults: {},
     testingServerCode: null,
+    testingConfigServer: false,
     configVisible: false,
     userAddVisible: false,
     confirmLoading: false,
@@ -150,6 +198,19 @@ function Admin() {
               ...patch,
             },
     }));
+  };
+
+  const setServerTestResult = (serverCode, nextResult) => {
+    setStatePatch((previous) => ({
+      serverTestResults: {
+        ...previous.serverTestResults,
+        [serverCode]: nextResult,
+      },
+    }));
+  };
+
+  const showServerTestDetail = (serverName, detail) => {
+    showDialog(detail, `测试失败 · ${serverName}`);
   };
 
   const loadDashboard = async (overrides = {}) => {
@@ -262,9 +323,11 @@ function Admin() {
       }
       case '3': {
         const response = await client.get('/api/backstage/connlist', headers);
-        setStatePatch({
-          connList: response.jsonData.data,
-        });
+        const connList = response.jsonData.data || [];
+        setStatePatch((previous) => ({
+          connList,
+          serverTestResults: pruneServerTestResults(connList, previous.serverTestResults),
+        }));
         break;
       }
       case '4': {
@@ -319,21 +382,36 @@ function Admin() {
   }, []);
 
   const testDbConn = async () => {
-    const client = createClient();
-    const response = await client.post('/api/backstage/testserver', {
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Token': state.token,
-      },
-      body: JSON.stringify(state.inputData),
+    setStatePatch({
+      testingConfigServer: true,
     });
 
-    if (response.jsonData.status === true) {
-      showDialog('数据库连通性和账号可用性校验成功', '提示');
-      return;
-    }
+    try {
+      const client = createClient();
+      const response = await client.post('/api/backstage/testserver', {
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Token': state.token,
+        },
+        body: JSON.stringify(state.inputData),
+      });
 
-    showDialog(response.jsonData.data, '连接失败');
+      if (response.jsonData.status === true) {
+        message.success('数据库连通性和账号可用性校验成功');
+        return;
+      }
+
+      showDialog(getServerTestDetail(response, '测试失败，请检查服务器配置。'), '连接失败');
+    } catch (error) {
+      showDialog(
+        error?.message || '测试请求失败，请检查网络或服务状态',
+        '连接失败',
+      );
+    } finally {
+      setStatePatch({
+        testingConfigServer: false,
+      });
+    }
   };
 
   const testServerRowBtn = async (serverCode) => {
@@ -346,6 +424,10 @@ function Admin() {
     setStatePatch({
       testingServerCode: serverCode,
     });
+    setServerTestResult(
+      serverCode,
+      createServerTestResult('testing', '正在测试连通性...', ''),
+    );
 
     const hideMessage = message.loading({
       content: `正在测试 ${serverData.dbServerName} 的连通性和账号可用性...`,
@@ -362,16 +444,38 @@ function Admin() {
       });
 
       if (response.jsonData.status === true) {
-        showDialog(
-          `${serverData.dbServerName} 连通性正常，账号凭据可用。`,
-          '测试成功',
+        setServerTestResult(
+          serverCode,
+          createServerTestResult(
+            'success',
+            summarizeServerTestMessage(
+              response.jsonData.data || response.jsonData.message || '连通性正常，账号凭据可用',
+              '连通性正常',
+            ),
+            response.jsonData.data || response.jsonData.message || '连通性正常，账号凭据可用',
+          ),
         );
         return;
       }
 
-      showDialog(
-        response.jsonData.data || response.jsonData.message || '测试失败，请检查服务器配置。',
-        `测试失败 · ${serverData.dbServerName}`,
+      const detail = getServerTestDetail(response, '测试失败，请检查服务器配置。');
+      setServerTestResult(
+        serverCode,
+        createServerTestResult(
+          'error',
+          summarizeServerTestMessage(detail, '测试失败'),
+          detail,
+        ),
+      );
+    } catch (error) {
+      const detail = error?.message || '测试请求失败，请检查网络或服务状态';
+      setServerTestResult(
+        serverCode,
+        createServerTestResult(
+          'error',
+          summarizeServerTestMessage(detail, '测试失败'),
+          detail,
+        ),
       );
     } finally {
       hideMessage();
@@ -768,6 +872,47 @@ function Admin() {
     { title: '服务器类型', dataIndex: 'dbServerType', render: (value) => getServerTypeLabel(value) },
     { title: '连接安全', dataIndex: 'dbSslMode', render: (value) => value || 'DEFAULT' },
     { title: '服务器分组', dataIndex: 'dbGroup' },
+    {
+      title: '最近测试',
+      width: 240,
+      render: (text, record) => {
+        const testResult = state.serverTestResults[record.code];
+        if (!testResult) {
+          return <span className="admin-server-test-empty">未测试</span>;
+        }
+
+        if (testResult.status === 'testing') {
+          return (
+            <div className="admin-server-test-cell">
+              <Tag color="processing">测试中</Tag>
+              <span className="admin-server-test-message">正在检查连通性和账号可用性</span>
+            </div>
+          );
+        }
+
+        const isSuccess = testResult.status === 'success';
+        return (
+          <div className="admin-server-test-cell">
+            <Tag color={isSuccess ? 'success' : 'error'}>
+              {isSuccess ? '正常' : '失败'}
+            </Tag>
+            <span className="admin-server-test-message">{testResult.message || '-'}</span>
+            {testResult.testedAt ? (
+              <span className="admin-task-time">{testResult.testedAt}</span>
+            ) : null}
+            {!isSuccess && testResult.detail ? (
+              <Button
+                className="admin-server-test-detail"
+                type="link"
+                onClick={() => showServerTestDetail(record.dbServerName, testResult.detail)}
+              >
+                查看详情
+              </Button>
+            ) : null}
+          </div>
+        );
+      },
+    },
     {
       title: '操作',
       render: (text, record) => (
@@ -1387,7 +1532,11 @@ function Admin() {
                 />
               </Form.Item>
               <Form.Item label="测试连接">
-                <Button type="primary" onClick={testDbConn}>
+                <Button
+                  type="primary"
+                  loading={state.testingConfigServer}
+                  onClick={testDbConn}
+                >
                   连接...
                 </Button>
               </Form.Item>
