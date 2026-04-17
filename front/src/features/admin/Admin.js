@@ -27,6 +27,7 @@ import {
   UserOutlined,
 } from '@ant-design/icons';
 import AdminDashboard from '@/features/admin/components/AdminDashboard';
+import { getServerTypeLabel } from '@/features/workbench/lib/serverType';
 import { createClient } from '@/shared/api/apiClient';
 import './Admin.css';
 
@@ -763,7 +764,7 @@ function Admin() {
     { title: '服务器地址', dataIndex: 'dbServerHost' },
     { title: '服务器端口', dataIndex: 'dbServerPort' },
     { title: '用户名', dataIndex: 'dbServerUsername' },
-    { title: '服务器类型', dataIndex: 'dbServerType' },
+    { title: '服务器类型', dataIndex: 'dbServerType', render: (value) => getServerTypeLabel(value) },
     { title: '连接安全', dataIndex: 'dbSslMode', render: (value) => value || 'DEFAULT' },
     { title: '服务器分组', dataIndex: 'dbGroup' },
     {
@@ -1352,7 +1353,9 @@ function Admin() {
                 >
                   <Select.Option value="mssql">mssql</Select.Option>
                   <Select.Option value="mysql">mysql</Select.Option>
-                  <Select.Option value="postgresql">postgresql</Select.Option>
+                  <Select.Option value="mariadb">mariadb</Select.Option>
+                  <Select.Option value="postgresql">pgsql / postgresql</Select.Option>
+                  <Select.Option value="clickhouse">clickhouse</Select.Option>
                 </Select>
               </Form.Item>
               <Form.Item label="连接安全">

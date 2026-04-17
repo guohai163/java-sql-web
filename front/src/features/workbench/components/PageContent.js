@@ -8,6 +8,13 @@ import { createClient } from '@/shared/api/apiClient';
 import dot from '@/features/workbench/assets/dot.gif';
 import DataDisplayFast from '@/features/workbench/components/DataDisplayFast';
 import Spreadsheet from '@/features/workbench/components/Spreadsheet';
+import WorkbenchDashboard from '@/features/workbench/components/WorkbenchDashboard';
+import {
+  getEditorMode,
+  getServerTypeLabel,
+  isMysqlFamily,
+  normalizeServerType,
+} from '@/features/workbench/lib/serverType';
 import '@/features/workbench/styles/PageContent.css';
 import 'codemirror/lib/codemirror.css';
 import 'codemirror/addon/hint/show-hint.css';
@@ -51,6 +58,11 @@ function createPane(overrides = {}) {
     queryResult: [],
     dataAreaRefresh: [],
     dataDisplayStyle: readRenderModePreference(),
+    dashboardData: null,
+    dashboardLoading: false,
+    dashboardError: '',
+    dashboardUpdatedAt: '',
+    contentTab: 'dashboard',
     selectedSql: '',
     ...overrides,
   };
@@ -126,7 +138,7 @@ function PageContent() {
     rearSql: '',
     options: {
       lineNumbers: true,
-      mode: { name: 'text/x-mysql' },
+      mode: { name: getEditorMode('mysql') },
       extraKeys: { Ctrl: 'autocomplete' },
       theme: 'idea',
     },
@@ -177,6 +189,79 @@ function PageContent() {
     };
   }, []);
 
+  const formatDashboardUpdatedAt = () =>
+    new Date().toLocaleString('zh-CN', {
+      hour12: false,
+    });
+
+  const clearPaneDashboard = (pane) => ({
+    ...pane,
+    dashboardData: null,
+    dashboardLoading: false,
+    dashboardError: '',
+    dashboardUpdatedAt: '',
+    contentTab: pane.queryResult.length > 0 ? pane.contentTab : 'dashboard',
+  });
+
+  const loadDashboardForPane = async ({
+    server,
+    database,
+    paneKey,
+    forceRefresh = false,
+  }) => {
+    const current = stateRef.current;
+
+    if (!server || !database) {
+      setState((previous) => ({
+        ...previous,
+        panes: updatePaneByKey(previous.panes, paneKey, (pane) => clearPaneDashboard(pane)),
+      }));
+      return;
+    }
+
+    setState((previous) => ({
+      ...previous,
+      panes: updatePaneByKey(previous.panes, paneKey, (pane) => ({
+        ...pane,
+        dashboardLoading: true,
+        dashboardError: '',
+        contentTab: pane.queryResult.length === 0 ? 'dashboard' : pane.contentTab,
+      })),
+    }));
+
+    const response = await clientRef.current.get(
+      `/database/dashboard/${server}/${database}?forceRefresh=${forceRefresh ? 'true' : 'false'}`,
+      { headers: { 'User-Token': current.token } },
+    );
+
+    if (response.jsonData.status) {
+      setState((previous) => ({
+        ...previous,
+        panes: updatePaneByKey(previous.panes, paneKey, (pane) => ({
+          ...pane,
+          dashboardLoading: false,
+          dashboardError: '',
+          dashboardUpdatedAt: formatDashboardUpdatedAt(),
+          dashboardData: {
+            ...(response.jsonData.data || {}),
+            updatedAt: formatDashboardUpdatedAt(),
+          },
+        })),
+      }));
+      return;
+    }
+
+    setState((previous) => ({
+      ...previous,
+      panes: updatePaneByKey(previous.panes, paneKey, (pane) => ({
+        ...pane,
+        dashboardLoading: false,
+        dashboardError: response.jsonData.message || 'dashboard 加载失败',
+        dashboardData: null,
+      })),
+    }));
+  };
+
   const handleDataSelect = async (data) => {
     const current = stateRef.current;
 
@@ -185,16 +270,14 @@ function PageContent() {
         `/database/serverinfo/${data.selectServer}`,
         { headers: { 'User-Token': current.token } },
       );
+      const serverType = normalizeServerType(response.jsonData.data.dbServerType);
       let sql = '';
 
-      if (
-        response.jsonData.data.dbServerType === 'mssql' ||
-        response.jsonData.data.dbServerType === 'mssql_druid'
-      ) {
+      if (serverType === 'mssql') {
         sql = `SELECT top 100 * FROM [${data.selectTable}]`;
-      } else if (response.jsonData.data.dbServerType === 'mysql') {
+      } else if (isMysqlFamily(serverType) || serverType === 'clickhouse') {
         sql = `SELECT * FROM \`${data.selectDatabase}\`.\`${data.selectTable}\` limit 100`;
-      } else if (response.jsonData.data.dbServerType === 'postgresql') {
+      } else if (serverType === 'postgresql') {
         sql = `SELECT * FROM public.${quotePostgresqlIdentifier(data.selectTable)} LIMIT 100`;
       }
 
@@ -209,7 +292,7 @@ function PageContent() {
           sql,
           server: data.selectServer,
           serverName: response.jsonData.data.dbServerName,
-          serverType: response.jsonData.data.dbServerType,
+          serverType,
           database: data.selectDatabase,
         })),
       }));
@@ -311,6 +394,7 @@ function PageContent() {
           { headers: { 'User-Token': current.token } },
         ),
       ]);
+      const serverType = normalizeServerType(serverResponse.jsonData.data.dbServerType);
 
       setState((previous) => ({
         ...previous,
@@ -319,7 +403,7 @@ function PageContent() {
         historySql: readHistorySql(data.selectServer),
         options: {
           lineNumbers: true,
-          mode: { name: 'text/x-mysql' },
+          mode: { name: getEditorMode(serverType) },
           extraKeys: { Ctrl: 'autocomplete' },
           hintOptions: {
             tables:
@@ -337,9 +421,19 @@ function PageContent() {
           server: data.selectServer,
           database: data.selectDatabase,
           serverName: serverResponse.jsonData.data.dbServerName,
-          serverType: serverResponse.jsonData.data.dbServerType,
+          serverType,
+          dashboardData: null,
+          dashboardLoading: false,
+          dashboardError: '',
+          dashboardUpdatedAt: '',
+          contentTab: 'dashboard',
         })),
       }));
+      void loadDashboardForPane({
+        server: data.selectServer,
+        database: data.selectDatabase,
+        paneKey: current.activeKey,
+      });
       return;
     }
 
@@ -348,17 +442,23 @@ function PageContent() {
         `/database/serverinfo/${data.selectServer}`,
         { headers: { 'User-Token': current.token } },
       );
+      const serverType = normalizeServerType(response.jsonData.data.dbServerType);
 
       setState((previous) => ({
         ...previous,
         selectServer: data.selectServer,
         selectDatabase: '',
+        options: {
+          ...previous.options,
+          mode: { name: getEditorMode(serverType) },
+        },
         historySql: readHistorySql(data.selectServer),
         panes: updatePaneByKey(previous.panes, previous.activeKey, (pane) => ({
-          ...pane,
+          ...clearPaneDashboard(pane),
           server: data.selectServer,
           serverName: response.jsonData.data.dbServerName,
-          serverType: response.jsonData.data.dbServerType,
+          serverType,
+          database: '',
         })),
       }));
     }
@@ -469,6 +569,7 @@ function PageContent() {
           historySql: nextHistory,
           panes: updatePaneByKey(previous.panes, currentPane.key, (pane) => ({
             ...pane,
+            contentTab: 'query',
             dataDisplayStyle: shouldUseModernDisplay,
             queryResult: response.jsonData.data,
             dataAreaRefresh: [sql],
@@ -558,8 +659,22 @@ function PageContent() {
         selectServer: pane.server || previous.selectServer,
         selectDatabase: pane.database || '',
         historySql: pane.server ? readHistorySql(pane.server) : [],
+        options: {
+          ...previous.options,
+          mode: { name: getEditorMode(pane.serverType) },
+        },
       };
     });
+  };
+
+  const handleContentTabChange = (paneKey, contentTab) => {
+    setState((previous) => ({
+      ...previous,
+      panes: updatePaneByKey(previous.panes, paneKey, (pane) => ({
+        ...pane,
+        contentTab,
+      })),
+    }));
   };
 
   const addTab = () => {
@@ -623,10 +738,10 @@ function PageContent() {
           closable: pane.closable !== false,
           children: (
             <>
-              <div id="menubar">
-                <div id="serverinfo" className="workbench-serverinfo">
-                  <img src={dot} alt="SERVERIMG" className="icon ic_s_host " />
-                  服务器: {pane.serverName} ({pane.serverType})
+                <div id="menubar">
+                  <div id="serverinfo" className="workbench-serverinfo">
+                    <img src={dot} alt="SERVERIMG" className="icon ic_s_host " />
+                  服务器: {pane.serverName} ({getServerTypeLabel(pane.serverType)})
                   <span className={pane.database === '' ? 'hide' : 'none'}>
                     &gt;&gt;{' '}
                     <img src={dot} className="icon ic_s_db " alt="DBIMG" />
@@ -714,46 +829,70 @@ function PageContent() {
                     ) : null}
                   </div>
                 </fieldset>
-                <div
-                  className={
-                    state.queryLoading || pane.queryResult.length === 0
-                      ? 'hide'
-                      : 'responsivetable workbench-result-panel'
-                  }
-                >
-                  <div className="workbench-panel-heading compact">
-                    <div>
-                      <h3>查询结果</h3>
-                      <p>{pane.queryResult.length} 行数据</p>
-                    </div>
-                  </div>
-                  <div className="container-wrap workbench-result-wrap" style={{ height: state.deskHeight }}>
-                    {pane.dataDisplayStyle ? (
-                      <Spreadsheet
-                        data={pane.queryResult}
-                        dataAreaRefresh={pane.dataAreaRefresh}
-                        dataId={pane.key}
-                      />
-                    ) : (
-                      <DataDisplayFast
-                        data={pane.queryResult}
-                        dataAreaRefresh={pane.dataAreaRefresh}
-                      />
-                    )}
-                  </div>
-                </div>
-                <div className={state.queryLoading ? 'query_load workbench-loading' : 'hide'}>
-                  <Spin indicator={antIcon} />
-                  数据查询中...
-                </div>
-                <div
-                  className={
-                    !state.queryLoading && pane.queryResult.length === 0
-                      ? 'query_load workbench-empty-state'
-                      : 'hide'
-                  }
-                >
-                  <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} />
+                <div className="workbench-lower-panel">
+                  <Tabs
+                    activeKey={pane.contentTab}
+                    className="workbench-content-tabs"
+                    items={[
+                      {
+                        key: 'dashboard',
+                        label: 'Dashboard',
+                        children: (
+                          <WorkbenchDashboard
+                            data={pane.dashboardData}
+                            error={pane.dashboardError}
+                            loading={pane.dashboardLoading}
+                            onRefresh={() =>
+                              void loadDashboardForPane({
+                                server: pane.server,
+                                database: pane.database,
+                                paneKey: pane.key,
+                                forceRefresh: true,
+                              })
+                            }
+                          />
+                        ),
+                      },
+                      {
+                        key: 'query',
+                        label: '查询结果',
+                        children: state.queryLoading ? (
+                          <div className="query_load workbench-loading">
+                            <Spin indicator={antIcon} />
+                            数据查询中...
+                          </div>
+                        ) : pane.queryResult.length === 0 ? (
+                          <div className="query_load workbench-empty-state">
+                            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="还没有查询结果" />
+                          </div>
+                        ) : (
+                          <div className="responsivetable workbench-result-panel">
+                            <div className="workbench-panel-heading compact">
+                              <div>
+                                <h3>查询结果</h3>
+                                <p>{pane.queryResult.length} 行数据</p>
+                              </div>
+                            </div>
+                            <div className="container-wrap workbench-result-wrap" style={{ height: state.deskHeight }}>
+                              {pane.dataDisplayStyle ? (
+                                <Spreadsheet
+                                  data={pane.queryResult}
+                                  dataAreaRefresh={pane.dataAreaRefresh}
+                                  dataId={pane.key}
+                                />
+                              ) : (
+                                <DataDisplayFast
+                                  data={pane.queryResult}
+                                  dataAreaRefresh={pane.dataAreaRefresh}
+                                />
+                              )}
+                            </div>
+                          </div>
+                        ),
+                      },
+                    ]}
+                    onChange={(contentTab) => handleContentTabChange(pane.key, contentTab)}
+                  />
                 </div>
               </div>
             </>

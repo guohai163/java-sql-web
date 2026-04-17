@@ -10,6 +10,7 @@ import org.guohai.javasqlweb.dao.UserManageDao;
 import org.guohai.javasqlweb.service.operation.DbOperation;
 import org.guohai.javasqlweb.service.operation.DbOperationFactory;
 import org.guohai.javasqlweb.util.AccessTokenUtils;
+import org.guohai.javasqlweb.util.DbServerTypeUtils;
 import org.guohai.javasqlweb.util.DashboardRangeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -110,7 +111,7 @@ public class BackstageServiceImpl implements BackstageService{
      */
     @Override
     public Result<List<ConnectConfigBean>> getConnData() {
-        List<ConnectConfigBean> listConn = baseConfigDao.getConnData();
+        List<ConnectConfigBean> listConn = DbServerTypeUtils.normalize(baseConfigDao.getConnData());
 
         return new Result<>(true, "", listConn);
     }
@@ -146,6 +147,7 @@ public class BackstageServiceImpl implements BackstageService{
      */
     @Override
     public Result<String> testServerConnect(ConnectConfigBean server) {
+        DbServerTypeUtils.normalize(server);
         if ("mssql".equalsIgnoreCase(server.getDbServerType())
                 && LEGACY_TLS_MODE.equalsIgnoreCase(server.getDbSslMode())
                 && !legacyTlsEnabled) {
@@ -180,7 +182,7 @@ public class BackstageServiceImpl implements BackstageService{
 
     @Override
     public Result<String> testSavedServerConnect(Integer code) {
-        ConnectConfigBean savedServer = baseConfigDao.getConnectConfig(code);
+        ConnectConfigBean savedServer = DbServerTypeUtils.normalize(baseConfigDao.getConnectConfig(code));
         if (savedServer == null) {
             return new Result<>(false, "服务器不存在", "服务器不存在");
         }
@@ -195,6 +197,7 @@ public class BackstageServiceImpl implements BackstageService{
      */
     @Override
     public Result<String> addConnServer(ConnectConfigBean server) {
+        DbServerTypeUtils.normalize(server);
         if(null != baseConfigDao.getConnectConfigByName(server.getDbServerName())){
             return new Result<>(false,"","同名服务器已经存在");
         }
@@ -364,6 +367,7 @@ public class BackstageServiceImpl implements BackstageService{
      */
     @Override
     public Result<String> updateServerData(ConnectConfigBean server) {
+        DbServerTypeUtils.normalize(server);
         if(null == baseConfigDao.getConnectConfigByCode(server.getCode())){
             return new Result<>(false, "","服务器不存在" );
         }

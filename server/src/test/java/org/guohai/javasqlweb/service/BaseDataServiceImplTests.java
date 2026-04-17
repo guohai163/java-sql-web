@@ -1,8 +1,10 @@
 package org.guohai.javasqlweb.service;
 
 import org.guohai.javasqlweb.beans.DatabaseNameBean;
+import org.guohai.javasqlweb.beans.ConnectConfigBean;
 import org.guohai.javasqlweb.beans.Result;
 import org.guohai.javasqlweb.beans.UserBean;
+import org.guohai.javasqlweb.beans.WorkbenchDashboardResponse;
 import org.guohai.javasqlweb.dao.BaseConfigDao;
 import org.guohai.javasqlweb.dao.QueryLogTargetDao;
 import org.guohai.javasqlweb.service.operation.DbOperation;
@@ -18,11 +20,17 @@ import java.lang.reflect.Field;
 import java.sql.SQLException;
 import java.sql.SQLTransientConnectionException;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -46,6 +54,8 @@ class BaseDataServiceImplTests {
         accessStaticMap("connectionFailureCountMap").clear();
         accessStaticMap("connectionCooldownUntilMap").clear();
         accessStaticMap("connectionLastErrorMap").clear();
+        accessStaticMap("workbenchServerDashboardCache").clear();
+        accessStaticMap("workbenchDatabaseDashboardCache").clear();
     }
 
     @Test
@@ -114,6 +124,35 @@ class BaseDataServiceImplTests {
         verify(operation, times(4)).getDbList();
     }
 
+    @Test
+    void workbenchDashboardUsesCacheUntilForceRefresh() throws Exception {
+        UserBean user = buildUser();
+        DbOperation operation = mock(DbOperation.class);
+        ConnectConfigBean connectConfigBean = new ConnectConfigBean();
+        connectConfigBean.setCode(11);
+        connectConfigBean.setDbServerType("mysql");
+        connectConfigBean.setDbServerName("core");
+        connectConfigBean.setDbServerHost("127.0.0.1");
+
+        when(baseConfigDao.hasServerPermission(user.getCode(), 11)).thenReturn(true);
+        when(baseConfigDao.getConnectConfig(11)).thenReturn(connectConfigBean);
+        when(operation.queryDatabaseBySql(anyString(), anyString(), anyInt()))
+                .thenReturn(buildDashboardResult("demo"));
+        accessStaticMap("operationMap").put(11, operation);
+
+        Result<WorkbenchDashboardResponse> firstResult = baseDataService.getWorkbenchDashboard(11, "demo", user, false);
+        assertTrue(firstResult.getStatus());
+        assertNotNull(firstResult.getData());
+        clearInvocations(operation);
+
+        Result<WorkbenchDashboardResponse> cachedResult = baseDataService.getWorkbenchDashboard(11, "demo", user, false);
+        assertTrue(cachedResult.getStatus());
+        verify(operation, times(0)).queryDatabaseBySql(anyString(), anyString(), anyInt());
+
+        baseDataService.getWorkbenchDashboard(11, "demo", user, true);
+        verify(operation, atLeastOnce()).queryDatabaseBySql(anyString(), anyString(), anyInt());
+    }
+
     @SuppressWarnings("unchecked")
     private static Map<Integer, Object> accessStaticMap(String fieldName) throws Exception {
         Field field = BaseDataServiceImpl.class.getDeclaredField(fieldName);
@@ -125,5 +164,11 @@ class BaseDataServiceImplTests {
         UserBean user = new UserBean();
         user.setCode(1);
         return user;
+    }
+
+    private Object[] buildDashboardResult(String value) {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("value", value);
+        return new Object[]{1, 1, List.of(row)};
     }
 }

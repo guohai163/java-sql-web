@@ -139,7 +139,7 @@ public final class ReadOnlySqlGuard {
     private static boolean isAllowedVariableStatement(String sql, String dbType) {
         String upperDbType = dbType == null ? "" : dbType.toLowerCase(Locale.ROOT);
         String normalized = sql.toUpperCase(Locale.ROOT);
-        if ("mysql".equals(upperDbType)) {
+        if ("mysql".equals(upperDbType) || "mariadb".equals(upperDbType)) {
             return normalized.matches("^SET\\s+@[_A-Z0-9$]+\\s*(:=|=).*$");
         }
         if ("mssql".equals(upperDbType)) {

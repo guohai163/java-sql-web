@@ -120,6 +120,19 @@ public interface BaseDataService {
     Result<Object> quereyDataBySql(Integer serverCode, String dbName, String sql, UserBean user, String userIp);
 
     /**
+     * 获取工作台 dashboard
+     * @param serverCode 服务器编号
+     * @param dbName 数据库名
+     * @param user 已认证用户
+     * @param forceRefresh 是否强制刷新
+     * @return dashboard 数据
+     */
+    Result<WorkbenchDashboardResponse> getWorkbenchDashboard(Integer serverCode,
+                                                            String dbName,
+                                                            UserBean user,
+                                                            boolean forceRefresh);
+
+    /**
      * 检查所有服务器的健康状态
      * @return
      */

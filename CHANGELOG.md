@@ -2,6 +2,22 @@
 
 本文件记录当前 `master` 分支之后到当前 `develop` 工作区的主要变更，按版本和当前未发布改动整理。
 
+## v2.7.0
+
+### 工作台 Dashboard
+- 在工作台右下区域新增 `Dashboard / 查询结果` 双页签，选库后自动展示数据库 dashboard，执行 SQL 后自动切回查询结果。
+- 新增工作台专用 dashboard 接口，按实例和数据库分层缓存 10 分钟，并支持手动刷新。
+- dashboard 统一采用只读 SQL 拉取实例信息、数据库信息和其他可观测指标，失败时按卡片局部降级显示。
+
+### 数据库兼容
+- 补齐工作台 dashboard 对 `mysql`、`mariadb`、`postgresql(pgsql)`、`mssql`、`clickhouse` 的分库型实现。
+- 新增数据库类型归一化逻辑，兼容历史 `pgsql`、`mssql_druid`、`clickhouce` 等旧值。
+- 后台服务器配置页增加 `mariadb`、`clickhouse` 选项，并统一服务器类型展示文案。
+
+### 测试
+- 增加工作台 dashboard 组件测试与数据库类型归一化测试。
+- 回归后端基础服务测试，验证 dashboard 缓存行为未破坏现有连接冷却逻辑。
+
 ## v2.6.3
 
 ### 前端

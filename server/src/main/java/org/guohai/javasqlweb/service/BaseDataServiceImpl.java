@@ -4,9 +4,12 @@ import jakarta.annotation.PreDestroy;
 import org.guohai.javasqlweb.beans.*;
 import org.guohai.javasqlweb.dao.BaseConfigDao;
 import org.guohai.javasqlweb.dao.QueryLogTargetDao;
+import org.guohai.javasqlweb.service.dashboard.WorkbenchDashboardProvider;
+import org.guohai.javasqlweb.service.dashboard.WorkbenchDashboardProviderFactory;
 import org.guohai.javasqlweb.service.operation.DbOperation;
 import org.guohai.javasqlweb.service.operation.DbOperationFactory;
 import org.guohai.javasqlweb.util.AuditSqlMaskingUtils;
+import org.guohai.javasqlweb.util.DbServerTypeUtils;
 import org.guohai.javasqlweb.util.ReadOnlySqlGuard;
 import org.guohai.javasqlweb.util.SqlTargetExtractor;
 import org.slf4j.Logger;
@@ -62,6 +65,10 @@ public class BaseDataServiceImpl implements BaseDataService{
 
     private static final Map<Integer, String> connectionLastErrorMap = new ConcurrentHashMap<>();
 
+    private static final Map<Integer, WorkbenchDashboardCacheEntry> workbenchServerDashboardCache = new ConcurrentHashMap<>();
+
+    private static final Map<String, WorkbenchDashboardCacheEntry> workbenchDatabaseDashboardCache = new ConcurrentHashMap<>();
+
     /**
      * sql最大保存长度
      */
@@ -71,6 +78,20 @@ public class BaseDataServiceImpl implements BaseDataService{
 
     private static final long CONNECTION_FAILURE_COOLDOWN_MILLIS = 5 * 60 * 1000L;
 
+    private static final long WORKBENCH_DASHBOARD_CACHE_MILLIS = 10 * 60 * 1000L;
+
+    private static class WorkbenchDashboardCacheEntry {
+        private final List<WorkbenchDashboardSection> sections;
+        private final long cachedAt;
+        private final long expiresAt;
+
+        private WorkbenchDashboardCacheEntry(List<WorkbenchDashboardSection> sections, long cachedAt, long expiresAt) {
+            this.sections = sections;
+            this.cachedAt = cachedAt;
+            this.expiresAt = expiresAt;
+        }
+    }
+
     @FunctionalInterface
     private interface OperationAction<T> {
         T execute(DbOperation operation) throws Exception;
@@ -78,7 +99,7 @@ public class BaseDataServiceImpl implements BaseDataService{
 
     @Override
     public Result<List<ConnectConfigBean>> getAllDataConnect() {
-        return new Result<>(true,"", baseConfigDao.getAllConnectConfig());
+        return new Result<>(true,"", DbServerTypeUtils.normalize(baseConfigDao.getAllConnectConfig()));
     }
 
     /**
@@ -91,7 +112,7 @@ public class BaseDataServiceImpl implements BaseDataService{
         if (permissionCheck != null) {
             return permissionCheck;
         }
-        ConnectConfigBean connBean = baseConfigDao.getConnectConfig(serverCode);
+        ConnectConfigBean connBean = DbServerTypeUtils.normalize(baseConfigDao.getConnectConfig(serverCode));
         connBean.setDbServerPassword("");
         connBean.setDbServerUsername("");
         connBean.setDbServerHost("");
@@ -261,7 +282,7 @@ public class BaseDataServiceImpl implements BaseDataService{
         if (permissionCheck != null) {
             return permissionCheck;
         }
-        ConnectConfigBean connectConfigBean = baseConfigDao.getConnectConfig(serverCode);
+        ConnectConfigBean connectConfigBean = DbServerTypeUtils.normalize(baseConfigDao.getConnectConfig(serverCode));
         String guardResult = ReadOnlySqlGuard.validate(sql, connectConfigBean == null ? "" : connectConfigBean.getDbServerType());
         if (guardResult != null) {
             return new Result<>(false, guardResult, null);
@@ -300,6 +321,61 @@ public class BaseDataServiceImpl implements BaseDataService{
             }
         }else{
             return new Result<>(false,"没有找到对应的数据库",null);
+        }
+    }
+
+    @Override
+    public Result<WorkbenchDashboardResponse> getWorkbenchDashboard(Integer serverCode,
+                                                                   String dbName,
+                                                                   UserBean user,
+                                                                   boolean forceRefresh) {
+        Result<WorkbenchDashboardResponse> permissionCheck = validateServerPermission(serverCode, user);
+        if (permissionCheck != null) {
+            return permissionCheck;
+        }
+        if (dbName == null || dbName.trim().isEmpty()) {
+            return new Result<>(false, "请选择数据库后再查看 dashboard", null);
+        }
+
+        ConnectConfigBean connectConfigBean = DbServerTypeUtils.normalize(baseConfigDao.getConnectConfig(serverCode));
+        if (connectConfigBean == null) {
+            return new Result<>(false, "没有找到对应的数据库", null);
+        }
+
+        WorkbenchDashboardProvider provider = WorkbenchDashboardProviderFactory.getProvider(connectConfigBean.getDbServerType());
+        if (provider == null) {
+            return new Result<>(false, "当前数据库类型暂不支持 dashboard", null);
+        }
+
+        if (!forceRefresh) {
+            WorkbenchDashboardResponse cachedResponse = buildWorkbenchDashboardFromCache(serverCode, dbName, connectConfigBean);
+            if (cachedResponse != null) {
+                return new Result<>(true, "", cachedResponse);
+            }
+        }
+
+        Result<WorkbenchDashboardResponse> cooldownResult = buildCooldownResultIfPresent(serverCode);
+        if (cooldownResult != null) {
+            return cooldownResult;
+        }
+
+        DbOperation operation = createDbOperation(serverCode);
+        if (operation == null) {
+            return new Result<>(false, "没有找到对应的数据库", null);
+        }
+
+        try {
+            List<WorkbenchDashboardSection> sections = provider.buildSections(operation, dbName, connectConfigBean);
+            WorkbenchDashboardResponse response = createWorkbenchDashboardResponse(serverCode, dbName, connectConfigBean.getDbServerType(), sections);
+            cacheWorkbenchDashboard(serverCode, dbName, response);
+            clearConnectionFailureState(serverCode);
+            return new Result<>(true, "", response);
+        } catch (Exception exception) {
+            LOG.warn("Workbench dashboard load failed for server {} db {}", serverCode, dbName, exception);
+            if (isConnectionFailure(exception)) {
+                return buildConnectionFailureResult(serverCode, exception);
+            }
+            return new Result<>(false, extractExceptionMessage(exception), null);
         }
     }
 
@@ -363,7 +439,7 @@ public class BaseDataServiceImpl implements BaseDataService{
         if(null == user){
             return new Result<>(false,"",null);
         }
-        return new Result<>(true, "", baseConfigDao.getHavePermConnConfig(user.getCode()));
+        return new Result<>(true, "", DbServerTypeUtils.normalize(baseConfigDao.getHavePermConnConfig(user.getCode())));
     }
 
     /**
@@ -388,6 +464,7 @@ public class BaseDataServiceImpl implements BaseDataService{
                 if(null == operationMap.get(serverCode)){
                     ConnectConfigBean connConfigBean = baseConfigDao.getConnectConfig(serverCode);
                     try{
+                        DbServerTypeUtils.normalize(connConfigBean);
                         dbOperation = DbOperationFactory.createDbOperation(connConfigBean);
                         operationMap.put(serverCode,dbOperation);
                     } catch (Exception e){
@@ -409,6 +486,8 @@ public class BaseDataServiceImpl implements BaseDataService{
         connectionFailureCountMap.clear();
         connectionCooldownUntilMap.clear();
         connectionLastErrorMap.clear();
+        workbenchServerDashboardCache.clear();
+        workbenchDatabaseDashboardCache.clear();
     }
 
     private <T> Result<T> validateServerPermission(Integer serverCode, UserBean user) {
@@ -477,6 +556,78 @@ public class BaseDataServiceImpl implements BaseDataService{
         connectionFailureCountMap.remove(serverCode);
         connectionCooldownUntilMap.remove(serverCode);
         connectionLastErrorMap.remove(serverCode);
+    }
+
+    private WorkbenchDashboardResponse buildWorkbenchDashboardFromCache(Integer serverCode,
+                                                                       String dbName,
+                                                                       ConnectConfigBean config) {
+        WorkbenchDashboardCacheEntry serverEntry = getValidDashboardCacheEntry(workbenchServerDashboardCache, serverCode);
+        WorkbenchDashboardCacheEntry databaseEntry = getValidDashboardCacheEntry(
+                workbenchDatabaseDashboardCache,
+                buildWorkbenchDatabaseCacheKey(serverCode, dbName)
+        );
+        if (serverEntry == null || databaseEntry == null) {
+            return null;
+        }
+        List<WorkbenchDashboardSection> mergedSections = new ArrayList<>(serverEntry.sections.size() + databaseEntry.sections.size());
+        mergedSections.addAll(serverEntry.sections);
+        mergedSections.addAll(databaseEntry.sections);
+        WorkbenchDashboardResponse response = createWorkbenchDashboardResponse(serverCode, dbName, config.getDbServerType(), mergedSections);
+        response.setCachedAt(Math.min(serverEntry.cachedAt, databaseEntry.cachedAt));
+        response.setExpiresAt(Math.min(serverEntry.expiresAt, databaseEntry.expiresAt));
+        return response;
+    }
+
+    private WorkbenchDashboardResponse createWorkbenchDashboardResponse(Integer serverCode,
+                                                                       String dbName,
+                                                                       String dbType,
+                                                                       List<WorkbenchDashboardSection> sections) {
+        long now = System.currentTimeMillis();
+        WorkbenchDashboardResponse response = new WorkbenchDashboardResponse();
+        response.setServerCode(serverCode);
+        response.setDbName(dbName);
+        response.setDbType(DbServerTypeUtils.normalize(dbType));
+        response.setCachedAt(now);
+        response.setExpiresAt(now + WORKBENCH_DASHBOARD_CACHE_MILLIS);
+        response.setSections(sections);
+        return response;
+    }
+
+    private void cacheWorkbenchDashboard(Integer serverCode, String dbName, WorkbenchDashboardResponse response) {
+        long now = System.currentTimeMillis();
+        long expiresAt = now + WORKBENCH_DASHBOARD_CACHE_MILLIS;
+        List<WorkbenchDashboardSection> serverSections = new ArrayList<>();
+        List<WorkbenchDashboardSection> databaseSections = new ArrayList<>();
+        for (WorkbenchDashboardSection section : response.getSections()) {
+            if ("system".equals(section.getKey())) {
+                serverSections.add(section);
+            } else {
+                databaseSections.add(section);
+            }
+        }
+        workbenchServerDashboardCache.put(serverCode, new WorkbenchDashboardCacheEntry(serverSections, now, expiresAt));
+        workbenchDatabaseDashboardCache.put(
+                buildWorkbenchDatabaseCacheKey(serverCode, dbName),
+                new WorkbenchDashboardCacheEntry(databaseSections, now, expiresAt)
+        );
+        response.setCachedAt(now);
+        response.setExpiresAt(expiresAt);
+    }
+
+    private <K> WorkbenchDashboardCacheEntry getValidDashboardCacheEntry(Map<K, WorkbenchDashboardCacheEntry> cache, K key) {
+        WorkbenchDashboardCacheEntry entry = cache.get(key);
+        if (entry == null) {
+            return null;
+        }
+        if (entry.expiresAt <= System.currentTimeMillis()) {
+            cache.remove(key);
+            return null;
+        }
+        return entry;
+    }
+
+    private String buildWorkbenchDatabaseCacheKey(Integer serverCode, String dbName) {
+        return serverCode + "::" + dbName;
     }
 
     private <T> Result<T> buildCooldownResultIfPresent(Integer serverCode) {

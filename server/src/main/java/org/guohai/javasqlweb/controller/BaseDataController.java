@@ -221,6 +221,21 @@ public class BaseDataController {
     }
 
     @ResponseBody
+    @RequestMapping(value = "/dashboard/{serverCode}/{dbName}", method = RequestMethod.GET)
+    public Result<WorkbenchDashboardResponse> getWorkbenchDashboard(
+            @PathVariable("serverCode") String serverCode,
+            @PathVariable("dbName") String dbName,
+            @RequestParam(value = "forceRefresh", defaultValue = "false") boolean forceRefresh,
+            HttpServletRequest request) {
+        return baseDataService.getWorkbenchDashboard(
+                Integer.parseInt(serverCode),
+                dbName,
+                getAuthenticatedUser(request),
+                forceRefresh
+        );
+    }
+
+    @ResponseBody
     @RequestMapping(value = "/server/group")
     public Result<List<String>> getDbGroup(HttpServletRequest request){
         return baseDataService.getDbGroup(getAuthenticatedUser(request));

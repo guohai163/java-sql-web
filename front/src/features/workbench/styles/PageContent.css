@@ -209,6 +209,117 @@
     background: rgba(255, 255, 255, 0.96);
 }
 
+.workbench-lower-panel {
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.96);
+    overflow: hidden;
+}
+
+.workbench-content-tabs > .ant-tabs-nav {
+    margin: 0 !important;
+    padding: 0 14px;
+    background: rgba(248, 252, 253, 0.92);
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.workbench-content-tabs > .ant-tabs-content-holder {
+    padding: 14px;
+}
+
+.workbench-dashboard-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.workbench-dashboard-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.workbench-dashboard-meta {
+    color: #64748b;
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
+.workbench-dashboard-feedback.error {
+    padding: 12px 14px;
+    border: 1px solid rgba(239, 68, 68, 0.14);
+    border-radius: 14px;
+    background: rgba(254, 242, 242, 0.92);
+    color: #b91c1c;
+    font-size: 0.88rem;
+}
+
+.workbench-dashboard-empty {
+    min-height: 240px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.workbench-dashboard-section {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.workbench-dashboard-grid-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+}
+
+.workbench-dashboard-card {
+    min-height: 132px;
+    padding: 14px;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 16px;
+    background: linear-gradient(180deg, rgba(248, 252, 253, 0.96), rgba(255, 255, 255, 0.98));
+}
+
+.workbench-dashboard-card.status-forbidden,
+.workbench-dashboard-card.status-unsupported {
+    background: linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(255, 255, 255, 0.98));
+}
+
+.workbench-dashboard-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 14px;
+    color: #334155;
+    font-size: 0.84rem;
+    font-weight: 700;
+}
+
+.workbench-dashboard-card-value {
+    color: #102033;
+    font-size: 1.18rem;
+    font-weight: 800;
+    line-height: 1.4;
+    word-break: break-word;
+}
+
+.workbench-dashboard-card-value small {
+    margin-left: 6px;
+    color: #64748b;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+.workbench-dashboard-card-helper {
+    margin-top: 10px;
+    color: #64748b;
+    font-size: 0.78rem;
+    line-height: 1.55;
+}
+
 .workbench-result-wrap {
     overflow: auto;
     border: 1px solid rgba(15, 23, 42, 0.08);
