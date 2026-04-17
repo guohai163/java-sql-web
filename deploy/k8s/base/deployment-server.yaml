@@ -65,20 +65,29 @@ spec:
               value: "${PROJECT_LEGACY_TLS_ENABLED}"
             - name: JAVA_TOOL_OPTIONS
               value: "${JAVA_TOOL_OPTIONS}"
+          startupProbe:
+            httpGet:
+              path: /livez
+              port: 8002
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 12
           readinessProbe:
             httpGet:
-              path: /health
+              path: /readyz
               port: 8002
-            initialDelaySeconds: 20
+            initialDelaySeconds: 5
             periodSeconds: 10
-            timeoutSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+            successThreshold: 1
           livenessProbe:
             httpGet:
-              path: /health
+              path: /livez
               port: 8002
-            initialDelaySeconds: 40
             periodSeconds: 15
-            timeoutSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
           resources:
             requests:
               cpu: "200m"

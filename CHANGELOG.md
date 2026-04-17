@@ -2,6 +2,20 @@
 
 本文件记录当前 `master` 分支之后到当前 `develop` 工作区的主要变更，按版本和当前未发布改动整理。
 
+## v2.7.2
+
+### k8s Probe
+- 新增 `GET /livez` 轻量存活探针接口，仅用于确认应用进程仍可响应 HTTP 请求。
+- 新增 `GET /readyz` 就绪探针接口，仅检查主数据库连通性，不再受动态目标库状态影响。
+- 保留现有 `GET /health` 作为业务巡检接口，继续用于人工排障和全量动态数据库健康检查。
+
+### 部署
+- 调整 `deploy/k8s/base/deployment-server.yaml`，将 `livenessProbe` 切换到 `/livez`、`readinessProbe` 切换到 `/readyz`。
+- 新增 `startupProbe`，降低启动阶段因探针过早介入导致的误重启风险。
+
+### 测试
+- 增加 probe 服务与 HomeController 的定向测试，验证 `/livez`、`/readyz` 和 `/health` 的 HTTP 语义分离。
+
 ## v2.7.1
 
 ### 版本同步

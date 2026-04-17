@@ -4,6 +4,7 @@ package org.guohai.javasqlweb.controller;
 import org.guohai.javasqlweb.beans.Result;
 import org.guohai.javasqlweb.beans.SqlGuidBean;
 import org.guohai.javasqlweb.service.BaseDataService;
+import org.guohai.javasqlweb.service.ProbeService;
 import org.guohai.javasqlweb.util.VersionUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -29,6 +30,9 @@ public class HomeController {
     @Autowired
     BaseDataService baseService;
 
+    @Autowired
+    ProbeService probeService;
+
     @CrossOrigin
     @RequestMapping(value = "/version", method = RequestMethod.GET)
     public Result<String > version(){
@@ -41,6 +45,22 @@ public class HomeController {
         Result<String> result = baseService.serverHealth();
         if (!result.getStatus()) {
             response.setStatus(500);
+        }
+        return result;
+    }
+
+    @CrossOrigin
+    @RequestMapping(value = "/livez", method = RequestMethod.GET)
+    public Result<String> liveness() {
+        return probeService.checkLiveness();
+    }
+
+    @CrossOrigin
+    @RequestMapping(value = "/readyz", method = RequestMethod.GET)
+    public Result<String> readiness(HttpServletResponse response) {
+        Result<String> result = probeService.checkReadiness();
+        if (!result.getStatus()) {
+            response.setStatus(503);
         }
         return result;
     }
