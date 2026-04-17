@@ -9,6 +9,7 @@ import * as webauthnJson from '@github/webauthn-json';
 import { createClient } from '@/shared/api/apiClient';
 import cache from '@/shared/lib/cache';
 import config from '@/shared/config/runtimeConfig';
+import { formatVersionLabel } from '@/shared/lib/version';
 import dot from '@/features/workbench/assets/dot.gif';
 import '@/features/workbench/styles/Navigation.css';
 
@@ -656,7 +657,7 @@ function Navigation() {
                 <span className="tone-sql">Sql</span>
                 <span className="tone-web">Web</span>
               </strong>
-              <span className="workbench-brand-version">v{config.version || '0.9.0'}</span>
+              <span className="workbench-brand-version">{formatVersionLabel(config.version)}</span>
             </div>
           </div>
           <div id="navipanellinks" className="workbench-quick-actions">

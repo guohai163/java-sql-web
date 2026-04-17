@@ -29,6 +29,7 @@ import {
 import AdminDashboard from '@/features/admin/components/AdminDashboard';
 import { getServerTypeLabel } from '@/features/workbench/lib/serverType';
 import { createClient } from '@/shared/api/apiClient';
+import { formatVersionLabel } from '@/shared/lib/version';
 import './Admin.css';
 
 const { confirm } = Modal;
@@ -1061,7 +1062,7 @@ function Admin() {
               <span className="tone-sql">Sql</span>
               <span className="tone-web">Web</span>
             </strong>
-            <span>v{state.version || '0.9.0'}</span>
+            <span>{formatVersionLabel(state.version)}</span>
           </div>
         </div>
         <Menu
@@ -1479,7 +1480,7 @@ function Admin() {
             </Form>
           </Modal>
         </Content>
-        <Footer className="admin-footer">JavaSqlWeb v{state.version || '0.9.0'}</Footer>
+        <Footer className="admin-footer">JavaSqlWeb {formatVersionLabel(state.version)}</Footer>
       </Layout>
     </Layout>
   );

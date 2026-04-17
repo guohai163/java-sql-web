@@ -4,6 +4,7 @@ package org.guohai.javasqlweb.controller;
 import org.guohai.javasqlweb.beans.Result;
 import org.guohai.javasqlweb.beans.SqlGuidBean;
 import org.guohai.javasqlweb.service.BaseDataService;
+import org.guohai.javasqlweb.util.VersionUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -31,7 +32,7 @@ public class HomeController {
     @CrossOrigin
     @RequestMapping(value = "/version", method = RequestMethod.GET)
     public Result<String > version(){
-        return new Result<>(true,"", version) ;
+        return new Result<>(true,"", VersionUtils.normalize(version)) ;
     }
 
     @CrossOrigin
