@@ -151,7 +151,18 @@ CREATE TABLE `passkey_auths_tb` (
                                     `user_agent` VARCHAR(200) NOT NULL COMMENT 'user agent',
                                     `create_date` datetime NOT NULL COMMENT '时间',
                                     PRIMARY KEY (`code`));
-);
+
+CREATE TABLE `webauthn_request_tb` (
+                                     `code` INT NOT NULL AUTO_INCREMENT,
+                                     `request_type` VARCHAR(32) NOT NULL COMMENT '请求类型',
+                                     `request_key` VARCHAR(128) NOT NULL COMMENT '请求关联键',
+                                     `request_json` TEXT NOT NULL COMMENT '序列化后的请求',
+                                     `expire_time` datetime NOT NULL COMMENT '过期时间',
+                                     `created_time` datetime NOT NULL COMMENT '创建时间',
+                                     PRIMARY KEY (`code`),
+                                     UNIQUE KEY `uk_type_key` (`request_type`,`request_key`),
+                                     KEY `idx_expire_time` (`expire_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 --ALTER TABLE `javasqlweb_db`.`user_tb`
 --ADD COLUMN `auth_secret` VARCHAR(45) NULL AFTER `token`,

@@ -2,6 +2,19 @@
 
 本文件记录当前 `master` 分支之后到当前 `develop` 工作区的主要变更，按版本和当前未发布改动整理。
 
+## v2.7.5 - 2026-04-17
+
+### Fixed
+- 修复 WebAuthn / Passkey 在 Kubernetes 多 Pod 部署下因请求落到不同实例而导致的登录失败问题。
+- 修复 Passkey 绑定流程对单实例内存状态的依赖，避免注册请求跨 Pod 时失效。
+
+### Changed
+- 将 WebAuthn 登录与注册流程的 pending request 从服务进程内存改为 MySQL 共享一次性存储，并统一增加过期和消费校验。
+- 补充初始化 SQL 与升级脚本，新增 `webauthn_request_tb` 用于共享保存临时 challenge 请求。
+
+### Tests
+- 增加 WebAuthn 服务层测试，覆盖共享存储、跨实例消费、一次性失效和空 key 校验场景。
+
 ## v2.7.3
 
 ### 后台服务器管理
