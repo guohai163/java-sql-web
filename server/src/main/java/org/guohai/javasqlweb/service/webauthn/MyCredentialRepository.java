@@ -39,7 +39,8 @@ public class MyCredentialRepository implements CredentialRepository {
     @Override
     public Optional<ByteArray> getUserHandleForUsername(String userName) {
         LOG.info("getUserHandleForUsername",userName);
-        return Optional.of( new ByteArray(userName.getBytes()));
+        return Optional.ofNullable(userName)
+                .map(name -> new ByteArray(name.getBytes()));
     }
 
     /**
@@ -50,7 +51,9 @@ public class MyCredentialRepository implements CredentialRepository {
     @Override
     public Optional<String> getUsernameForUserHandle(ByteArray userHandle) {
         List<String> listUser  = webAuthnDao.getUserName(userHandle.getBase64());
-        return Optional.of(listUser.get(0));
+        return listUser == null || listUser.isEmpty()
+                ? Optional.empty()
+                : Optional.ofNullable(listUser.get(0));
     }
 
     /**
@@ -63,8 +66,7 @@ public class MyCredentialRepository implements CredentialRepository {
     public Optional<RegisteredCredential> lookup(ByteArray credentialId, ByteArray userHandle) {
         LOG.info("lookup");
         WebAuthnBean webAuthnBean = webAuthnDao.getWebAuthnBean(credentialId.getBase64(), userHandle.getBase64());
-        Optional<WebAuthnBean> auth = Optional.of(webAuthnBean);
-        return auth.map(
+        return Optional.ofNullable(webAuthnBean).map(
                 credential ->
                         RegisteredCredential.builder()
                                 .credentialId(ByteArray.fromBase64(credential.getCredentialId()))

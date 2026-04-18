@@ -2,6 +2,21 @@
 
 本文件记录当前 `master` 分支之后到当前 `develop` 工作区的主要变更，按版本和当前未发布改动整理。
 
+## v2.7.6 - 2026-04-19
+
+### Fixed
+- 修复 Passkey / WebAuthn 注册在公网 HTTPS 站点下因 `PUBLIC_HOST` 示例仍为 `http://...` 导致的 origin 校验失败问题。
+- 修复 WebAuthn 凭证仓储在查不到凭证或用户名时抛出空指针的问题，改为返回空结果参与认证失败分支处理。
+
+### Changed
+- 增强 Passkey 注册与登录失败日志，输出配置的 relying party domain、host、allowed origins 和原始异常信息，便于快速定位域名配置错误。
+- 优化 Passkey 注册失败返回文案，origin mismatch 时直接提示检查 `PROJECT_HOST` 是否与浏览器访问地址完全一致。
+- 更新本地与 Kubernetes 部署示例中的 `PUBLIC_HOST` 为 `https://...`，并在部署文档中补充推荐配置示例。
+
+### Tests
+- 增加 `MyCredentialRepository` 单测，覆盖空凭证、空用户名和正常凭证构建场景。
+- 增加 `WebAuthService.register` 的 origin mismatch 失败测试，验证返回消息可直接指导修复配置。
+
 ## v2.7.5 - 2026-04-17
 
 ### Fixed

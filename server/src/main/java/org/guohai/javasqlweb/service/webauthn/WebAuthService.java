@@ -41,6 +41,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 
@@ -52,9 +53,13 @@ public class WebAuthService {
 
     private static final Logger LOG = LoggerFactory.getLogger(WebAuthService.class);
     private static final String PASSKEY_REQUEST_INVALID_MESSAGE = "passkey 请求已失效，请重新发起";
+    private static final String PASSKEY_ORIGIN_MISMATCH_MESSAGE =
+            "passkey 域名配置不匹配，请检查 PROJECT_HOST 是否与浏览器访问地址完全一致";
     private static final long REQUEST_EXPIRE_MS = 5 * 60 * 1000L;
 
     RelyingParty rp;
+    private final String relyingPartyDomain;
+    private final String relyingPartyHost;
 
     /**
      * 管理DAO
@@ -74,6 +79,8 @@ public class WebAuthService {
     public WebAuthService(@Value("${project.domain}") String domain,
                           @Value("${project.host}") String host,
                           MyCredentialRepository myCredentialRepository) {
+        this.relyingPartyDomain = domain;
+        this.relyingPartyHost = host;
         Set<String> setStr = new HashSet<>(2);
         setStr.add(host);
 
@@ -86,6 +93,7 @@ public class WebAuthService {
                 .credentialRepository(myCredentialRepository)
                 .origins(setStr)
                 .build();
+        logOriginConfigurationWarning();
     }
 
     /**
@@ -160,8 +168,9 @@ public class WebAuthService {
                     new Date());
             return new Result<>(Boolean.TRUE.equals(webAuthnDao.addPublicKey(webAuthnBean)), "", null);
         } catch (RegistrationFailedException e) {
-            LOG.error("Passkey registration failed", e);
-            return new Result<>(false, "处理失败", null);
+            LOG.error("Passkey registration failed. configuredDomain={}, configuredHost={}, allowedOrigins={}, message={}",
+                    relyingPartyDomain, relyingPartyHost, rp.getOrigins(), e.getMessage(), e);
+            return new Result<>(false, resolvePasskeyFailureMessage(e), null);
         }
     }
 
@@ -221,7 +230,8 @@ public class WebAuthService {
                 }
             }
         } catch (AssertionFailedException e) {
-            LOG.error("Passkey sign in failed", e);
+            LOG.error("Passkey sign in failed. configuredDomain={}, configuredHost={}, allowedOrigins={}, message={}",
+                    relyingPartyDomain, relyingPartyHost, rp.getOrigins(), e.getMessage(), e);
             return new Result<>(false, e.toString(), null);
         }
 
@@ -301,6 +311,27 @@ public class WebAuthService {
 
     private boolean isBlank(String value) {
         return value == null || value.trim().isEmpty();
+    }
+
+    private void logOriginConfigurationWarning() {
+        if (isBlank(relyingPartyHost) || isBlank(relyingPartyDomain)) {
+            return;
+        }
+        String normalizedDomain = relyingPartyDomain.trim().toLowerCase(Locale.ROOT);
+        String normalizedHost = relyingPartyHost.trim().toLowerCase(Locale.ROOT);
+        if (!"localhost".equals(normalizedDomain) && !normalizedHost.startsWith("https://")) {
+            LOG.warn("Passkey relying party host is not HTTPS. project.domain={}, project.host={}. " +
+                    "Public passkey registration/login will fail when browser origin uses HTTPS.",
+                    relyingPartyDomain, relyingPartyHost);
+        }
+    }
+
+    private String resolvePasskeyFailureMessage(RegistrationFailedException exception) {
+        String message = exception.getMessage();
+        if (message != null && message.contains("Incorrect origin")) {
+            return PASSKEY_ORIGIN_MISMATCH_MESSAGE + "，当前配置为 " + relyingPartyHost;
+        }
+        return "处理失败";
     }
 
     record AssertionVerificationResult(boolean success, String userName) {

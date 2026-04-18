@@ -8,6 +8,7 @@ import com.yubico.webauthn.data.PublicKeyCredentialParameters;
 import com.yubico.webauthn.data.PublicKeyCredentialType;
 import com.yubico.webauthn.data.RelyingPartyIdentity;
 import com.yubico.webauthn.data.UserIdentity;
+import com.yubico.webauthn.exception.RegistrationFailedException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.guohai.javasqlweb.beans.Result;
 import org.guohai.javasqlweb.beans.UserBean;
@@ -38,6 +39,7 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doThrow;
 
 @ExtendWith(MockitoExtension.class)
 class WebAuthServiceTests {
@@ -207,6 +209,32 @@ class WebAuthServiceTests {
         assertEquals(request.getUser().getId().getBase64(), webAuthnCaptor.getValue().getUserHandle());
         assertEquals("credential-1", webAuthnCaptor.getValue().getCredentialId());
         assertEquals("public-key-1", webAuthnCaptor.getValue().getPublicKey());
+    }
+
+    @Test
+    void registerReturnsHelpfulMessageWhenOriginMismatchOccurs() throws Exception {
+        WebAuthService spyService = spy(createService());
+        PublicKeyCredentialCreationOptions request = buildRegistrationRequest();
+        WebAuthnRequestBean storedRequest = new WebAuthnRequestBean();
+        storedRequest.setCode(22);
+        storedRequest.setRequestType(WebAuthnRequestType.REGISTRATION);
+        storedRequest.setRequestKey("token-3");
+        storedRequest.setRequestJson(request.toJson());
+        storedRequest.setCreatedTime(new Date());
+        storedRequest.setExpireTime(new Date(System.currentTimeMillis() + 60_000L));
+
+        when(webAuthnRequestDao.getActiveRequestForUpdate(eq(WebAuthnRequestType.REGISTRATION), eq("token-3"), any(Date.class)))
+                .thenReturn(storedRequest);
+        when(webAuthnRequestDao.deleteByCode(22)).thenReturn(1);
+        doThrow(new RegistrationFailedException(new IllegalArgumentException(
+                "Incorrect origin, please see the RelyingParty.origins setting: https://jsw.gydev.cn")))
+                .when(spyService).verifyRegistration(eq("register-body"), any(PublicKeyCredentialCreationOptions.class));
+
+        Result<String> result = spyService.register("token-3", "register-body");
+
+        assertFalse(result.getStatus());
+        assertEquals("passkey 域名配置不匹配，请检查 PROJECT_HOST 是否与浏览器访问地址完全一致，当前配置为 https://jsw.gydev.cn",
+                result.getMessage());
     }
 
     @Test

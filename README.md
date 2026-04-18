@@ -68,6 +68,13 @@ cp .env.example .env
 - `DB_PASSWORD`：MariaDB root 密码
 - `PUBLIC_DOMAIN` / `PUBLIC_HOST`：对外访问域名与完整 URL
 
+建议配置示例：
+
+```shell
+PUBLIC_DOMAIN=jsw.example.com
+PUBLIC_HOST=https://jsw.example.com
+```
+
 启动服务：
 
 ```shell
@@ -117,6 +124,14 @@ cp deploy/k8s/env/prod.env.example deploy/k8s/env/prod.env
 - `PUBLIC_HOST`
 - `INGRESS_HOST`
 - `DB_STORAGE_CLASS`（如果集群没有默认 StorageClass）
+
+建议配置示例：
+
+```shell
+PUBLIC_DOMAIN=jsw.example.com
+PUBLIC_HOST=https://jsw.example.com
+INGRESS_HOST=jsw.example.com
+```
 
 部署：
 
