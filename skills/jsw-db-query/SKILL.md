@@ -1,5 +1,5 @@
 ---
-name: java-sql-web-query
+name: jsw-db-query
 description: Use this skill when OpenClaw needs to query data, inspect databases, list tables, or explain read-only SQL results through this JavaSqlWeb project's backend API with Bearer authentication and permission-aware guardrails.
 ---
 

@@ -13,7 +13,7 @@ Use these settings when you want OpenClaw to provide the JavaSqlWeb server URL a
 {
   "skills": {
     "entries": {
-      "java-sql-web-query": {
+      "jsw-db-query": {
         "enabled": true,
         "env": {
           "JSW_BASE_URL": "https://your-jsw.example.com",
