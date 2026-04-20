@@ -1,7 +1,6 @@
 package org.guohai.javasqlweb.service.operation;
 
 import org.guohai.javasqlweb.beans.*;
-import org.guohai.javasqlweb.service.BaseDataServiceImpl;
 import org.guohai.javasqlweb.util.HikariDataSourceUtils;
 
 import javax.sql.DataSource;
@@ -12,6 +11,8 @@ import static org.guohai.javasqlweb.util.Utils.closeResource;
 
 public class DbOperationPostgresqlDruid implements DbOperation {
     private static final String PUBLIC_SCHEMA = "public";
+    private static final long CACHED_DATASOURCE_IDLE_MILLIS = 10 * 60 * 1000L;
+    private static final int MAX_CACHED_DATASOURCES = 16;
 
     /**
      * 数据源
@@ -22,11 +23,22 @@ public class DbOperationPostgresqlDruid implements DbOperation {
      * 保存每个库的连接
      * 因为postgres数据库的特殊性无法在一个连接里访问多个库，所以 得制造多份连接。
      */
-    private Map<String, DataSource> postgresMap = new HashMap<>();
+    private final Map<String, CachedDataSource> postgresMap = new HashMap<>();
     /**
      * 保存连接资源
      */
     private ConnectConfigBean connect;
+
+    private static final class CachedDataSource {
+        private final DataSource dataSource;
+        private long lastAccessAt;
+        private int borrowCount;
+
+        private CachedDataSource(DataSource dataSource, long lastAccessAt) {
+            this.dataSource = dataSource;
+            this.lastAccessAt = lastAccessAt;
+        }
+    }
     /**
      * 构造方法
      * @param conn
@@ -50,6 +62,7 @@ public class DbOperationPostgresqlDruid implements DbOperation {
     @Override
     public List<DatabaseNameBean> getDbList() throws SQLException, ClassNotFoundException {
         List<DatabaseNameBean> listDnb = new ArrayList<>();
+        cleanupCachedDataSources(System.currentTimeMillis(), null);
         Connection conn = sqlDs.getConnection();
         Statement st = conn.createStatement();
         ResultSet rs = st.executeQuery("SELECT datname FROM pg_database;");
@@ -60,19 +73,6 @@ public class DbOperationPostgresqlDruid implements DbOperation {
                 continue;
             }
             listDnb.add(new DatabaseNameBean(dbName));
-            // 创建库的连接
-            DataSource sqlDS = postgresMap.get(dbName);
-            if(null == sqlDS) {
-                synchronized (BaseDataServiceImpl.class) {
-                    if (null == postgresMap.get(dbName)) {
-                        try {
-                            postgresMap.put(dbName, createDataSource(dbName));
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                        }
-                    }
-                }
-            }
         }
         closeResource(rs,st,conn);
         return listDnb;
@@ -88,17 +88,25 @@ public class DbOperationPostgresqlDruid implements DbOperation {
     @Override
     public List<TablesNameBean> getTableList(String dbName) throws SQLException {
         List<TablesNameBean> listTnb = new ArrayList<>();
-        Connection conn = postgresMap.get(dbName).getConnection();
-        Statement st = conn.createStatement();
-        ResultSet rs = st.executeQuery(String.format(
-                "select relname as TABLE_NAME, reltuples as rowCounts from pg_class\n" +
-                        "where relkind = 'r' and relnamespace = (select oid from pg_namespace where nspname='public')\n" +
-                        "order by rowCounts desc;", dbName));
-        while (rs.next()){
-            listTnb.add(new TablesNameBean(rs.getString("TABLE_NAME"),
-                    rs.getLong("rowCounts")));
+        DataSource dataSource = acquireDataSource(dbName);
+        Connection conn = null;
+        Statement st = null;
+        ResultSet rs = null;
+        try {
+            conn = dataSource.getConnection();
+            st = conn.createStatement();
+            rs = st.executeQuery(String.format(
+                    "select relname as TABLE_NAME, reltuples as rowCounts from pg_class\n" +
+                            "where relkind = 'r' and relnamespace = (select oid from pg_namespace where nspname='public')\n" +
+                            "order by rowCounts desc;", dbName));
+            while (rs.next()){
+                listTnb.add(new TablesNameBean(rs.getString("TABLE_NAME"),
+                        rs.getLong("rowCounts")));
+            }
+        } finally {
+            closeResource(rs,st,conn);
+            releaseDataSource(dbName);
         }
-        closeResource(rs,st,conn);
         return listTnb;
     }
 
@@ -115,8 +123,9 @@ public class DbOperationPostgresqlDruid implements DbOperation {
         Connection conn = null;
         PreparedStatement ps = null;
         ResultSet rs = null;
+        DataSource dataSource = acquireDataSource(dbName);
         try {
-            conn = getRequiredDataSource(dbName).getConnection();
+            conn = dataSource.getConnection();
             ps = conn.prepareStatement(
                     "SELECT viewname " +
                             "FROM pg_catalog.pg_views " +
@@ -130,6 +139,7 @@ public class DbOperationPostgresqlDruid implements DbOperation {
             }
         } finally {
             closeResource(rs, ps, conn);
+            releaseDataSource(dbName);
         }
         return viewList;
     }
@@ -147,8 +157,9 @@ public class DbOperationPostgresqlDruid implements DbOperation {
         Connection conn = null;
         PreparedStatement ps = null;
         ResultSet rs = null;
+        DataSource dataSource = acquireDataSource(dbName);
         try {
-            conn = getRequiredDataSource(dbName).getConnection();
+            conn = dataSource.getConnection();
             ps = conn.prepareStatement(
                     "SELECT COALESCE(definition, '') AS view_definition " +
                             "FROM pg_catalog.pg_views " +
@@ -170,6 +181,7 @@ public class DbOperationPostgresqlDruid implements DbOperation {
             return new ViewNameBean(viewName, "");
         } finally {
             closeResource(rs, ps, conn);
+            releaseDataSource(dbName);
         }
     }
 
@@ -187,8 +199,9 @@ public class DbOperationPostgresqlDruid implements DbOperation {
         Connection conn = null;
         PreparedStatement ps = null;
         ResultSet rs = null;
+        DataSource dataSource = acquireDataSource(dbName);
         try {
-            conn = getRequiredDataSource(dbName).getConnection();
+            conn = dataSource.getConnection();
             ps = conn.prepareStatement(
                     "SELECT c.column_name, " +
                             "       CASE " +
@@ -231,6 +244,7 @@ public class DbOperationPostgresqlDruid implements DbOperation {
             }
         } finally {
             closeResource(rs, ps, conn);
+            releaseDataSource(dbName);
         }
         return columnList;
     }
@@ -249,8 +263,9 @@ public class DbOperationPostgresqlDruid implements DbOperation {
         Connection conn = null;
         PreparedStatement ps = null;
         ResultSet rs = null;
+        DataSource dataSource = acquireDataSource(dbName);
         try {
-            conn = getRequiredDataSource(dbName).getConnection();
+            conn = dataSource.getConnection();
             ps = conn.prepareStatement(
                     "SELECT ci.relname AS index_name, " +
                             "       pg_get_indexdef(i.indexrelid) AS index_description, " +
@@ -284,6 +299,7 @@ public class DbOperationPostgresqlDruid implements DbOperation {
             }
         } finally {
             closeResource(rs, ps, conn);
+            releaseDataSource(dbName);
         }
         return indexList;
     }
@@ -301,8 +317,9 @@ public class DbOperationPostgresqlDruid implements DbOperation {
         Connection conn = null;
         PreparedStatement ps = null;
         ResultSet rs = null;
+        DataSource dataSource = acquireDataSource(dbName);
         try {
-            conn = getRequiredDataSource(dbName).getConnection();
+            conn = dataSource.getConnection();
             ps = conn.prepareStatement(
                     "SELECT DISTINCT routine_name " +
                             "FROM information_schema.routines " +
@@ -316,6 +333,7 @@ public class DbOperationPostgresqlDruid implements DbOperation {
             }
         } finally {
             closeResource(rs, ps, conn);
+            releaseDataSource(dbName);
         }
         return procedureList;
     }
@@ -333,8 +351,9 @@ public class DbOperationPostgresqlDruid implements DbOperation {
         Connection conn = null;
         PreparedStatement ps = null;
         ResultSet rs = null;
+        DataSource dataSource = acquireDataSource(dbName);
         try {
-            conn = getRequiredDataSource(dbName).getConnection();
+            conn = dataSource.getConnection();
             ps = conn.prepareStatement(
                     "SELECT COALESCE(pg_get_functiondef(p.oid), '') AS routine_definition " +
                             "FROM pg_catalog.pg_proc p " +
@@ -354,6 +373,7 @@ public class DbOperationPostgresqlDruid implements DbOperation {
             return new StoredProceduresBean(spName, "");
         } finally {
             closeResource(rs, ps, conn);
+            releaseDataSource(dbName);
         }
     }
 
@@ -370,12 +390,13 @@ public class DbOperationPostgresqlDruid implements DbOperation {
     public Object[] queryDatabaseBySql(String dbName, String sql, Integer limit) throws SQLException {
         Object[] result = new Object[3];
         List<Map<String, Object>> listData = new ArrayList<>();
-        Connection conn = postgresMap.get(dbName).getConnection();
-        Statement st = conn.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE,ResultSet.CONCUR_READ_ONLY);
-
+        DataSource dataSource = acquireDataSource(dbName);
+        Connection conn = null;
+        Statement st = null;
         ResultSet rs = null;
         try{
-
+            conn = dataSource.getConnection();
+            st = conn.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE,ResultSet.CONCUR_READ_ONLY);
             rs = st.executeQuery(String.format("%s;", sql));
             // 获得结果集结构信息,元数据
             java.sql.ResultSetMetaData md = rs.getMetaData();
@@ -407,6 +428,7 @@ public class DbOperationPostgresqlDruid implements DbOperation {
         }
         finally {
             closeResource(rs,st,conn);
+            releaseDataSource(dbName);
         }
 
 
@@ -426,8 +448,9 @@ public class DbOperationPostgresqlDruid implements DbOperation {
         Connection conn = null;
         PreparedStatement ps = null;
         ResultSet rs = null;
+        DataSource dataSource = acquireDataSource(dbName);
         try {
-            conn = getRequiredDataSource(dbName).getConnection();
+            conn = dataSource.getConnection();
             ps = conn.prepareStatement(
                     "SELECT table_name, string_agg(column_name, ',' ORDER BY ordinal_position) AS column_names " +
                             "FROM information_schema.columns " +
@@ -445,6 +468,7 @@ public class DbOperationPostgresqlDruid implements DbOperation {
             }
         } finally {
             closeResource(rs, ps, conn);
+            releaseDataSource(dbName);
         }
         return tables;
     }
@@ -467,10 +491,12 @@ public class DbOperationPostgresqlDruid implements DbOperation {
     @Override
     public void close() {
         HikariDataSourceUtils.closeDataSource(sqlDs);
-        for (DataSource dataSource : postgresMap.values()) {
-            HikariDataSourceUtils.closeDataSource(dataSource);
+        synchronized (postgresMap) {
+            for (CachedDataSource cachedDataSource : postgresMap.values()) {
+                HikariDataSourceUtils.closeDataSource(cachedDataSource.dataSource);
+            }
+            postgresMap.clear();
         }
-        postgresMap.clear();
     }
 
 
@@ -490,19 +516,78 @@ public class DbOperationPostgresqlDruid implements DbOperation {
         );
     }
 
-    private DataSource getRequiredDataSource(String dbName) {
-        DataSource dataSource = postgresMap.get(dbName);
-        if (dataSource != null) {
-            return dataSource;
-        }
-        synchronized (BaseDataServiceImpl.class) {
-            DataSource existing = postgresMap.get(dbName);
-            if (existing != null) {
-                return existing;
+    private DataSource acquireDataSource(String dbName) {
+        synchronized (postgresMap) {
+            long now = System.currentTimeMillis();
+            cleanupCachedDataSources(now, dbName);
+            CachedDataSource cachedDataSource = postgresMap.get(dbName);
+            if (cachedDataSource == null) {
+                cachedDataSource = new CachedDataSource(createDataSource(dbName), now);
+                postgresMap.put(dbName, cachedDataSource);
             }
-            DataSource created = createDataSource(dbName);
-            postgresMap.put(dbName, created);
-            return created;
+            cachedDataSource.lastAccessAt = now;
+            cachedDataSource.borrowCount++;
+            return cachedDataSource.dataSource;
+        }
+    }
+
+    private void releaseDataSource(String dbName) {
+        synchronized (postgresMap) {
+            CachedDataSource cachedDataSource = postgresMap.get(dbName);
+            if (cachedDataSource == null) {
+                return;
+            }
+            if (cachedDataSource.borrowCount > 0) {
+                cachedDataSource.borrowCount--;
+            }
+            cachedDataSource.lastAccessAt = System.currentTimeMillis();
+            cleanupCachedDataSources(cachedDataSource.lastAccessAt, dbName);
+        }
+    }
+
+    private void cleanupCachedDataSources(long now, String keepDbName) {
+        List<String> idleKeys = new ArrayList<>();
+        for (Map.Entry<String, CachedDataSource> entry : postgresMap.entrySet()) {
+            if (keepDbName != null && keepDbName.equals(entry.getKey())) {
+                continue;
+            }
+            CachedDataSource cachedDataSource = entry.getValue();
+            if (cachedDataSource.borrowCount == 0
+                    && now - cachedDataSource.lastAccessAt >= CACHED_DATASOURCE_IDLE_MILLIS) {
+                idleKeys.add(entry.getKey());
+            }
+        }
+        for (String dbName : idleKeys) {
+            closeCachedDataSource(dbName);
+        }
+
+        while (postgresMap.size() > MAX_CACHED_DATASOURCES) {
+            String oldestKey = null;
+            long oldestAccess = Long.MAX_VALUE;
+            for (Map.Entry<String, CachedDataSource> entry : postgresMap.entrySet()) {
+                if (keepDbName != null && keepDbName.equals(entry.getKey())) {
+                    continue;
+                }
+                CachedDataSource cachedDataSource = entry.getValue();
+                if (cachedDataSource.borrowCount > 0) {
+                    continue;
+                }
+                if (cachedDataSource.lastAccessAt < oldestAccess) {
+                    oldestAccess = cachedDataSource.lastAccessAt;
+                    oldestKey = entry.getKey();
+                }
+            }
+            if (oldestKey == null) {
+                break;
+            }
+            closeCachedDataSource(oldestKey);
+        }
+    }
+
+    private void closeCachedDataSource(String dbName) {
+        CachedDataSource cachedDataSource = postgresMap.remove(dbName);
+        if (cachedDataSource != null) {
+            HikariDataSourceUtils.closeDataSource(cachedDataSource.dataSource);
         }
     }
 

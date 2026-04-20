@@ -53,6 +53,9 @@ class BackstageServiceImplTests {
     @Mock
     private UserSecurityTaskService userSecurityTaskService;
 
+    @Mock
+    private BaseDataService baseDataService;
+
     @Spy
     @InjectMocks
     private BackstageServiceImpl backstageService;
@@ -133,5 +136,34 @@ class BackstageServiceImplTests {
 
         assertFalse(result.getStatus());
         verify(operation).close();
+    }
+
+    @Test
+    void updateServerInvalidatesCachedResourcesAfterSuccess() {
+        ConnectConfigBean existingServer = new ConnectConfigBean();
+        existingServer.setCode(9);
+        ConnectConfigBean updatingServer = new ConnectConfigBean();
+        updatingServer.setCode(9);
+        updatingServer.setDbServerType("mysql");
+
+        when(baseConfigDao.getConnectConfigByCode(9)).thenReturn(existingServer);
+
+        Result<String> result = backstageService.updateServerData(updatingServer);
+
+        assertTrue(result.getStatus());
+        verify(baseDataService).invalidateServerResources(9);
+    }
+
+    @Test
+    void deleteServerInvalidatesCachedResourcesAfterSuccess() {
+        ConnectConfigBean existingServer = new ConnectConfigBean();
+        existingServer.setCode(10);
+
+        when(baseConfigDao.getConnectConfig(10)).thenReturn(existingServer);
+
+        Result<String> result = backstageService.delServer(10);
+
+        assertTrue(result.getStatus());
+        verify(baseDataService).invalidateServerResources(10);
     }
 }

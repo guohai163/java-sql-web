@@ -329,6 +329,7 @@ public class BaseDataServiceImpl implements BaseDataService{
                                                                    String dbName,
                                                                    UserBean user,
                                                                    boolean forceRefresh) {
+        evictExpiredDashboardCaches(System.currentTimeMillis());
         Result<WorkbenchDashboardResponse> permissionCheck = validateServerPermission(serverCode, user);
         if (permissionCheck != null) {
             return permissionCheck;
@@ -377,6 +378,23 @@ public class BaseDataServiceImpl implements BaseDataService{
             }
             return new Result<>(false, extractExceptionMessage(exception), null);
         }
+    }
+
+    @Override
+    public void invalidateServerResources(Integer serverCode) {
+        if (serverCode == null) {
+            return;
+        }
+        DbOperation operation = operationMap.remove(serverCode);
+        closeOperationQuietly(serverCode, operation);
+        clearConnectionFailureState(serverCode);
+        workbenchServerDashboardCache.remove(serverCode);
+        String cacheKeyPrefix = serverCode + "::";
+        workbenchDatabaseDashboardCache.forEach((key, value) -> {
+            if (key != null && key.startsWith(cacheKeyPrefix)) {
+                workbenchDatabaseDashboardCache.remove(key, value);
+            }
+        });
     }
 
     /**
@@ -596,6 +614,7 @@ public class BaseDataServiceImpl implements BaseDataService{
     private void cacheWorkbenchDashboard(Integer serverCode, String dbName, WorkbenchDashboardResponse response) {
         long now = System.currentTimeMillis();
         long expiresAt = now + WORKBENCH_DASHBOARD_CACHE_MILLIS;
+        evictExpiredDashboardCaches(now);
         List<WorkbenchDashboardSection> serverSections = new ArrayList<>();
         List<WorkbenchDashboardSection> databaseSections = new ArrayList<>();
         for (WorkbenchDashboardSection section : response.getSections()) {
@@ -624,6 +643,19 @@ public class BaseDataServiceImpl implements BaseDataService{
             return null;
         }
         return entry;
+    }
+
+    private void evictExpiredDashboardCaches(long now) {
+        removeExpiredDashboardEntries(workbenchServerDashboardCache, now);
+        removeExpiredDashboardEntries(workbenchDatabaseDashboardCache, now);
+    }
+
+    private <K> void removeExpiredDashboardEntries(Map<K, WorkbenchDashboardCacheEntry> cache, long now) {
+        cache.forEach((key, entry) -> {
+            if (entry != null && entry.expiresAt <= now) {
+                cache.remove(key, entry);
+            }
+        });
     }
 
     private String buildWorkbenchDatabaseCacheKey(Integer serverCode, String dbName) {

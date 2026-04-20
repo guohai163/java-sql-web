@@ -133,6 +133,12 @@ public interface BaseDataService {
                                                             boolean forceRefresh);
 
     /**
+     * 使指定服务器的内存缓存和动态连接资源失效
+     * @param serverCode 服务器编号
+     */
+    void invalidateServerResources(Integer serverCode);
+
+    /**
      * 检查所有服务器的健康状态
      * @return
      */

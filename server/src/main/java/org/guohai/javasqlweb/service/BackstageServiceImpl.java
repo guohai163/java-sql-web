@@ -59,6 +59,9 @@ public class BackstageServiceImpl implements BackstageService{
     @Autowired
     UserSecurityTaskService userSecurityTaskService;
 
+    @Autowired
+    BaseDataService baseDataService;
+
     @org.springframework.beans.factory.annotation.Value("${project.legacy-tls-enabled:false}")
     private boolean legacyTlsEnabled;
 
@@ -202,6 +205,9 @@ public class BackstageServiceImpl implements BackstageService{
             return new Result<>(false,"","同名服务器已经存在");
         }
         baseConfigDao.addConnServer(server);
+        if (server.getCode() != null) {
+            baseDataService.invalidateServerResources(server.getCode());
+        }
         return new Result<>(true, "","服务器增加成功");
     }
 
@@ -322,6 +328,7 @@ public class BackstageServiceImpl implements BackstageService{
             return new Result<>(false, "","无此服务器" ) ;
         }
         baseConfigDao.delServerByCode(code);
+        baseDataService.invalidateServerResources(code);
         return new Result<>(true, "","删除成功");
     }
 
@@ -372,6 +379,7 @@ public class BackstageServiceImpl implements BackstageService{
             return new Result<>(false, "","服务器不存在" );
         }
         baseConfigDao.updateConnServer(server);
+        baseDataService.invalidateServerResources(server.getCode());
         return new Result<>(true, "","修改成功");
     }
 

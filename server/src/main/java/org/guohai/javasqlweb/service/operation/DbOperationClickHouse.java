@@ -38,6 +38,10 @@ public class DbOperationClickHouse implements DbOperation{
         );
     }
 
+    DbOperationClickHouse(DataSource dataSource) {
+        this.sqlDs = dataSource;
+    }
+
 
     /**
      * 获得实例服务器库列表
@@ -185,9 +189,10 @@ public class DbOperationClickHouse implements DbOperation{
         Connection conn = null;
         Statement st = null;
         ResultSet rs = null;
+        int safeLimit = limit == null ? Integer.MAX_VALUE : Math.max(limit, 0);
         try{
             conn = sqlDs.getConnection();
-            st = conn.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE,ResultSet.CONCUR_READ_ONLY);
+            st = conn.createStatement();
             //按【;】拆分SQL执行，默认最后一条为查询语句，为了方便使用SET @变量 = XXX
             sql = sql.replace("\n"," ");
             sql = sql.replace("\r"," ");
@@ -198,15 +203,12 @@ public class DbOperationClickHouse implements DbOperation{
             java.sql.ResultSetMetaData md = rs.getMetaData();
             // 获得列数
             int columnCount = md.getColumnCount();
-            rs.last();
-            result[0] = rs.getRow();
-            rs.beforeFirst();
-            int dataCount = 1;
+            boolean hasMore = false;
             while (rs.next()){
-                if(dataCount>limit){
+                if(listData.size() >= safeLimit){
+                    hasMore = true;
                     break;
                 }
-                dataCount++;
                 Map<String, Object> rowData = new LinkedHashMap<>();
                 for(int i=1;i<=columnCount;i++){
                     Object object = rs.getObject(i);
@@ -219,6 +221,7 @@ public class DbOperationClickHouse implements DbOperation{
                 listData.add(rowData);
             }
 
+            result[0] = hasMore ? listData.size() + 1 : listData.size();
             result[1] = listData.size();
             result[2] = listData;
         } finally {
