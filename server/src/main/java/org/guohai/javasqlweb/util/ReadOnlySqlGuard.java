@@ -143,10 +143,114 @@ public final class ReadOnlySqlGuard {
             return normalized.matches("^SET\\s+@[_A-Z0-9$]+\\s*(:=|=).*$");
         }
         if ("mssql".equals(upperDbType)) {
-            return normalized.matches("^DECLARE\\s+@[_A-Z0-9]+.*$")
+            return isAllowedMssqlDeclareStatement(sql)
                     || normalized.matches("^SET\\s+@[_A-Z0-9]+\\s*=.*$");
         }
         return false;
+    }
+
+    private static boolean isAllowedMssqlDeclareStatement(String sql) {
+        String trimmed = sql == null ? "" : sql.trim();
+        if (!trimmed.regionMatches(true, 0, "DECLARE", 0, "DECLARE".length())) {
+            return false;
+        }
+        String body = trimmed.substring("DECLARE".length()).trim();
+        if (body.isEmpty()) {
+            return false;
+        }
+        for (String declaration : splitTopLevelCommaSegments(body)) {
+            if (!isAllowedMssqlScalarDeclaration(declaration)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static List<String> splitTopLevelCommaSegments(String sql) {
+        List<String> segments = new ArrayList<>();
+        StringBuilder current = new StringBuilder();
+        int depth = 0;
+        for (int i = 0; i < sql.length(); i++) {
+            char currentChar = sql.charAt(i);
+            if (currentChar == '(') {
+                depth++;
+            } else if (currentChar == ')') {
+                if (depth > 0) {
+                    depth--;
+                }
+            } else if (currentChar == ',' && depth == 0) {
+                segments.add(current.toString().trim());
+                current.setLength(0);
+                continue;
+            }
+            current.append(currentChar);
+        }
+        if (current.length() > 0) {
+            segments.add(current.toString().trim());
+        }
+        return segments;
+    }
+
+    private static boolean isAllowedMssqlScalarDeclaration(String declaration) {
+        if (declaration == null || declaration.isBlank()) {
+            return false;
+        }
+        int index = 0;
+        if (declaration.charAt(index) != '@') {
+            return false;
+        }
+        index++;
+        while (index < declaration.length() && isMssqlVariableChar(declaration.charAt(index))) {
+            index++;
+        }
+        if (index == 1) {
+            return false;
+        }
+        while (index < declaration.length() && Character.isWhitespace(declaration.charAt(index))) {
+            index++;
+        }
+        if (index >= declaration.length()) {
+            return false;
+        }
+
+        int typeStart = index;
+        int depth = 0;
+        while (index < declaration.length()) {
+            char currentChar = declaration.charAt(index);
+            if (currentChar == '(') {
+                depth++;
+            } else if (currentChar == ')') {
+                if (depth == 0) {
+                    return false;
+                }
+                depth--;
+            } else if (currentChar == '=' && depth == 0) {
+                break;
+            }
+            index++;
+        }
+        if (depth != 0) {
+            return false;
+        }
+
+        String typeClause = declaration.substring(typeStart, index).trim();
+        if (typeClause.isEmpty()) {
+            return false;
+        }
+        String normalizedType = typeClause.toUpperCase(Locale.ROOT);
+        if ("TABLE".equals(extractFirstKeyword(typeClause))
+                || normalizedType.startsWith("AS TABLE")) {
+            return false;
+        }
+
+        if (index < declaration.length()) {
+            return !declaration.substring(index + 1).trim().isEmpty();
+        }
+        return true;
+    }
+
+    private static boolean isMssqlVariableChar(char currentChar) {
+        return currentChar == '_' || Character.isLetterOrDigit(currentChar);
     }
 
     private static boolean isAllowedReadOnlyStatement(String sql, String firstKeyword) {
@@ -204,7 +308,7 @@ public final class ReadOnlySqlGuard {
         return "";
     }
 
-    private static String extractFirstKeyword(String sql) {
+    static String extractFirstKeyword(String sql) {
         int index = 0;
         while (index < sql.length() && !Character.isLetter(sql.charAt(index))) {
             index++;
@@ -216,7 +320,7 @@ public final class ReadOnlySqlGuard {
         return start < index ? sql.substring(start, index).toUpperCase(Locale.ROOT) : "";
     }
 
-    private static String stripStringsAndComments(String sql) {
+    static String stripStringsAndComments(String sql) {
         StringBuilder sanitized = new StringBuilder();
         boolean inSingle = false;
         boolean inDouble = false;

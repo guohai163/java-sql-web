@@ -10,6 +10,7 @@ import org.guohai.javasqlweb.service.operation.DbOperation;
 import org.guohai.javasqlweb.service.operation.DbOperationFactory;
 import org.guohai.javasqlweb.util.AuditSqlMaskingUtils;
 import org.guohai.javasqlweb.util.DbServerTypeUtils;
+import org.guohai.javasqlweb.util.MssqlQueryBatchParser;
 import org.guohai.javasqlweb.util.ReadOnlySqlGuard;
 import org.guohai.javasqlweb.util.SqlTargetExtractor;
 import org.slf4j.Logger;
@@ -283,7 +284,18 @@ public class BaseDataServiceImpl implements BaseDataService{
             return permissionCheck;
         }
         ConnectConfigBean connectConfigBean = DbServerTypeUtils.normalize(baseConfigDao.getConnectConfig(serverCode));
-        String guardResult = ReadOnlySqlGuard.validate(sql, connectConfigBean == null ? "" : connectConfigBean.getDbServerType());
+        String dbType = connectConfigBean == null ? "" : connectConfigBean.getDbServerType();
+        String effectiveDbName = dbName;
+        String executableSql = sql;
+        if (DbServerTypeUtils.MSSQL.equals(dbType)) {
+            MssqlQueryBatchParser.ParsedBatch parsedBatch = MssqlQueryBatchParser.parse(sql, dbName);
+            if (!parsedBatch.isValid()) {
+                return new Result<>(false, parsedBatch.getErrorMessage(), null);
+            }
+            effectiveDbName = parsedBatch.getEffectiveDbName();
+            executableSql = parsedBatch.getSqlWithoutUse();
+        }
+        String guardResult = ReadOnlySqlGuard.validate(executableSql, dbType);
         if (guardResult != null) {
             return new Result<>(false, guardResult, null);
         }
@@ -298,18 +310,18 @@ public class BaseDataServiceImpl implements BaseDataService{
                 String saveSql = maskedSql.length() > SAVE_SQL_LENGTH_LIMIT
                         ? maskedSql.substring(0, SAVE_SQL_LENGTH_LIMIT)
                         : maskedSql;
-                QueryLogBean queryLog = new QueryLogBean(userIp, user.getUserName(), dbName, serverCode, saveSql, new Date());
+                QueryLogBean queryLog = new QueryLogBean(userIp, user.getUserName(), effectiveDbName, serverCode, saveSql, new Date());
                 baseConfigDao.saveQueryLog(queryLog);
                 LOG.info(maskedSql);
                 Long startTime = System.currentTimeMillis();
-                Object[] result = operation.queryDatabaseBySql(dbName, sql, limit);
+                Object[] result = operation.queryDatabaseBySql(effectiveDbName, executableSql, limit);
                 Integer resultRowCount = resolveResultRowCount(result);
                 String returnResult = Integer.parseInt(result[0].toString())>Integer.parseInt(result[1].toString())?
                         String.format("因程序限制只显示%s条数据",result[1].toString()):
                         "";
                 Long endTime = System.currentTimeMillis()-startTime;
                 baseConfigDao.updateQueryLogMetrics(queryLog.getCode(), endTime.intValue(), resultRowCount);
-                saveQueryTargets(queryLog.getCode(), dbName, sql);
+                saveQueryTargets(queryLog.getCode(), effectiveDbName, executableSql);
                 clearConnectionFailureState(serverCode);
                 return new Result<>(true, returnResult, result[2]);
             } catch (Exception e) {

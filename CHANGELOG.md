@@ -2,6 +2,19 @@
 
 本文件记录当前 `master` 分支之后到当前 `develop` 工作区的主要变更，按版本和当前未发布改动整理。
 
+## v2.8.0 - 2026-04-20
+
+### Changed
+- 将仓库内置查询 skill 的安装与发布流程统一到 SkillHub / ClawHub，README、安装脚本和 skill 名称同步切换为 `jsw-db-query`。
+- 新增 `scripts/publish-skillhub-skill.sh`，便于直接发布仓库内的 SkillHub 查询 skill 包。
+
+### Fixed
+- 修复 MSSQL 只读查询在批处理首句包含 `USE` 时被 guard 拦截的问题，现支持配合标量 `DECLARE/SET`、CTE 和子查询执行，并按实际生效库记录查询审计。
+
+### Tests
+- 增加 MSSQL 批处理解析与只读校验测试，覆盖 `USE`、CTE、子查询放行以及表变量、`SELECT INTO` 拒绝场景。
+- 补充服务层测试，验证 MSSQL 查询执行时会把实际生效库同步到执行参数、查询日志和目标表审计。
+
 ## v2.7.8 - 2026-04-20
 
 ### Fixed

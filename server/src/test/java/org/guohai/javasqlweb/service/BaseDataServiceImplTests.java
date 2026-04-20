@@ -2,6 +2,8 @@ package org.guohai.javasqlweb.service;
 
 import org.guohai.javasqlweb.beans.DatabaseNameBean;
 import org.guohai.javasqlweb.beans.ConnectConfigBean;
+import org.guohai.javasqlweb.beans.QueryLogBean;
+import org.guohai.javasqlweb.beans.QueryLogTargetBean;
 import org.guohai.javasqlweb.beans.Result;
 import org.guohai.javasqlweb.beans.UserBean;
 import org.guohai.javasqlweb.beans.WorkbenchDashboardResponse;
@@ -12,6 +14,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -24,12 +27,15 @@ import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.times;
@@ -57,6 +63,7 @@ class BaseDataServiceImplTests {
         accessStaticMap("connectionLastErrorMap").clear();
         accessStaticMap("workbenchServerDashboardCache").clear();
         accessStaticMap("workbenchDatabaseDashboardCache").clear();
+        setField("limit", 100);
     }
 
     @Test
@@ -203,12 +210,58 @@ class BaseDataServiceImplTests {
         assertFalse(accessStaticMap("workbenchDatabaseDashboardCache").containsKey("99::archive"));
     }
 
+    @Test
+    void queryDataBySqlUsesEffectiveMssqlDatabaseForExecutionAndAudit() throws Exception {
+        UserBean user = buildUser();
+        user.setUserName("tester");
+        DbOperation operation = mock(DbOperation.class);
+        ConnectConfigBean connectConfigBean = new ConnectConfigBean();
+        connectConfigBean.setCode(13);
+        connectConfigBean.setDbServerType("mssql");
+        String sql = "USE [TreasureWDDB_History]\nSELECT * FROM orders";
+
+        when(baseConfigDao.hasServerPermission(user.getCode(), 13)).thenReturn(true);
+        when(baseConfigDao.getConnectConfig(13)).thenReturn(connectConfigBean);
+        when(operation.queryDatabaseBySql(anyString(), anyString(), anyInt()))
+                .thenReturn(new Object[]{1, 1, List.of(Map.of("id", "1"))});
+        doAnswer(invocation -> {
+            QueryLogBean queryLog = invocation.getArgument(0);
+            queryLog.setCode(77);
+            return true;
+        }).when(baseConfigDao).saveQueryLog(any(QueryLogBean.class));
+        accessStaticMap("operationMap").put(13, operation);
+
+        Result<Object> result = baseDataService.quereyDataBySql(13, "default_db", sql, user, "127.0.0.1");
+
+        assertTrue(result.getStatus());
+        ArgumentCaptor<String> databaseCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+        verify(operation).queryDatabaseBySql(databaseCaptor.capture(), sqlCaptor.capture(), anyInt());
+        assertEquals("TreasureWDDB_History", databaseCaptor.getValue());
+        assertEquals("SELECT * FROM orders", sqlCaptor.getValue().trim());
+
+        ArgumentCaptor<QueryLogBean> queryLogCaptor = ArgumentCaptor.forClass(QueryLogBean.class);
+        verify(baseConfigDao).saveQueryLog(queryLogCaptor.capture());
+        assertEquals("TreasureWDDB_History", queryLogCaptor.getValue().getQueryDatabase());
+        assertEquals(sql, queryLogCaptor.getValue().getQuerySqlscript());
+
+        ArgumentCaptor<QueryLogTargetBean> targetCaptor = ArgumentCaptor.forClass(QueryLogTargetBean.class);
+        verify(queryLogTargetDao).saveTarget(targetCaptor.capture());
+        assertEquals(Integer.valueOf(77), targetCaptor.getValue().getQueryLogCode());
+        assertEquals("TreasureWDDB_History", targetCaptor.getValue().getDatabaseName());
+        assertEquals("orders", targetCaptor.getValue().getTableName());
+    }
     private static Map<Object, Object> accessStaticMap(String fieldName) throws Exception {
         Field field = BaseDataServiceImpl.class.getDeclaredField(fieldName);
         field.setAccessible(true);
         return (Map<Object, Object>) field.get(null);
     }
 
+    private void setField(String fieldName, Object value) throws Exception {
+        Field field = BaseDataServiceImpl.class.getDeclaredField(fieldName);
+        field.setAccessible(true);
+        field.set(baseDataService, value);
+    }
     private static Object createDashboardCacheEntry(long cachedAt, long expiresAt) throws Exception {
         Class<?> entryClass = Class.forName(BaseDataServiceImpl.class.getName() + "$WorkbenchDashboardCacheEntry");
         Constructor<?> constructor = entryClass.getDeclaredConstructor(List.class, long.class, long.class);
