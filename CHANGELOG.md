@@ -2,6 +2,17 @@
 
 本文件记录当前 `master` 分支之后到当前 `develop` 工作区的主要变更，按版本和当前未发布改动整理。
 
+## v2.7.8 - 2026-04-20
+
+### Fixed
+- 修复 ClickHouse 查看表结构时错误按 MySQL 风格列名读取 `system.columns` 结果，导致 `/database/columnslist/...` 返回 `Result has no column with name 'Field'` 的问题。
+
+### Changed
+- 将 ClickHouse 表结构查询结果显式映射为 `column_name`、`column_type`、`column_comment` 字段，并按 `Nullable(...)` 类型推导列是否可空。
+
+### Tests
+- 为 ClickHouse 增加表结构查询定向测试，覆盖别名映射、Nullable 判定、空备注兜底和资源释放。
+
 ## v2.7.7 - 2026-04-20
 
 ### Fixed

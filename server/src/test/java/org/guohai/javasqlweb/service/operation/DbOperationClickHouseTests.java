@@ -97,4 +97,40 @@ class DbOperationClickHouseTests {
         assertEquals(String.valueOf(timestamp), rows.get(0).get("created_at"));
         assertTrue(((Integer) result[0]) == ((Integer) result[1]));
     }
+
+    @Test
+    void getColumnsListMapsAliasedClickHouseColumnsAndNullableState() throws Exception {
+        DataSource dataSource = mock(DataSource.class);
+        Connection connection = mock(Connection.class);
+        Statement statement = mock(Statement.class);
+        ResultSet resultSet = mock(ResultSet.class);
+        DbOperationClickHouse operation = new DbOperationClickHouse(dataSource);
+
+        when(dataSource.getConnection()).thenReturn(connection);
+        when(connection.createStatement()).thenReturn(statement);
+        when(statement.executeQuery(anyString())).thenReturn(resultSet);
+        when(resultSet.next()).thenReturn(true, true, false);
+        when(resultSet.getString("column_name")).thenReturn("user_id", "remark");
+        when(resultSet.getString("column_type")).thenReturn("UInt64", "Nullable(String)");
+        when(resultSet.getString("column_comment")).thenReturn(null, "备注");
+
+        List<org.guohai.javasqlweb.beans.ColumnsNameBean> columns =
+                operation.getColumnsList("dw_game_wd", "dw_scan_stall_result");
+
+        assertEquals(2, columns.size());
+        assertEquals("user_id", columns.get(0).getColumnName());
+        assertEquals("UInt64", columns.get(0).getColumnType());
+        assertEquals("", columns.get(0).getColumnComment());
+        assertEquals("not null", columns.get(0).getColumnIsNull());
+        assertEquals("remark", columns.get(1).getColumnName());
+        assertEquals("Nullable(String)", columns.get(1).getColumnType());
+        assertEquals("备注", columns.get(1).getColumnComment());
+        assertEquals("null", columns.get(1).getColumnIsNull());
+        verify(statement).executeQuery(
+                "SELECT name AS column_name, type AS column_type, comment AS column_comment " +
+                        "FROM system.columns WHERE database='dw_game_wd' AND table='dw_scan_stall_result' LIMIT 100;");
+        verify(resultSet).close();
+        verify(statement).close();
+        verify(connection).close();
+    }
 }

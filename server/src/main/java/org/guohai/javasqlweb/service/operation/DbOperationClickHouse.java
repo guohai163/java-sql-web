@@ -121,17 +121,29 @@ public class DbOperationClickHouse implements DbOperation{
     @Override
     public List<ColumnsNameBean> getColumnsList(String dbName, String tableName) throws SQLException {
         List<ColumnsNameBean> listCnb = new ArrayList<>();
-        Connection conn = sqlDs.getConnection();
-        Statement st = conn.createStatement();
-        ResultSet rs = st.executeQuery(String.format("SELECT name,type,comment FROM system.columns where database='%s' and table='%s' limit 100;", dbName, tableName));
-        while (rs.next()){
-            listCnb.add(new ColumnsNameBean(rs.getString("Field"),
-                    rs.getString("Type"),
-                    "",
-                    rs.getString("Comment"),
-                    "NO".equals(rs.getString("Null"))?"not null":"null"));
+        Connection conn = null;
+        Statement st = null;
+        ResultSet rs = null;
+        try {
+            conn = sqlDs.getConnection();
+            st = conn.createStatement();
+            rs = st.executeQuery(String.format(
+                    "SELECT name AS column_name, type AS column_type, comment AS column_comment " +
+                            "FROM system.columns WHERE database='%s' AND table='%s' LIMIT 100;",
+                    dbName,
+                    tableName));
+            while (rs.next()){
+                String columnType = rs.getString("column_type");
+                String columnComment = rs.getString("column_comment");
+                listCnb.add(new ColumnsNameBean(rs.getString("column_name"),
+                        columnType,
+                        "",
+                        columnComment == null ? "" : columnComment,
+                        isNullableClickHouseType(columnType) ? "null" : "not null"));
+            }
+        } finally {
+            closeResource(rs,st,conn);
         }
-        closeResource(rs,st,conn);
         return listCnb;
     }
 
@@ -258,5 +270,9 @@ public class DbOperationClickHouse implements DbOperation{
     @Override
     public void close() {
         HikariDataSourceUtils.closeDataSource(sqlDs);
+    }
+
+    private boolean isNullableClickHouseType(String columnType) {
+        return columnType != null && columnType.contains("Nullable(");
     }
 }
