@@ -4,8 +4,11 @@ import org.guohai.javasqlweb.beans.*;
 import org.guohai.javasqlweb.util.HikariDataSourceUtils;
 
 import javax.sql.DataSource;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -14,10 +17,35 @@ import static org.guohai.javasqlweb.util.Utils.closeResource;
 
 public class DbOperationClickHouse implements DbOperation{
 
+    private static final long CACHED_DATASOURCE_IDLE_MILLIS = 10 * 60 * 1000L;
+    private static final int MAX_CACHED_DATASOURCES = 16;
+
     /**
      * 数据源
      */
-    private DataSource sqlDs;
+    private final DataSource sqlDs;
+
+    private final ConnectConfigBean connect;
+
+    private final Map<String, CachedDataSource> queryDataSourceMap = new HashMap<>();
+
+    private final QueryDataSourceFactory queryDataSourceFactory;
+
+    private static final class CachedDataSource {
+        private final DataSource dataSource;
+        private long lastAccessAt;
+        private int borrowCount;
+
+        private CachedDataSource(DataSource dataSource, long lastAccessAt) {
+            this.dataSource = dataSource;
+            this.lastAccessAt = lastAccessAt;
+        }
+    }
+
+    @FunctionalInterface
+    interface QueryDataSourceFactory {
+        DataSource create(String dbName) throws Exception;
+    }
 
     /**
      * 构造方法
@@ -25,23 +53,20 @@ public class DbOperationClickHouse implements DbOperation{
      * @throws Exception
      */
     DbOperationClickHouse(ConnectConfigBean conn) throws Exception {
-        sqlDs = HikariDataSourceUtils.createDataSource(
-                "jsw-clickhouse-" + conn.getCode(),
-                String.format(
-                        "jdbc:clickhouse://%s:%s?retry=0&client_retry_on_failures=None",
-                        conn.getDbServerHost(),
-                        conn.getDbServerPort()
-                ),
-                conn.getDbServerUsername(),
-                conn.getDbServerPassword(),
-                "select now()"
-        );
+        this(createServerDataSource(conn), conn, null);
     }
 
     DbOperationClickHouse(DataSource dataSource) {
-        this.sqlDs = dataSource;
+        this(dataSource, null, null);
     }
 
+    DbOperationClickHouse(DataSource dataSource,
+                          ConnectConfigBean conn,
+                          QueryDataSourceFactory queryDataSourceFactory) {
+        this.sqlDs = dataSource;
+        this.connect = conn;
+        this.queryDataSourceFactory = queryDataSourceFactory == null ? this::createQueryDataSource : queryDataSourceFactory;
+    }
 
     /**
      * 获得实例服务器库列表
@@ -198,18 +223,19 @@ public class DbOperationClickHouse implements DbOperation{
     public Object[] queryDatabaseBySql(String dbName, String sql, Integer limit) throws SQLException {
         Object[] result = new Object[3];
         List<Map<String, Object>> listData = new ArrayList<>();
+        DataSource queryDataSource = null;
         Connection conn = null;
         Statement st = null;
         ResultSet rs = null;
         int safeLimit = limit == null ? Integer.MAX_VALUE : Math.max(limit, 0);
         try{
-            conn = sqlDs.getConnection();
+            queryDataSource = acquireQueryDataSource(dbName);
+            conn = queryDataSource.getConnection();
             st = conn.createStatement();
             //按【;】拆分SQL执行，默认最后一条为查询语句，为了方便使用SET @变量 = XXX
             sql = sql.replace("\n"," ");
             sql = sql.replace("\r"," ");
 
-            st.execute(String.format("use %s", dbName));
             rs = st.executeQuery(String.format("%s;", sql));
             // 获得结果集结构信息,元数据
             java.sql.ResultSetMetaData md = rs.getMetaData();
@@ -238,6 +264,7 @@ public class DbOperationClickHouse implements DbOperation{
             result[2] = listData;
         } finally {
             closeResource(rs,st,conn);
+            releaseQueryDataSource(dbName, queryDataSource);
         }
 
 
@@ -270,9 +297,149 @@ public class DbOperationClickHouse implements DbOperation{
     @Override
     public void close() {
         HikariDataSourceUtils.closeDataSource(sqlDs);
+        synchronized (queryDataSourceMap) {
+            for (CachedDataSource cachedDataSource : queryDataSourceMap.values()) {
+                HikariDataSourceUtils.closeDataSource(cachedDataSource.dataSource);
+            }
+            queryDataSourceMap.clear();
+        }
     }
 
     private boolean isNullableClickHouseType(String columnType) {
         return columnType != null && columnType.contains("Nullable(");
+    }
+
+    private static DataSource createServerDataSource(ConnectConfigBean conn) {
+        return HikariDataSourceUtils.createDataSource(
+                "jsw-clickhouse-" + conn.getCode(),
+                String.format(
+                        "jdbc:clickhouse://%s:%s?retry=0&client_retry_on_failures=None",
+                        conn.getDbServerHost(),
+                        conn.getDbServerPort()
+                ),
+                conn.getDbServerUsername(),
+                conn.getDbServerPassword(),
+                "select now()"
+        );
+    }
+
+    private DataSource createQueryDataSource(String dbName) {
+        if (connect == null) {
+            throw new IllegalStateException("ClickHouse query datasource factory requires connect config");
+        }
+        String normalizedDbName = normalizeDatabaseName(dbName);
+        return HikariDataSourceUtils.createDataSource(
+                String.format("jsw-clickhouse-%s-%s", connect.getCode(), Integer.toHexString(normalizedDbName.hashCode())),
+                String.format(
+                        "jdbc:clickhouse://%s:%s/%s?retry=0&client_retry_on_failures=None",
+                        connect.getDbServerHost(),
+                        connect.getDbServerPort(),
+                        encodeDatabaseName(normalizedDbName)
+                ),
+                connect.getDbServerUsername(),
+                connect.getDbServerPassword(),
+                "select now()"
+        );
+    }
+
+    private DataSource acquireQueryDataSource(String dbName) throws SQLException {
+        String normalizedDbName = normalizeDatabaseName(dbName);
+        if (normalizedDbName.isEmpty()) {
+            return sqlDs;
+        }
+        synchronized (queryDataSourceMap) {
+            long now = System.currentTimeMillis();
+            cleanupQueryDataSources(now, normalizedDbName);
+            CachedDataSource cachedDataSource = queryDataSourceMap.get(normalizedDbName);
+            if (cachedDataSource == null) {
+                cachedDataSource = new CachedDataSource(createQueryDataSourceSafely(normalizedDbName), now);
+                queryDataSourceMap.put(normalizedDbName, cachedDataSource);
+            }
+            cachedDataSource.lastAccessAt = now;
+            cachedDataSource.borrowCount++;
+            return cachedDataSource.dataSource;
+        }
+    }
+
+    private void releaseQueryDataSource(String dbName, DataSource dataSource) {
+        String normalizedDbName = normalizeDatabaseName(dbName);
+        if (dataSource == null || normalizedDbName.isEmpty() || dataSource == sqlDs) {
+            return;
+        }
+        synchronized (queryDataSourceMap) {
+            CachedDataSource cachedDataSource = queryDataSourceMap.get(normalizedDbName);
+            if (cachedDataSource == null) {
+                return;
+            }
+            if (cachedDataSource.borrowCount > 0) {
+                cachedDataSource.borrowCount--;
+            }
+            cachedDataSource.lastAccessAt = System.currentTimeMillis();
+            cleanupQueryDataSources(cachedDataSource.lastAccessAt, normalizedDbName);
+        }
+    }
+
+    private void cleanupQueryDataSources(long now, String keepDbName) {
+        List<String> idleKeys = new ArrayList<>();
+        for (Map.Entry<String, CachedDataSource> entry : queryDataSourceMap.entrySet()) {
+            if (keepDbName != null && keepDbName.equals(entry.getKey())) {
+                continue;
+            }
+            CachedDataSource cachedDataSource = entry.getValue();
+            if (cachedDataSource.borrowCount == 0
+                    && now - cachedDataSource.lastAccessAt >= CACHED_DATASOURCE_IDLE_MILLIS) {
+                idleKeys.add(entry.getKey());
+            }
+        }
+        for (String dbName : idleKeys) {
+            closeCachedQueryDataSource(dbName);
+        }
+
+        while (queryDataSourceMap.size() > MAX_CACHED_DATASOURCES) {
+            String oldestKey = null;
+            long oldestAccess = Long.MAX_VALUE;
+            for (Map.Entry<String, CachedDataSource> entry : queryDataSourceMap.entrySet()) {
+                if (keepDbName != null && keepDbName.equals(entry.getKey())) {
+                    continue;
+                }
+                CachedDataSource cachedDataSource = entry.getValue();
+                if (cachedDataSource.borrowCount > 0) {
+                    continue;
+                }
+                if (cachedDataSource.lastAccessAt < oldestAccess) {
+                    oldestAccess = cachedDataSource.lastAccessAt;
+                    oldestKey = entry.getKey();
+                }
+            }
+            if (oldestKey == null) {
+                break;
+            }
+            closeCachedQueryDataSource(oldestKey);
+        }
+    }
+
+    private void closeCachedQueryDataSource(String dbName) {
+        CachedDataSource cachedDataSource = queryDataSourceMap.remove(dbName);
+        if (cachedDataSource != null) {
+            HikariDataSourceUtils.closeDataSource(cachedDataSource.dataSource);
+        }
+    }
+
+    private DataSource createQueryDataSourceSafely(String dbName) throws SQLException {
+        try {
+            return queryDataSourceFactory.create(dbName);
+        } catch (SQLException exception) {
+            throw exception;
+        } catch (Exception exception) {
+            throw new SQLException("create clickhouse datasource failed", exception);
+        }
+    }
+
+    private String normalizeDatabaseName(String dbName) {
+        return dbName == null ? "" : dbName.trim();
+    }
+
+    private String encodeDatabaseName(String dbName) {
+        return URLEncoder.encode(dbName, StandardCharsets.UTF_8).replace("+", "%20");
     }
 }

@@ -2,6 +2,20 @@
 
 本文件记录当前 `master` 分支之后到当前 `develop` 工作区的主要变更，按版本和当前未发布改动整理。
 
+## v2.8.1 - 2026-04-21
+
+### Changed
+- ClickHouse 查询执行改为按所选库复用默认 database 连接，不再依赖查询前显式执行 `USE <db>`，继续保持无状态只读查询模型。
+- 为 ClickHouse 的按库查询连接新增空闲回收和缓存上限控制，减少单实例访问多个库时连接池长期常驻。
+
+### Fixed
+- 修复查询 ClickHouse 时因内部执行 `USE` 触发 `There is no session or session context has expired` 的问题。
+- 让 ClickHouse dashboard 中依赖 `currentDatabase()` 的指标跟随当前选中库执行，不再受 session 上下文影响。
+
+### Tests
+- 更新 ClickHouse 查询测试，覆盖默认库连接、不再执行 `USE`、同库连接复用、空闲回收和超量淘汰。
+- 新增 ClickHouse dashboard 定向测试，验证 `currentDatabase()` 类查询会透传当前选中库。
+
 ## v2.8.0 - 2026-04-20
 
 ### Changed
