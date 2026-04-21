@@ -24,8 +24,10 @@ import java.net.ConnectException;
 import java.net.SocketTimeoutException;
 import java.sql.SQLNonTransientConnectionException;
 import java.sql.SQLException;
+import java.sql.SQLTimeoutException;
 import java.sql.SQLTransientConnectionException;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -52,6 +54,9 @@ public class BaseDataServiceImpl implements BaseDataService{
 
     @Value("${project.limit}")
     private Integer limit;
+
+    @Value("${project.target-query-timeout-seconds:30}")
+    private Integer targetQueryTimeoutSeconds;
     /**
      * 服务器实例集合
      */
@@ -409,6 +414,18 @@ public class BaseDataServiceImpl implements BaseDataService{
         });
     }
 
+    @Override
+    public Result<List<TargetPoolStatBean>> getTargetPoolStats() {
+        long now = System.currentTimeMillis();
+        List<ConnectConfigBean> servers = DbServerTypeUtils.normalize(baseConfigDao.getAllConnectConfig());
+        List<TargetPoolStatBean> targetPools = new ArrayList<>();
+        for (ConnectConfigBean server : servers) {
+            targetPools.add(buildTargetPoolStat(server, now));
+        }
+        targetPools.sort(Comparator.comparing(TargetPoolStatBean::getServerCode, Comparator.nullsLast(Integer::compareTo)));
+        return new Result<>(true, "", targetPools);
+    }
+
     /**
      * 检查所有服务器的健康状态
      *
@@ -496,6 +513,9 @@ public class BaseDataServiceImpl implements BaseDataService{
                     try{
                         DbServerTypeUtils.normalize(connConfigBean);
                         dbOperation = DbOperationFactory.createDbOperation(connConfigBean);
+                        if (dbOperation != null) {
+                            dbOperation.configureQueryTimeoutSeconds(targetQueryTimeoutSeconds == null ? 30 : targetQueryTimeoutSeconds);
+                        }
                         operationMap.put(serverCode,dbOperation);
                     } catch (Exception e){
                         e.printStackTrace();
@@ -718,6 +738,9 @@ public class BaseDataServiceImpl implements BaseDataService{
     }
 
     private boolean isConnectionFailure(Throwable throwable) {
+        if (isQueryTimeoutFailure(throwable)) {
+            return false;
+        }
         Throwable current = throwable;
         while (current != null) {
             if (current instanceof SQLTransientConnectionException
@@ -756,6 +779,23 @@ public class BaseDataServiceImpl implements BaseDataService{
         return false;
     }
 
+    private boolean isQueryTimeoutFailure(Throwable throwable) {
+        Throwable current = throwable;
+        while (current != null) {
+            if (current instanceof SQLTimeoutException) {
+                return true;
+            }
+            if (current instanceof SQLException sqlException) {
+                String sqlState = sqlException.getSQLState();
+                if ("HYT00".equalsIgnoreCase(sqlState) || "S1T00".equalsIgnoreCase(sqlState)) {
+                    return true;
+                }
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
     private String extractExceptionMessage(Throwable throwable) {
         Throwable current = throwable;
         String message = null;
@@ -780,5 +820,72 @@ public class BaseDataServiceImpl implements BaseDataService{
         } catch (Exception e) {
             LOG.warn("Failed to close cached operation for server {}", serverCode, e);
         }
+    }
+
+    private TargetPoolStatBean buildTargetPoolStat(ConnectConfigBean server, long now) {
+        TargetPoolStatBean stat = new TargetPoolStatBean();
+        if (server == null) {
+            stat.setRuntimeStatus("unused");
+            stat.setInCooldown(false);
+            stat.setCooldownRemainingSeconds(0L);
+            stat.setFailureCount(0);
+            return stat;
+        }
+
+        Integer serverCode = server.getCode();
+        Integer failureCount = serverCode == null ? 0 : connectionFailureCountMap.getOrDefault(serverCode, 0);
+        String lastError = serverCode == null ? null : connectionLastErrorMap.get(serverCode);
+        Long cooldownUntilMillis = serverCode == null ? null : connectionCooldownUntilMap.get(serverCode);
+        if (cooldownUntilMillis != null && cooldownUntilMillis <= now && serverCode != null) {
+            clearConnectionFailureState(serverCode);
+            cooldownUntilMillis = null;
+            failureCount = 0;
+            lastError = null;
+        }
+
+        DbOperation operation = serverCode == null ? null : operationMap.get(serverCode);
+        PoolStatBean poolStat = operation == null ? null : operation.describeRuntimePool();
+        boolean inCooldown = cooldownUntilMillis != null && cooldownUntilMillis > now;
+        long cooldownRemainingSeconds = inCooldown ? Math.max(1L, (cooldownUntilMillis - now + 999L) / 1000L) : 0L;
+
+        stat.setServerCode(serverCode);
+        stat.setServerName(server.getDbServerName());
+        stat.setDbType(DbServerTypeUtils.normalize(server.getDbServerType()));
+        stat.setPoolName(poolStat == null ? null : poolStat.getPoolName());
+        stat.setActiveConnections(poolStat == null ? null : poolStat.getActiveConnections());
+        stat.setIdleConnections(poolStat == null ? null : poolStat.getIdleConnections());
+        stat.setTotalConnections(poolStat == null ? null : poolStat.getTotalConnections());
+        stat.setThreadsAwaitingConnection(poolStat == null ? null : poolStat.getThreadsAwaitingConnection());
+        stat.setFailureCount(failureCount);
+        stat.setInCooldown(inCooldown);
+        stat.setCooldownRemainingSeconds(cooldownRemainingSeconds);
+        stat.setLastError(lastError);
+        stat.setRuntimeStatus(resolveRuntimeStatus(stat, operation));
+        return stat;
+    }
+
+    private String resolveRuntimeStatus(TargetPoolStatBean stat, DbOperation operation) {
+        if (Boolean.TRUE.equals(stat.getInCooldown())) {
+            return "cooldown";
+        }
+        if (isWarningPoolStat(stat)) {
+            return "warning";
+        }
+        String dbType = stat.getDbType() == null ? "" : stat.getDbType().toLowerCase(Locale.ROOT);
+        if (DbServerTypeUtils.MYSQL.equals(dbType) || DbServerTypeUtils.MARIADB.equals(dbType)) {
+            if (operation != null || stat.getPoolName() != null) {
+                return "ok";
+            }
+        }
+        return "unused";
+    }
+
+    private boolean isWarningPoolStat(TargetPoolStatBean stat) {
+        if (stat == null) {
+            return false;
+        }
+        return (stat.getFailureCount() != null && stat.getFailureCount() > 0)
+                || (stat.getThreadsAwaitingConnection() != null && stat.getThreadsAwaitingConnection() > 0)
+                || (stat.getLastError() != null && !stat.getLastError().isBlank());
     }
 }

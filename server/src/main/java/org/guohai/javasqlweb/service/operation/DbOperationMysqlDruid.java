@@ -1,5 +1,7 @@
 package org.guohai.javasqlweb.service.operation;
 
+import com.zaxxer.hikari.HikariDataSource;
+import com.zaxxer.hikari.HikariPoolMXBean;
 import org.guohai.javasqlweb.beans.*;
 import org.guohai.javasqlweb.util.HikariDataSourceUtils;
 import org.slf4j.Logger;
@@ -37,6 +39,8 @@ public class DbOperationMysqlDruid implements DbOperation {
      */
     private DataSource sqlDs;
 
+    private int queryTimeoutSeconds;
+
     /**
      * 构造方法
      * @param conn
@@ -51,6 +55,10 @@ public class DbOperationMysqlDruid implements DbOperation {
                 conn.getDbServerPassword(),
                 "select now()"
         );
+    }
+
+    DbOperationMysqlDruid(DataSource dataSource) {
+        this.sqlDs = dataSource;
     }
 
     /**
@@ -273,6 +281,9 @@ public class DbOperationMysqlDruid implements DbOperation {
         try{
             conn = sqlDs.getConnection();
             st = conn.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE,ResultSet.CONCUR_READ_ONLY);
+            if (queryTimeoutSeconds > 0) {
+                st.setQueryTimeout(queryTimeoutSeconds);
+            }
             //选择一个数据库
             st.execute("use ".concat(dbName));
             //按【;】拆分SQL执行，默认最后一条为查询语句，为了方便使用SET @变量 = XXX
@@ -326,6 +337,31 @@ public class DbOperationMysqlDruid implements DbOperation {
         return result;
     }
 
+    @Override
+    public void configureQueryTimeoutSeconds(int seconds) {
+        queryTimeoutSeconds = Math.max(0, seconds);
+    }
+
+    @Override
+    public PoolStatBean describeRuntimePool() {
+        HikariDataSource hikariDataSource = unwrapHikariDataSource();
+        if (hikariDataSource == null) {
+            return null;
+        }
+        PoolStatBean bean = new PoolStatBean();
+        bean.setPoolName(hikariDataSource.getPoolName());
+        bean.setJdbcUrl(hikariDataSource.getJdbcUrl());
+        bean.setDriverClassName(hikariDataSource.getDriverClassName());
+        HikariPoolMXBean poolMxBean = hikariDataSource.getHikariPoolMXBean();
+        if (poolMxBean != null) {
+            bean.setActiveConnections(poolMxBean.getActiveConnections());
+            bean.setIdleConnections(poolMxBean.getIdleConnections());
+            bean.setTotalConnections(poolMxBean.getTotalConnections());
+            bean.setThreadsAwaitingConnection(poolMxBean.getThreadsAwaitingConnection());
+        }
+        return bean;
+    }
+
     private boolean isMysqlDateTimeColumn(String columnTypeName) {
         if (columnTypeName == null) {
             return false;
@@ -377,6 +413,17 @@ public class DbOperationMysqlDruid implements DbOperation {
     @Override
     public void close() {
         HikariDataSourceUtils.closeDataSource(sqlDs);
+    }
+
+    private HikariDataSource unwrapHikariDataSource() {
+        if (sqlDs instanceof HikariDataSource hikariDataSource) {
+            return hikariDataSource;
+        }
+        try {
+            return sqlDs.unwrap(HikariDataSource.class);
+        } catch (SQLException ignored) {
+            return null;
+        }
     }
 
 

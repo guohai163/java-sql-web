@@ -104,6 +104,19 @@ public interface DbOperation {
     Boolean serverHealth() throws SQLException;
 
     /**
+     * Configure execution timeout for user queries in seconds.
+     */
+    default void configureQueryTimeoutSeconds(int seconds) {
+    }
+
+    /**
+     * Describe runtime pool metrics when the implementation exposes them.
+     */
+    default PoolStatBean describeRuntimePool() {
+        return null;
+    }
+
+    /**
      * 释放底层资源，默认无操作。
      */
     default void close() {

@@ -139,6 +139,12 @@ public interface BaseDataService {
     void invalidateServerResources(Integer serverCode);
 
     /**
+     * 获取动态目标库连接池运行时快照
+     * @return
+     */
+    Result<List<TargetPoolStatBean>> getTargetPoolStats();
+
+    /**
      * 检查所有服务器的健康状态
      * @return
      */

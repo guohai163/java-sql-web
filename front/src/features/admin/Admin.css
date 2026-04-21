@@ -359,6 +359,10 @@
     background: linear-gradient(135deg, #e11d48, #fb7185);
 }
 
+.accent-slate .admin-kpi-icon {
+    background: linear-gradient(135deg, #475569, #64748b);
+}
+
 .admin-dashboard-grid {
     display: grid;
     grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.95fr);

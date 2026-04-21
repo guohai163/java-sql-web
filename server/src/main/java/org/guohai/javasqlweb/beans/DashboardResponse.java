@@ -27,4 +27,6 @@ public class DashboardResponse {
     private List<DashboardObjectHotspotItem> tableHotspots;
 
     private List<DashboardRecentQueryItem> recentQueries;
+
+    private List<TargetPoolStatBean> dynamicTargetPools;
 }

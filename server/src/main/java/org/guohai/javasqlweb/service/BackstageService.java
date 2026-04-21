@@ -7,6 +7,7 @@ import org.guohai.javasqlweb.beans.PoolStatBean;
 import org.guohai.javasqlweb.beans.QueryLogBean;
 import org.guohai.javasqlweb.beans.QueryLogCursorResponse;
 import org.guohai.javasqlweb.beans.Result;
+import org.guohai.javasqlweb.beans.TargetPoolStatBean;
 import org.guohai.javasqlweb.beans.UserBean;
 import org.springframework.web.bind.annotation.RequestBody;
 
@@ -36,6 +37,12 @@ public interface BackstageService {
      * @return 连接池信息
      */
     Result<List<PoolStatBean>> getPoolStats();
+
+    /**
+     * 获取动态目标库连接池运行时快照
+     * @return
+     */
+    Result<List<TargetPoolStatBean>> getTargetPoolStats();
 
     /**
      * 测试数据库连接性
@@ -107,6 +114,13 @@ public interface BackstageService {
      * @return
      */
     Result<String> delServer(Integer code);
+
+    /**
+     * 重置指定服务器的动态连接池与冷却状态
+     * @param code
+     * @return
+     */
+    Result<String> resetServer(Integer code);
 
     /**
      * 通过有效token修改用户密码

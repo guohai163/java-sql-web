@@ -21,6 +21,7 @@ project:
   host: ${PROJECT_HOST:http://localhost}
   auto-user-link-enabled: ${PROJECT_AUTO_USER_LINK_ENABLED:false}
   legacy-tls-enabled: ${PROJECT_LEGACY_TLS_ENABLED:false}
+  target-query-timeout-seconds: ${PROJECT_TARGET_QUERY_TIMEOUT_SECONDS:30}
 management:
   endpoints:
     web:

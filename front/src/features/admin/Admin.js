@@ -90,6 +90,28 @@ function pruneServerTestResults(connList, serverTestResults) {
   }, {});
 }
 
+function buildServerRuntimeMap(runtimeList) {
+  return (runtimeList || []).reduce((accumulator, item) => {
+    if (item?.serverCode != null) {
+      accumulator[item.serverCode] = item;
+    }
+    return accumulator;
+  }, {});
+}
+
+function getServerRuntimeMeta(status) {
+  switch (status) {
+    case 'ok':
+      return { color: 'success', text: '正常' };
+    case 'warning':
+      return { color: 'warning', text: '警告' };
+    case 'cooldown':
+      return { color: 'error', text: '冷却中' };
+    default:
+      return { color: 'default', text: '未使用' };
+  }
+}
+
 function getAccountStatusMeta(status) {
   if (status === 'ACTIVE') {
     return { color: 'success', text: '正常' };
@@ -154,8 +176,10 @@ function Admin() {
     },
     queryLogCursor: createEmptyQueryLogCursor(),
     connList: [],
+    serverRuntimeMap: {},
     serverTestResults: {},
     testingServerCode: null,
+    resettingServerCode: null,
     testingConfigServer: false,
     configVisible: false,
     userAddVisible: false,
@@ -291,6 +315,15 @@ function Admin() {
     showDialog(response.jsonData.message || '查询日志加载失败');
   };
 
+  const loadServerRuntime = async (client, headers) => {
+    const response = await client.get('/api/backstage/server-runtime', headers);
+    if (response.jsonData.status === true) {
+      return response.jsonData.data || [];
+    }
+    showDialog(response.jsonData.message || '动态目标库运行状态加载失败');
+    return [];
+  };
+
   const loadMenu = async (menuKey) => {
     setStatePatch({
       menuSelect: menuKey,
@@ -322,10 +355,14 @@ function Admin() {
         break;
       }
       case '3': {
-        const response = await client.get('/api/backstage/connlist', headers);
-        const connList = response.jsonData.data || [];
+        const [connResponse, runtimeList] = await Promise.all([
+          client.get('/api/backstage/connlist', headers),
+          loadServerRuntime(client, headers),
+        ]);
+        const connList = connResponse.jsonData.data || [];
         setStatePatch((previous) => ({
           connList,
+          serverRuntimeMap: buildServerRuntimeMap(runtimeList),
           serverTestResults: pruneServerTestResults(connList, previous.serverTestResults),
         }));
         break;
@@ -346,14 +383,16 @@ function Admin() {
         break;
       }
       case '7': {
-        const [groupResponse, connResponse, permResponse] = await Promise.all([
+        const [groupResponse, connResponse, permResponse, runtimeList] = await Promise.all([
           client.get('/api/backstage/usergroups', headers),
           client.get('/api/backstage/connlist', headers),
           client.get('/api/backstage/db_perm', headers),
+          loadServerRuntime(client, headers),
         ]);
         setStatePatch({
           userGroupList: groupResponse.jsonData.data,
           connList: connResponse.jsonData.data,
+          serverRuntimeMap: buildServerRuntimeMap(runtimeList),
           dbPermissionList: permResponse.jsonData.data,
         });
         break;
@@ -843,6 +882,42 @@ function Admin() {
     showDialog(response.jsonData.data);
   };
 
+  const resetServerRowBtn = (serverCode) => {
+    const serverData = state.connList.find((item) => item.code === serverCode);
+    confirm({
+      title: '重置目标库连接池',
+      content: `确认重置 ${serverData?.dbServerName || serverCode} 的动态连接池并清除冷却状态吗？`,
+      onOk: async () => {
+        setStatePatch({
+          resettingServerCode: serverCode,
+        });
+        try {
+          const client = createClient();
+          const response = await client.post(`/api/backstage/resetserver/${serverCode}`, {
+            headers: {
+              'Content-Type': 'application/json',
+              'User-Token': state.token,
+            },
+          });
+
+          if (response.jsonData.status === true) {
+            message.success(response.jsonData.data || '目标库连接池已重置');
+            await loadMenu('3');
+            return;
+          }
+
+          showDialog(response.jsonData.message || response.jsonData.data || '重置失败');
+        } catch (error) {
+          showDialog(error?.message || '重置请求失败，请检查网络或服务状态', '重置失败');
+        } finally {
+          setStatePatch({
+            resettingServerCode: null,
+          });
+        }
+      },
+    });
+  };
+
   const showEditServerBtn = (serverCode) => {
     const serverData = state.connList.find((item) => item.code === serverCode) || {};
     setStatePatch({
@@ -872,6 +947,29 @@ function Admin() {
     { title: '服务器类型', dataIndex: 'dbServerType', render: (value) => getServerTypeLabel(value) },
     { title: '连接安全', dataIndex: 'dbSslMode', render: (value) => value || 'DEFAULT' },
     { title: '服务器分组', dataIndex: 'dbGroup' },
+    {
+      title: '运行状态',
+      width: 300,
+      render: (text, record) => {
+        const runtime = state.serverRuntimeMap[record.code] || {};
+        const meta = getServerRuntimeMeta(runtime.runtimeStatus);
+        const poolSummary = runtime.poolName
+          ? `活跃 ${runtime.activeConnections || 0} / 空闲 ${runtime.idleConnections || 0} / 总数 ${runtime.totalConnections || 0} / 等待 ${runtime.threadsAwaitingConnection || 0}`
+          : '未创建动态池';
+        return (
+          <div className="admin-server-test-cell">
+            <Tag color={meta.color}>{meta.text}</Tag>
+            <span className="admin-server-test-message">{poolSummary}</span>
+            {runtime.inCooldown && runtime.cooldownRemainingSeconds ? (
+              <span className="admin-task-time">冷却剩余 {runtime.cooldownRemainingSeconds}s</span>
+            ) : null}
+            {!runtime.inCooldown && runtime.lastError ? (
+              <span className="admin-task-time">{summarizeServerTestMessage(runtime.lastError, '最近错误')}</span>
+            ) : null}
+          </div>
+        );
+      },
+    },
     {
       title: '最近测试',
       width: 240,
@@ -926,6 +1024,13 @@ function Admin() {
           </Button>
           <Button type="link" onClick={() => showEditServerBtn(record.code)}>
             编辑
+          </Button>
+          <Button
+            type="link"
+            loading={state.resettingServerCode === record.code}
+            onClick={() => resetServerRowBtn(record.code)}
+          >
+            重置
           </Button>
           <Button type="link" onClick={() => serverDeleteBtn(record.code)}>
             删除

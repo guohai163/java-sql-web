@@ -68,6 +68,19 @@ function formatTimestamp(value) {
   return String(value).replace('T', ' ');
 }
 
+function getRuntimeStatusMeta(status) {
+  switch (status) {
+    case 'ok':
+      return { color: 'success', text: '正常' };
+    case 'warning':
+      return { color: 'warning', text: '警告' };
+    case 'cooldown':
+      return { color: 'error', text: '冷却中' };
+    default:
+      return { color: 'default', text: '未使用' };
+  }
+}
+
 function bucketLabel(value, range) {
   if (!value) {
     return '';
@@ -128,6 +141,14 @@ function buildSummaryCards(summary) {
       helper: '查询响应时间',
       accent: 'rose',
     },
+    {
+      key: 'dynamic-pool',
+      title: '目标库连接池',
+      icon: <DatabaseOutlined />,
+      value: formatInteger(summary?.activeDynamicPools),
+      helper: `冷却 ${formatInteger(summary?.cooldownDynamicPools)} / 连接 ${formatInteger(summary?.dynamicPoolConnections)} / 等待 ${formatInteger(summary?.dynamicPoolWaitingThreads)}`,
+      accent: 'slate',
+    },
   ];
 }
 
@@ -154,11 +175,37 @@ function AdminDashboard({ data, filter, loading, updatedAt, onRangeChange, onGra
     { title: 'SQL 摘要', dataIndex: 'querySqlscript', ellipsis: true },
   ];
 
+  const dynamicPoolColumns = [
+    { title: '服务器', dataIndex: 'serverName', width: 140, ellipsis: true },
+    { title: '类型', dataIndex: 'dbType', width: 100 },
+    {
+      title: '状态',
+      dataIndex: 'runtimeStatus',
+      width: 110,
+      render: (value) => {
+        const meta = getRuntimeStatusMeta(value);
+        return <Tag color={meta.color}>{meta.text}</Tag>;
+      },
+    },
+    { title: '活跃', dataIndex: 'activeConnections', render: formatInteger, width: 90 },
+    { title: '空闲', dataIndex: 'idleConnections', render: formatInteger, width: 90 },
+    { title: '总数', dataIndex: 'totalConnections', render: formatInteger, width: 90 },
+    { title: '等待', dataIndex: 'threadsAwaitingConnection', render: formatInteger, width: 90 },
+    {
+      title: '冷却剩余',
+      dataIndex: 'cooldownRemainingSeconds',
+      width: 120,
+      render: (value, record) => (record?.inCooldown && value != null ? `${value}s` : '-'),
+    },
+    { title: '最近错误', dataIndex: 'lastError', ellipsis: true },
+  ];
+
   const userChartData = data?.userRanking || [];
   const databaseHotspots = data?.databaseHotspots || [];
   const tableHotspots = data?.tableHotspots || [];
   const trendData = data?.trend || [];
   const recentQueries = data?.recentQueries || [];
+  const dynamicTargetPools = data?.dynamicTargetPools || [];
   const maxTableQueryCount = tableHotspots[0]?.queryCount || 1;
 
   return (
@@ -381,6 +428,27 @@ function AdminDashboard({ data, filter, loading, updatedAt, onRangeChange, onGra
             </div>
           ) : (
             <Empty description="暂无表热点" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+          )}
+        </section>
+
+        <section className="admin-dashboard-card">
+          <div className="admin-card-heading">
+            <div>
+              <h3>动态目标库连接池</h3>
+              <p>观察活跃、等待和冷却中的动态目标库连接池</p>
+            </div>
+            <Tag color="geekblue">{formatInteger(dynamicTargetPools.length)}</Tag>
+          </div>
+          {dynamicTargetPools.length > 0 ? (
+            <Table
+              columns={dynamicPoolColumns}
+              dataSource={dynamicTargetPools}
+              pagination={false}
+              rowKey={(record) => `dynamic-pool-${record.serverCode}`}
+              size="small"
+            />
+          ) : (
+            <Empty description="当前没有活跃或异常的动态目标库连接池" image={Empty.PRESENTED_IMAGE_SIMPLE} />
           )}
         </section>
 

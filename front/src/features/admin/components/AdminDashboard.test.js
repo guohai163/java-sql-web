@@ -42,6 +42,10 @@ describe('AdminDashboard', () => {
             activePoolConnections: 4,
             idlePoolConnections: 14,
             waitingPoolThreads: 1,
+            activeDynamicPools: 2,
+            cooldownDynamicPools: 1,
+            dynamicPoolConnections: 20,
+            dynamicPoolWaitingThreads: 3,
             queryCount: 66,
             totalReturnedRows: 1024,
             averageQueryConsuming: 28.4,
@@ -72,6 +76,21 @@ describe('AdminDashboard', () => {
               querySqlscript: 'select * from orders limit 20',
             },
           ],
+          dynamicTargetPools: [
+            {
+              serverCode: 9,
+              serverName: 'order-core',
+              dbType: 'mysql',
+              runtimeStatus: 'cooldown',
+              activeConnections: 20,
+              idleConnections: 0,
+              totalConnections: 20,
+              threadsAwaitingConnection: 3,
+              inCooldown: true,
+              cooldownRemainingSeconds: 251,
+              lastError: 'pool exhausted',
+            },
+          ],
         }}
         filter={{ range: '24h', grain: 'hour' }}
         loading={false}
@@ -86,9 +105,11 @@ describe('AdminDashboard', () => {
     expect(screen.getByText('查询趋势')).toBeInTheDocument();
     expect(screen.getByText('用户查询排行')).toBeInTheDocument();
     expect(screen.getByText('最近 10 条查询')).toBeInTheDocument();
+    expect(screen.getByText('动态目标库连接池')).toBeInTheDocument();
     expect(screen.getByText('未探活')).toBeInTheDocument();
     expect(screen.getAllByText('alice').length).toBeGreaterThan(0);
     expect(screen.getAllByText('order_db.orders').length).toBeGreaterThan(0);
+    expect(screen.getByText('order-core')).toBeInTheDocument();
   });
 
   test('renders empty states when dashboard has no data', () => {
@@ -101,6 +122,7 @@ describe('AdminDashboard', () => {
           databaseHotspots: [],
           tableHotspots: [],
           recentQueries: [],
+          dynamicTargetPools: [],
         }}
         filter={{ range: '24h', grain: 'hour' }}
         loading={false}
@@ -113,5 +135,6 @@ describe('AdminDashboard', () => {
 
     expect(screen.getByText('当前时间范围还没有查询记录')).toBeInTheDocument();
     expect(screen.getByText('暂无用户查询排行')).toBeInTheDocument();
+    expect(screen.getByText('当前没有活跃或异常的动态目标库连接池')).toBeInTheDocument();
   });
 });

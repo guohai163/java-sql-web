@@ -24,6 +24,14 @@ public class DashboardSummary {
 
     private Integer waitingPoolThreads;
 
+    private Integer activeDynamicPools;
+
+    private Integer cooldownDynamicPools;
+
+    private Integer dynamicPoolConnections;
+
+    private Integer dynamicPoolWaitingThreads;
+
     private Long queryCount;
 
     private Long totalReturnedRows;

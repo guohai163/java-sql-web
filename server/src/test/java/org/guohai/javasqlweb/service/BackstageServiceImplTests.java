@@ -77,6 +77,7 @@ class BackstageServiceImplTests {
         when(hikariDataSource.getJdbcUrl()).thenReturn("jdbc:mysql://localhost:3306/javasqlweb_db");
         when(hikariDataSource.getDriverClassName()).thenReturn("com.mysql.cj.jdbc.Driver");
         when(baseConfigDao.getConnData()).thenReturn(Collections.emptyList());
+        when(baseDataService.getTargetPoolStats()).thenReturn(new Result<>(true, "", Collections.emptyList()));
         when(dashboardDao.getUserSummary(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
                 .thenReturn(userSummary);
         when(dashboardDao.getTrend(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyString()))
@@ -104,6 +105,45 @@ class BackstageServiceImplTests {
         assertEquals(5L, result.getData().getSummary().getQueryCount());
         assertEquals(50L, result.getData().getSummary().getTotalReturnedRows());
         verify(baseConfigDao, never()).getConnectConfig(anyInt());
+    }
+
+    @Test
+    void getDashboardIncludesDynamicPoolSummaryAndList() {
+        DashboardSummary userSummary = new DashboardSummary();
+        TargetPoolStatBean poolStat = new TargetPoolStatBean();
+        poolStat.setServerCode(9);
+        poolStat.setServerName("core");
+        poolStat.setRuntimeStatus("cooldown");
+        poolStat.setInCooldown(true);
+        poolStat.setTotalConnections(20);
+        poolStat.setThreadsAwaitingConnection(3);
+
+        when(baseConfigDao.getConnData()).thenReturn(Collections.emptyList());
+        when(baseDataService.getTargetPoolStats()).thenReturn(new Result<>(true, "", List.of(poolStat)));
+        when(dashboardDao.getUserSummary(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(userSummary);
+        when(dashboardDao.getTrend(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyString()))
+                .thenReturn(Collections.emptyList());
+        when(dashboardDao.getUserRanking(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyInt()))
+                .thenReturn(Collections.emptyList());
+        when(dashboardDao.getDatabaseHotspots(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyInt()))
+                .thenReturn(Collections.emptyList());
+        when(dashboardDao.getTableHotspots(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyInt()))
+                .thenReturn(Collections.emptyList());
+        when(dashboardDao.getRecentQueries(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyInt()))
+                .thenReturn(Collections.emptyList());
+        when(dashboardDao.countQueries(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any())).thenReturn(0L);
+        when(dashboardDao.sumResultRows(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any())).thenReturn(0L);
+        when(dashboardDao.avgQueryConsuming(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any())).thenReturn(0D);
+
+        Result<DashboardResponse> result = backstageService.getDashboard("24h", "hour", 10, 5, 10, 10);
+
+        assertTrue(result.getStatus());
+        assertEquals(1, result.getData().getSummary().getActiveDynamicPools());
+        assertEquals(1, result.getData().getSummary().getCooldownDynamicPools());
+        assertEquals(20, result.getData().getSummary().getDynamicPoolConnections());
+        assertEquals(3, result.getData().getSummary().getDynamicPoolWaitingThreads());
+        assertEquals(1, result.getData().getDynamicTargetPools().size());
     }
 
     @Test
@@ -165,5 +205,18 @@ class BackstageServiceImplTests {
 
         assertTrue(result.getStatus());
         verify(baseDataService).invalidateServerResources(10);
+    }
+
+    @Test
+    void resetServerInvalidatesCachedResourcesAfterSuccess() {
+        ConnectConfigBean existingServer = new ConnectConfigBean();
+        existingServer.setCode(11);
+
+        when(baseConfigDao.getConnectConfig(11)).thenReturn(existingServer);
+
+        Result<String> result = backstageService.resetServer(11);
+
+        assertTrue(result.getStatus());
+        verify(baseDataService).invalidateServerResources(11);
     }
 }

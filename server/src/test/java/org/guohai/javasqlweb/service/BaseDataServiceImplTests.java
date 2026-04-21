@@ -2,9 +2,11 @@ package org.guohai.javasqlweb.service;
 
 import org.guohai.javasqlweb.beans.DatabaseNameBean;
 import org.guohai.javasqlweb.beans.ConnectConfigBean;
+import org.guohai.javasqlweb.beans.PoolStatBean;
 import org.guohai.javasqlweb.beans.QueryLogBean;
 import org.guohai.javasqlweb.beans.QueryLogTargetBean;
 import org.guohai.javasqlweb.beans.Result;
+import org.guohai.javasqlweb.beans.TargetPoolStatBean;
 import org.guohai.javasqlweb.beans.UserBean;
 import org.guohai.javasqlweb.beans.WorkbenchDashboardResponse;
 import org.guohai.javasqlweb.dao.BaseConfigDao;
@@ -22,6 +24,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.sql.SQLException;
+import java.sql.SQLTimeoutException;
 import java.sql.SQLTransientConnectionException;
 import java.util.List;
 import java.util.LinkedHashMap;
@@ -64,6 +67,7 @@ class BaseDataServiceImplTests {
         accessStaticMap("workbenchServerDashboardCache").clear();
         accessStaticMap("workbenchDatabaseDashboardCache").clear();
         setField("limit", 100);
+        setField("targetQueryTimeoutSeconds", 30);
     }
 
     @Test
@@ -125,6 +129,24 @@ class BaseDataServiceImplTests {
 
         for (int i = 0; i < 4; i++) {
             Result<List<DatabaseNameBean>> result = baseDataService.getDbName(9, user);
+            assertFalse(result.getStatus());
+            assertFalse(result.getMessage().contains("冷却"));
+        }
+
+        verify(operation, times(4)).getDbList();
+    }
+
+    @Test
+    void sqlTimeoutDoesNotTriggerCooldown() throws Exception {
+        UserBean user = buildUser();
+        DbOperation operation = mock(DbOperation.class);
+
+        when(baseConfigDao.hasServerPermission(user.getCode(), 15)).thenReturn(true);
+        when(operation.getDbList()).thenThrow(new SQLTimeoutException("query timed out"));
+        accessStaticMap("operationMap").put(15, operation);
+
+        for (int i = 0; i < 4; i++) {
+            Result<List<DatabaseNameBean>> result = baseDataService.getDbName(15, user);
             assertFalse(result.getStatus());
             assertFalse(result.getMessage().contains("冷却"));
         }
@@ -251,6 +273,56 @@ class BaseDataServiceImplTests {
         assertEquals("TreasureWDDB_History", targetCaptor.getValue().getDatabaseName());
         assertEquals("orders", targetCaptor.getValue().getTableName());
     }
+
+    @Test
+    void getTargetPoolStatsBuildsUnusedOkWarningAndCooldownStates() throws Exception {
+        ConnectConfigBean okServer = buildConnectConfig(21, "mysql", "core");
+        ConnectConfigBean warningServer = buildConnectConfig(22, "mysql", "billing");
+        ConnectConfigBean cooldownServer = buildConnectConfig(23, "mysql", "archive");
+        ConnectConfigBean unusedServer = buildConnectConfig(24, "clickhouse", "ck");
+        DbOperation okOperation = mock(DbOperation.class);
+        DbOperation warningOperation = mock(DbOperation.class);
+
+        when(baseConfigDao.getAllConnectConfig()).thenReturn(List.of(okServer, warningServer, cooldownServer, unusedServer));
+        when(okOperation.describeRuntimePool()).thenReturn(buildPoolStat("jsw-mysql-21", 1, 2, 3, 0));
+        when(warningOperation.describeRuntimePool()).thenReturn(buildPoolStat("jsw-mysql-22", 5, 0, 5, 2));
+        accessStaticMap("operationMap").put(21, okOperation);
+        accessStaticMap("operationMap").put(22, warningOperation);
+        accessStaticMap("connectionFailureCountMap").put(23, 3);
+        accessStaticMap("connectionCooldownUntilMap").put(23, System.currentTimeMillis() + 60_000L);
+        accessStaticMap("connectionLastErrorMap").put(23, "pool exhausted");
+
+        Result<List<TargetPoolStatBean>> result = baseDataService.getTargetPoolStats();
+
+        assertTrue(result.getStatus());
+        Map<Integer, TargetPoolStatBean> statsByCode = result.getData().stream()
+                .collect(java.util.stream.Collectors.toMap(TargetPoolStatBean::getServerCode, stat -> stat));
+        assertEquals("ok", statsByCode.get(21).getRuntimeStatus());
+        assertEquals("warning", statsByCode.get(22).getRuntimeStatus());
+        assertEquals("cooldown", statsByCode.get(23).getRuntimeStatus());
+        assertEquals("unused", statsByCode.get(24).getRuntimeStatus());
+        assertTrue(Boolean.TRUE.equals(statsByCode.get(23).getInCooldown()));
+        assertTrue(statsByCode.get(23).getCooldownRemainingSeconds() > 0);
+    }
+
+    @Test
+    void invalidateServerResourcesClearsRuntimeSnapshotSignals() throws Exception {
+        ConnectConfigBean server = buildConnectConfig(31, "mysql", "core");
+        DbOperation operation = mock(DbOperation.class);
+
+        when(baseConfigDao.getAllConnectConfig()).thenReturn(List.of(server));
+        accessStaticMap("operationMap").put(31, operation);
+        accessStaticMap("connectionFailureCountMap").put(31, 2);
+        accessStaticMap("connectionCooldownUntilMap").put(31, System.currentTimeMillis() + 60_000L);
+        accessStaticMap("connectionLastErrorMap").put(31, "pool exhausted");
+
+        baseDataService.invalidateServerResources(31);
+        Result<List<TargetPoolStatBean>> result = baseDataService.getTargetPoolStats();
+
+        assertEquals("unused", result.getData().get(0).getRuntimeStatus());
+        assertEquals(0, result.getData().get(0).getFailureCount());
+        assertFalse(Boolean.TRUE.equals(result.getData().get(0).getInCooldown()));
+    }
     private static Map<Object, Object> accessStaticMap(String fieldName) throws Exception {
         Field field = BaseDataServiceImpl.class.getDeclaredField(fieldName);
         field.setAccessible(true);
@@ -279,5 +351,23 @@ class BaseDataServiceImplTests {
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("value", value);
         return new Object[]{1, 1, List.of(row)};
+    }
+
+    private ConnectConfigBean buildConnectConfig(int code, String dbType, String serverName) {
+        ConnectConfigBean bean = new ConnectConfigBean();
+        bean.setCode(code);
+        bean.setDbServerType(dbType);
+        bean.setDbServerName(serverName);
+        return bean;
+    }
+
+    private PoolStatBean buildPoolStat(String poolName, int active, int idle, int total, int waiting) {
+        PoolStatBean poolStatBean = new PoolStatBean();
+        poolStatBean.setPoolName(poolName);
+        poolStatBean.setActiveConnections(active);
+        poolStatBean.setIdleConnections(idle);
+        poolStatBean.setTotalConnections(total);
+        poolStatBean.setThreadsAwaitingConnection(waiting);
+        return poolStatBean;
     }
 }

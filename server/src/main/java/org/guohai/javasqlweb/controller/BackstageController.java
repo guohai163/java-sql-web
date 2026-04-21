@@ -69,6 +69,12 @@ public class BackstageController {
         return backstageService.getPoolStats();
     }
 
+    @RequestMapping(value = "/server-runtime", method = RequestMethod.GET)
+    @ResponseBody
+    public Result<List<TargetPoolStatBean>> serverRuntime() {
+        return backstageService.getTargetPoolStats();
+    }
+
     /**
      * 返回基础信息
      * @return
@@ -176,6 +182,12 @@ public class BackstageController {
     @RequestMapping(value = "/delserver", method = RequestMethod.POST)
     public Result<String> delServer(@RequestBody Integer code){
         return backstageService.delServer(code);
+    }
+
+    @ResponseBody
+    @RequestMapping(value = "/resetserver/{code}", method = RequestMethod.POST)
+    public Result<String> resetServer(@PathVariable("code") Integer code){
+        return backstageService.resetServer(code);
     }
 
     /**
