@@ -80,6 +80,23 @@ public interface BaseConfigDao {
     @Options(useGeneratedKeys = true, keyProperty = "code", keyColumn = "code")
     Boolean saveQueryLog(QueryLogBean queryLog);
 
+    @Insert("INSERT INTO `db_query_log`\n" +
+            "(`query_ip`,\n" +
+            "`query_name`,\n" +
+            "`query_database`,\n" +
+            "`server_code`,\n" +
+            "`query_sqlscript`,\n" +
+            "`query_time`)\n" +
+            "VALUES\n" +
+            "(#{queryIp},\n" +
+            "#{queryName},\n" +
+            "#{queryDatabase},\n" +
+            "#{serverCode},\n" +
+            "#{querySqlscript},\n" +
+            "#{queryTime});")
+    @Options(useGeneratedKeys = true, keyProperty = "code", keyColumn = "code")
+    Boolean saveQueryLogLegacy(QueryLogBean queryLog);
+
     /**
      * 更新处理统计
      * @param code
@@ -145,6 +162,9 @@ public interface BaseConfigDao {
             "</script>")
     List<QueryLogBean> getQueryLogsByServerAndSessionIds(@Param("serverCode") Integer serverCode,
                                                          @Param("sessionIds") List<String> sessionIds);
+
+    @Select("SELECT 1")
+    Integer selectOne();
 
     /**
      * 获取所有的连接配置

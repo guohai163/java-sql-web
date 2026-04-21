@@ -41,6 +41,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Service
 public class BaseDataServiceImpl implements BaseDataService{
+    private static final String DB_SESSION_ID_COLUMN = "db_session_id";
 
     /**
      * 日志
@@ -324,11 +325,11 @@ public class BaseDataServiceImpl implements BaseDataService{
                         limit,
                         sessionId -> {
                             queryLog.setDbSessionId(sessionId);
-                            baseConfigDao.saveQueryLog(queryLog);
+                            saveQueryLogCompat(queryLog);
                         }
                 );
                 if (queryLog.getCode() == null) {
-                    baseConfigDao.saveQueryLog(queryLog);
+                    saveQueryLogCompat(queryLog);
                 }
                 Object[] result = executionResult == null ? null : executionResult.getRows();
                 Integer resultRowCount = resolveResultRowCount(result);
@@ -621,6 +622,24 @@ public class BaseDataServiceImpl implements BaseDataService{
         }
     }
 
+    private void saveQueryLogCompat(QueryLogBean queryLog) {
+        try {
+            baseConfigDao.saveQueryLog(queryLog);
+        } catch (Exception exception) {
+            if (!isMissingColumn(exception, DB_SESSION_ID_COLUMN)) {
+                throw exception;
+            }
+            LOG.warn("db_query_log is missing db_session_id, falling back to legacy insert");
+            String originalSessionId = queryLog.getDbSessionId();
+            try {
+                queryLog.setDbSessionId(null);
+                baseConfigDao.saveQueryLogLegacy(queryLog);
+            } finally {
+                queryLog.setDbSessionId(originalSessionId);
+            }
+        }
+    }
+
     private <T> Result<T> executeServerOperation(Integer serverCode, OperationAction<T> action) {
         Result<T> cooldownResult = buildCooldownResultIfPresent(serverCode);
         if (cooldownResult != null) {
@@ -852,6 +871,22 @@ public class BaseDataServiceImpl implements BaseDataService{
             return message;
         }
         return throwable == null ? "目标数据库连接失败" : throwable.toString();
+    }
+
+    private boolean isMissingColumn(Throwable throwable, String columnName) {
+        Throwable current = throwable;
+        while (current != null) {
+            String message = current.getMessage();
+            if (message != null) {
+                String normalized = message.toLowerCase(Locale.ROOT);
+                if (normalized.contains("unknown column")
+                        && normalized.contains(columnName.toLowerCase(Locale.ROOT))) {
+                    return true;
+                }
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     private void closeOperationQuietly(Integer serverCode, DbOperation operation) {

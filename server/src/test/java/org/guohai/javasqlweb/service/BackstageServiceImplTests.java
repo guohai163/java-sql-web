@@ -246,4 +246,27 @@ class BackstageServiceImplTests {
         assertEquals(Integer.valueOf(88), result.getData().get(0).getQueryLogCode());
         assertTrue(Boolean.TRUE.equals(result.getData().get(0).getMatchedByPlatformTrace()));
     }
+
+    @Test
+    void getTargetPoolSessionsSkipsPlatformEnrichmentWhenDbSessionIdColumnMissing() {
+        ConnectConfigBean existingServer = new ConnectConfigBean();
+        existingServer.setCode(13);
+        TargetSessionStatBean session = new TargetSessionStatBean();
+        session.setServerCode(13);
+        session.setSessionId("401");
+        session.setDatabaseUserName("report_user");
+
+        when(baseConfigDao.getConnectConfig(13)).thenReturn(existingServer);
+        when(baseDataService.getTargetPoolSessions(13)).thenReturn(new Result<>(true, "", List.of(session)));
+        when(baseConfigDao.getQueryLogsByServerAndSessionIds(13, List.of("401")))
+                .thenThrow(new RuntimeException("Unknown column 'db_session_id' in 'field list'"));
+
+        Result<List<TargetSessionStatBean>> result = backstageService.getTargetPoolSessions(13);
+
+        assertTrue(result.getStatus());
+        assertEquals(1, result.getData().size());
+        assertEquals("report_user", result.getData().get(0).getDatabaseUserName());
+        assertEquals(null, result.getData().get(0).getPlatformUserName());
+        assertFalse(Boolean.TRUE.equals(result.getData().get(0).getMatchedByPlatformTrace()));
+    }
 }

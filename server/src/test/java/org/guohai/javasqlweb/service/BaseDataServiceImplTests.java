@@ -41,6 +41,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.times;
@@ -307,6 +308,42 @@ class BaseDataServiceImplTests {
         assertEquals("101", result.getData().get(0).getSessionId());
         assertEquals(Integer.valueOf(41), result.getData().get(0).getServerCode());
         assertEquals("mysql", result.getData().get(0).getDbType());
+    }
+
+    @Test
+    void queryDataBySqlFallsBackToLegacyQueryLogInsertWhenDbSessionIdColumnMissing() throws Exception {
+        UserBean user = buildUser();
+        user.setUserName("tester");
+        DbOperation operation = mock(DbOperation.class);
+        ConnectConfigBean connectConfigBean = new ConnectConfigBean();
+        connectConfigBean.setCode(51);
+        connectConfigBean.setDbServerType("mysql");
+
+        when(baseConfigDao.hasServerPermission(user.getCode(), 51)).thenReturn(true);
+        when(baseConfigDao.getConnectConfig(51)).thenReturn(connectConfigBean);
+        doThrow(new RuntimeException("Unknown column 'db_session_id' in 'field list'"))
+                .when(baseConfigDao).saveQueryLog(any(QueryLogBean.class));
+        doAnswer(saveInvocation -> {
+            QueryLogBean legacyLog = saveInvocation.getArgument(0);
+            legacyLog.setCode(91);
+            return true;
+        }).when(baseConfigDao).saveQueryLogLegacy(any(QueryLogBean.class));
+        when(operation.queryDatabaseBySqlWithSession(anyString(), anyString(), anyInt(), any()))
+                .thenAnswer(invocation -> {
+                    @SuppressWarnings("unchecked")
+                    java.util.function.Consumer<String> sessionReady = invocation.getArgument(3);
+                    sessionReady.accept("601");
+                    QueryExecutionResult executionResult = new QueryExecutionResult();
+                    executionResult.setDbSessionId("601");
+                    executionResult.setRows(new Object[]{1, 1, List.of(Map.of("id", "1"))});
+                    return executionResult;
+                });
+        accessStaticMap("operationMap").put(51, operation);
+
+        Result<Object> result = baseDataService.quereyDataBySql(51, "demo", "SELECT 1", user, "127.0.0.1");
+
+        assertTrue(result.getStatus());
+        verify(baseConfigDao).saveQueryLogLegacy(any(QueryLogBean.class));
     }
 
     @Test

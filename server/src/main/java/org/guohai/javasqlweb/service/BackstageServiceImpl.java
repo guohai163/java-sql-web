@@ -37,6 +37,7 @@ import java.util.Map;
 public class BackstageServiceImpl implements BackstageService{
 
     private static final String LEGACY_TLS_MODE = "LEGACY_TLS";
+    private static final String DB_SESSION_ID_COLUMN = "db_session_id";
     private static final String QUERY_LOG_DIRECTION_NEWER = "newer";
     private static final String QUERY_LOG_DIRECTION_OLDER = "older";
     private static final int QUERY_LOG_DEFAULT_PAGE_SIZE = 25;
@@ -544,7 +545,16 @@ public class BackstageServiceImpl implements BackstageService{
         if (sessionIds.isEmpty()) {
             return;
         }
-        List<QueryLogBean> queryLogs = baseConfigDao.getQueryLogsByServerAndSessionIds(serverCode, sessionIds);
+        List<QueryLogBean> queryLogs;
+        try {
+            queryLogs = baseConfigDao.getQueryLogsByServerAndSessionIds(serverCode, sessionIds);
+        } catch (Exception exception) {
+            if (isMissingColumn(exception, DB_SESSION_ID_COLUMN)) {
+                LOG.warn("db_query_log is missing db_session_id, skip platform user enrichment for server {}", serverCode);
+                return;
+            }
+            throw exception;
+        }
         Map<String, QueryLogBean> latestInFlightBySession = new LinkedHashMap<>();
         for (QueryLogBean queryLog : queryLogs) {
             if (queryLog == null || queryLog.getDbSessionId() == null || queryLog.getDbSessionId().isBlank()) {
@@ -567,6 +577,22 @@ public class BackstageServiceImpl implements BackstageService{
             session.setQueryLogCode(queryLog.getCode());
             session.setMatchedByPlatformTrace(true);
         }
+    }
+
+    private boolean isMissingColumn(Throwable throwable, String columnName) {
+        Throwable current = throwable;
+        while (current != null) {
+            String message = current.getMessage();
+            if (message != null) {
+                String normalized = message.toLowerCase(java.util.Locale.ROOT);
+                if (normalized.contains("unknown column")
+                        && normalized.contains(columnName.toLowerCase(java.util.Locale.ROOT))) {
+                    return true;
+                }
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     private Integer normalizeLimit(Integer value, int defaultValue) {

@@ -2,6 +2,18 @@
 
 本文件记录当前 `master` 分支之后到当前 `develop` 工作区的主要变更，按版本和当前未发布改动整理。
 
+## v2.9.1 - 2026-04-22
+
+### Fixed
+- 修复已升级到 `v2.9.0` 但主库尚未执行 `db_query_log.db_session_id` 迁移时，工作台 SQL 查询直接报 `Unknown column 'db_session_id' in 'field list'` 的问题。
+- 兼容旧表结构场景下的后台活动会话明细：缺少 `db_session_id` 字段时仍返回数据库侧会话信息，只跳过平台用户归因，不再影响管理后台查看动态池明细。
+
+### Changed
+- 新增 `deploy/upgrade/2026-04-22-db-session-id.sql` 升级脚本，补齐 `db_session_id` 字段和索引，便于线上环境按需完成热修后的正式迁移。
+
+### Tests
+- 增加旧库缺少 `db_session_id` 时的后端兼容测试，覆盖查询日志 legacy 插入回退和后台活动会话明细跳过平台归因两条降级链路。
+
 ## v2.9.0 - 2026-04-22
 
 ### Added
