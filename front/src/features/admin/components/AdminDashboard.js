@@ -152,7 +152,16 @@ function buildSummaryCards(summary) {
   ];
 }
 
-function AdminDashboard({ data, filter, loading, updatedAt, onRangeChange, onGrainChange, onRefresh }) {
+function AdminDashboard({
+  data,
+  filter,
+  loading,
+  updatedAt,
+  onRangeChange,
+  onGrainChange,
+  onRefresh,
+  onViewDynamicPoolDetail,
+}) {
   const summaryCards = buildSummaryCards(data?.summary);
   const userRankingColumns = [
     { title: '排名', dataIndex: 'rank', width: 72 },
@@ -198,6 +207,16 @@ function AdminDashboard({ data, filter, loading, updatedAt, onRangeChange, onGra
       render: (value, record) => (record?.inCooldown && value != null ? `${value}s` : '-'),
     },
     { title: '最近错误', dataIndex: 'lastError', ellipsis: true },
+    {
+      title: '操作',
+      key: 'actions',
+      width: 96,
+      render: (_, record) => (
+        <Button size="small" type="link" onClick={() => onViewDynamicPoolDetail?.(record)}>
+          明细
+        </Button>
+      ),
+    },
   ];
 
   const userChartData = data?.userRanking || [];

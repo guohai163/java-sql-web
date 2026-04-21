@@ -66,6 +66,7 @@ public interface BaseConfigDao {
             "`query_name`,\n" +
             "`query_database`,\n" +
             "`server_code`,\n" +
+            "`db_session_id`,\n" +
             "`query_sqlscript`,\n" +
             "`query_time`)\n" +
             "VALUES\n" +
@@ -73,6 +74,7 @@ public interface BaseConfigDao {
             "#{queryName},\n" +
             "#{queryDatabase},\n" +
             "#{serverCode},\n" +
+            "#{dbSessionId},\n" +
             "#{querySqlscript},\n" +
             "#{queryTime});")
     @Options(useGeneratedKeys = true, keyProperty = "code", keyColumn = "code")
@@ -131,6 +133,18 @@ public interface BaseConfigDao {
 
     @Select("SELECT EXISTS(SELECT 1 FROM db_query_log WHERE code > #{code})")
     Boolean existsNewerQueryLog(@Param("code") Integer code);
+
+    @Select("<script>" +
+            "SELECT * FROM db_query_log " +
+            "WHERE server_code = #{serverCode} " +
+            "AND db_session_id IN " +
+            "<foreach collection='sessionIds' item='sessionId' open='(' separator=',' close=')'>" +
+            "#{sessionId}" +
+            "</foreach> " +
+            "ORDER BY code DESC" +
+            "</script>")
+    List<QueryLogBean> getQueryLogsByServerAndSessionIds(@Param("serverCode") Integer serverCode,
+                                                         @Param("sessionIds") List<String> sessionIds);
 
     /**
      * 获取所有的连接配置

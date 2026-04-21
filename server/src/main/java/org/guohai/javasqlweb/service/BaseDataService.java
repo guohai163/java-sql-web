@@ -145,6 +145,13 @@ public interface BaseDataService {
     Result<List<TargetPoolStatBean>> getTargetPoolStats();
 
     /**
+     * 获取指定目标库动态连接池对应的活动会话明细
+     * @param serverCode 服务器编号
+     * @return 活动会话列表
+     */
+    Result<List<TargetSessionStatBean>> getTargetPoolSessions(Integer serverCode);
+
+    /**
      * 检查所有服务器的健康状态
      * @return
      */

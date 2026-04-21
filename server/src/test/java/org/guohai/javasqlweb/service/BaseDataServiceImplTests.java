@@ -4,9 +4,11 @@ import org.guohai.javasqlweb.beans.DatabaseNameBean;
 import org.guohai.javasqlweb.beans.ConnectConfigBean;
 import org.guohai.javasqlweb.beans.PoolStatBean;
 import org.guohai.javasqlweb.beans.QueryLogBean;
+import org.guohai.javasqlweb.beans.QueryExecutionResult;
 import org.guohai.javasqlweb.beans.QueryLogTargetBean;
 import org.guohai.javasqlweb.beans.Result;
 import org.guohai.javasqlweb.beans.TargetPoolStatBean;
+import org.guohai.javasqlweb.beans.TargetSessionStatBean;
 import org.guohai.javasqlweb.beans.UserBean;
 import org.guohai.javasqlweb.beans.WorkbenchDashboardResponse;
 import org.guohai.javasqlweb.dao.BaseConfigDao;
@@ -244,8 +246,16 @@ class BaseDataServiceImplTests {
 
         when(baseConfigDao.hasServerPermission(user.getCode(), 13)).thenReturn(true);
         when(baseConfigDao.getConnectConfig(13)).thenReturn(connectConfigBean);
-        when(operation.queryDatabaseBySql(anyString(), anyString(), anyInt()))
-                .thenReturn(new Object[]{1, 1, List.of(Map.of("id", "1"))});
+        when(operation.queryDatabaseBySqlWithSession(anyString(), anyString(), anyInt(), any()))
+                .thenAnswer(invocation -> {
+                    @SuppressWarnings("unchecked")
+                    java.util.function.Consumer<String> sessionReady = invocation.getArgument(3);
+                    sessionReady.accept("55");
+                    QueryExecutionResult executionResult = new QueryExecutionResult();
+                    executionResult.setDbSessionId("55");
+                    executionResult.setRows(new Object[]{1, 1, List.of(Map.of("id", "1"))});
+                    return executionResult;
+                });
         doAnswer(invocation -> {
             QueryLogBean queryLog = invocation.getArgument(0);
             queryLog.setCode(77);
@@ -258,7 +268,7 @@ class BaseDataServiceImplTests {
         assertTrue(result.getStatus());
         ArgumentCaptor<String> databaseCaptor = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
-        verify(operation).queryDatabaseBySql(databaseCaptor.capture(), sqlCaptor.capture(), anyInt());
+        verify(operation).queryDatabaseBySqlWithSession(databaseCaptor.capture(), sqlCaptor.capture(), anyInt(), any());
         assertEquals("TreasureWDDB_History", databaseCaptor.getValue());
         assertEquals("SELECT * FROM orders", sqlCaptor.getValue().trim());
 
@@ -266,12 +276,37 @@ class BaseDataServiceImplTests {
         verify(baseConfigDao).saveQueryLog(queryLogCaptor.capture());
         assertEquals("TreasureWDDB_History", queryLogCaptor.getValue().getQueryDatabase());
         assertEquals(sql, queryLogCaptor.getValue().getQuerySqlscript());
+        assertEquals("55", queryLogCaptor.getValue().getDbSessionId());
 
         ArgumentCaptor<QueryLogTargetBean> targetCaptor = ArgumentCaptor.forClass(QueryLogTargetBean.class);
         verify(queryLogTargetDao).saveTarget(targetCaptor.capture());
         assertEquals(Integer.valueOf(77), targetCaptor.getValue().getQueryLogCode());
         assertEquals("TreasureWDDB_History", targetCaptor.getValue().getDatabaseName());
         assertEquals("orders", targetCaptor.getValue().getTableName());
+    }
+
+    @Test
+    void getTargetPoolSessionsReturnsSortedSessionDetailsForServer() throws Exception {
+        ConnectConfigBean server = buildConnectConfig(41, "mysql", "core");
+        DbOperation operation = mock(DbOperation.class);
+        TargetSessionStatBean longRunning = new TargetSessionStatBean();
+        longRunning.setSessionId("101");
+        longRunning.setRunningSeconds(20L);
+        TargetSessionStatBean shorter = new TargetSessionStatBean();
+        shorter.setSessionId("102");
+        shorter.setRunningSeconds(5L);
+
+        when(baseConfigDao.getConnectConfig(41)).thenReturn(server);
+        when(operation.listActiveSessions()).thenReturn(List.of(shorter, longRunning));
+        accessStaticMap("operationMap").put(41, operation);
+
+        Result<List<TargetSessionStatBean>> result = baseDataService.getTargetPoolSessions(41);
+
+        assertTrue(result.getStatus());
+        assertEquals(2, result.getData().size());
+        assertEquals("101", result.getData().get(0).getSessionId());
+        assertEquals(Integer.valueOf(41), result.getData().get(0).getServerCode());
+        assertEquals("mysql", result.getData().get(0).getDbType());
     }
 
     @Test
@@ -303,6 +338,33 @@ class BaseDataServiceImplTests {
         assertEquals("unused", statsByCode.get(24).getRuntimeStatus());
         assertTrue(Boolean.TRUE.equals(statsByCode.get(23).getInCooldown()));
         assertTrue(statsByCode.get(23).getCooldownRemainingSeconds() > 0);
+    }
+
+    @Test
+    void getTargetPoolStatsMarksPostgresqlMssqlAndClickhousePoolsAsOkWhenSnapshotExists() throws Exception {
+        ConnectConfigBean postgresServer = buildConnectConfig(25, "pgsql", "analytics");
+        ConnectConfigBean mssqlServer = buildConnectConfig(26, "mssql", "reporting");
+        ConnectConfigBean clickhouseServer = buildConnectConfig(27, "clickhouse", "warehouse");
+        DbOperation postgresOperation = mock(DbOperation.class);
+        DbOperation mssqlOperation = mock(DbOperation.class);
+        DbOperation clickhouseOperation = mock(DbOperation.class);
+
+        when(baseConfigDao.getAllConnectConfig()).thenReturn(List.of(postgresServer, mssqlServer, clickhouseServer));
+        when(postgresOperation.describeRuntimePool()).thenReturn(buildPoolStat("jsw-postgresql-core", 2, 1, 3, 0));
+        when(mssqlOperation.describeRuntimePool()).thenReturn(buildPoolStat("jsw-mssql-26", 1, 4, 5, 0));
+        when(clickhouseOperation.describeRuntimePool()).thenReturn(buildPoolStat("jsw-clickhouse-27-a1b2", 3, 2, 5, 1));
+        accessStaticMap("operationMap").put(25, postgresOperation);
+        accessStaticMap("operationMap").put(26, mssqlOperation);
+        accessStaticMap("operationMap").put(27, clickhouseOperation);
+
+        Result<List<TargetPoolStatBean>> result = baseDataService.getTargetPoolStats();
+
+        assertTrue(result.getStatus());
+        Map<Integer, TargetPoolStatBean> statsByCode = result.getData().stream()
+                .collect(java.util.stream.Collectors.toMap(TargetPoolStatBean::getServerCode, stat -> stat));
+        assertEquals("ok", statsByCode.get(25).getRuntimeStatus());
+        assertEquals("ok", statsByCode.get(26).getRuntimeStatus());
+        assertEquals("warning", statsByCode.get(27).getRuntimeStatus());
     }
 
     @Test

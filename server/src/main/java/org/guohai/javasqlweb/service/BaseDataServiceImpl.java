@@ -316,10 +316,21 @@ public class BaseDataServiceImpl implements BaseDataService{
                         ? maskedSql.substring(0, SAVE_SQL_LENGTH_LIMIT)
                         : maskedSql;
                 QueryLogBean queryLog = new QueryLogBean(userIp, user.getUserName(), effectiveDbName, serverCode, saveSql, new Date());
-                baseConfigDao.saveQueryLog(queryLog);
                 LOG.info(maskedSql);
                 Long startTime = System.currentTimeMillis();
-                Object[] result = operation.queryDatabaseBySql(effectiveDbName, executableSql, limit);
+                QueryExecutionResult executionResult = operation.queryDatabaseBySqlWithSession(
+                        effectiveDbName,
+                        executableSql,
+                        limit,
+                        sessionId -> {
+                            queryLog.setDbSessionId(sessionId);
+                            baseConfigDao.saveQueryLog(queryLog);
+                        }
+                );
+                if (queryLog.getCode() == null) {
+                    baseConfigDao.saveQueryLog(queryLog);
+                }
+                Object[] result = executionResult == null ? null : executionResult.getRows();
                 Integer resultRowCount = resolveResultRowCount(result);
                 String returnResult = Integer.parseInt(result[0].toString())>Integer.parseInt(result[1].toString())?
                         String.format("因程序限制只显示%s条数据",result[1].toString()):
@@ -424,6 +435,38 @@ public class BaseDataServiceImpl implements BaseDataService{
         }
         targetPools.sort(Comparator.comparing(TargetPoolStatBean::getServerCode, Comparator.nullsLast(Integer::compareTo)));
         return new Result<>(true, "", targetPools);
+    }
+
+    @Override
+    public Result<List<TargetSessionStatBean>> getTargetPoolSessions(Integer serverCode) {
+        if (serverCode == null) {
+            return new Result<>(false, "无此服务器", null);
+        }
+        ConnectConfigBean server = DbServerTypeUtils.normalize(baseConfigDao.getConnectConfig(serverCode));
+        if (server == null) {
+            return new Result<>(false, "无此服务器", null);
+        }
+        DbOperation operation = operationMap.get(serverCode);
+        if (operation == null) {
+            return new Result<>(true, "", List.of());
+        }
+        try {
+            List<TargetSessionStatBean> sessionResult = operation.listActiveSessions();
+            List<TargetSessionStatBean> sessions = sessionResult == null ? new ArrayList<>() : new ArrayList<>(sessionResult);
+            String normalizedDbType = DbServerTypeUtils.normalize(server.getDbServerType());
+            for (TargetSessionStatBean session : sessions) {
+                session.setServerCode(serverCode);
+                if (session.getDbType() == null || session.getDbType().isBlank()) {
+                    session.setDbType(normalizedDbType);
+                }
+            }
+            sessions.sort(Comparator
+                    .comparing((TargetSessionStatBean session) -> defaultLong(session == null ? null : session.getRunningSeconds()), Comparator.reverseOrder())
+                    .thenComparing((TargetSessionStatBean session) -> session == null ? null : session.getSessionId(), Comparator.nullsLast(String::compareTo)));
+            return new Result<>(true, "", sessions);
+        } catch (SQLException exception) {
+            return new Result<>(false, buildSessionDetailPermissionMessage(DbServerTypeUtils.normalize(server.getDbServerType()), exception), null);
+        }
     }
 
     /**
@@ -871,13 +914,23 @@ public class BaseDataServiceImpl implements BaseDataService{
         if (isWarningPoolStat(stat)) {
             return "warning";
         }
-        String dbType = stat.getDbType() == null ? "" : stat.getDbType().toLowerCase(Locale.ROOT);
-        if (DbServerTypeUtils.MYSQL.equals(dbType) || DbServerTypeUtils.MARIADB.equals(dbType)) {
-            if (operation != null || stat.getPoolName() != null) {
-                return "ok";
-            }
+        if (hasRuntimePoolSnapshot(stat)) {
+            return "ok";
         }
         return "unused";
+    }
+
+    private boolean hasRuntimePoolSnapshot(TargetPoolStatBean stat) {
+        if (stat == null) {
+            return false;
+        }
+        if (stat.getPoolName() != null && !stat.getPoolName().isBlank()) {
+            return true;
+        }
+        return stat.getActiveConnections() != null
+                || stat.getIdleConnections() != null
+                || stat.getTotalConnections() != null
+                || stat.getThreadsAwaitingConnection() != null;
     }
 
     private boolean isWarningPoolStat(TargetPoolStatBean stat) {
@@ -887,5 +940,23 @@ public class BaseDataServiceImpl implements BaseDataService{
         return (stat.getFailureCount() != null && stat.getFailureCount() > 0)
                 || (stat.getThreadsAwaitingConnection() != null && stat.getThreadsAwaitingConnection() > 0)
                 || (stat.getLastError() != null && !stat.getLastError().isBlank());
+    }
+
+    private String buildSessionDetailPermissionMessage(String dbType, SQLException exception) {
+        String baseMessage = extractExceptionMessage(exception);
+        if (DbServerTypeUtils.MYSQL.equals(dbType) || DbServerTypeUtils.MARIADB.equals(dbType)) {
+            return String.format("读取 MySQL 会话明细失败，请确认目标库账号具备 PROCESS 或等价可见 processlist 权限。原始错误：%s", baseMessage);
+        }
+        if (DbServerTypeUtils.POSTGRESQL.equals(dbType)) {
+            return String.format("读取 PostgreSQL 会话明细失败，请确认目标库账号具备查看完整 pg_stat_activity 的统计权限。原始错误：%s", baseMessage);
+        }
+        if (DbServerTypeUtils.MSSQL.equals(dbType)) {
+            return String.format("读取 SQL Server 会话明细失败，请确认目标库账号具备 VIEW SERVER STATE 权限。原始错误：%s", baseMessage);
+        }
+        return baseMessage;
+    }
+
+    private long defaultLong(Long value) {
+        return value == null ? 0L : value;
     }
 }

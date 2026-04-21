@@ -5,6 +5,7 @@ import copy from 'copy-to-clipboard';
 import {
   Alert,
   Button,
+  Drawer,
   Form,
   Input,
   InputNumber,
@@ -174,6 +175,11 @@ function Admin() {
       range: '24h',
       grain: 'hour',
     },
+    sessionDetailVisible: false,
+    sessionDetailLoading: false,
+    sessionDetailError: '',
+    sessionDetailServer: null,
+    sessionDetailRows: [],
     queryLogCursor: createEmptyQueryLogCursor(),
     connList: [],
     serverRuntimeMap: {},
@@ -322,6 +328,44 @@ function Admin() {
     }
     showDialog(response.jsonData.message || '动态目标库运行状态加载失败');
     return [];
+  };
+
+  const loadTargetSessionDetails = async (serverRecord, options = {}) => {
+    const serverCode = serverRecord?.serverCode;
+    if (serverCode == null) {
+      return;
+    }
+
+    setStatePatch((previous) => ({
+      sessionDetailVisible: true,
+      sessionDetailLoading: true,
+      sessionDetailError: '',
+      sessionDetailServer: serverRecord,
+      sessionDetailRows: options.keepRows ? previous.sessionDetailRows : [],
+    }));
+
+    const client = createClient();
+    const response = await client.get(`/api/backstage/server-runtime/${serverCode}/sessions`, {
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Token': state.token,
+      },
+    });
+
+    if (response.jsonData.status === true) {
+      setStatePatch({
+        sessionDetailLoading: false,
+        sessionDetailError: '',
+        sessionDetailRows: response.jsonData.data || [],
+      });
+      return;
+    }
+
+    setStatePatch({
+      sessionDetailLoading: false,
+      sessionDetailError: response.jsonData.message || '活动会话明细加载失败',
+      sessionDetailRows: [],
+    });
   };
 
   const loadMenu = async (menuKey) => {
@@ -1354,6 +1398,9 @@ function Admin() {
               onRefresh={() => {
                 void loadDashboard();
               }}
+              onViewDynamicPoolDetail={(record) => {
+                void loadTargetSessionDetails(record);
+              }}
             />
           ) : null}
 
@@ -1733,6 +1780,73 @@ function Admin() {
               </Form.Item>
             </Form>
           </Modal>
+          <Drawer
+            destroyOnClose={false}
+            extra={(
+              <Button
+                loading={state.sessionDetailLoading}
+                onClick={() => {
+                  if (state.sessionDetailServer) {
+                    void loadTargetSessionDetails(state.sessionDetailServer, { keepRows: true });
+                  }
+                }}
+              >
+                刷新
+              </Button>
+            )}
+            onClose={() => {
+              setStatePatch({
+                sessionDetailVisible: false,
+              });
+            }}
+            open={state.sessionDetailVisible}
+            title={`活动会话明细 · ${state.sessionDetailServer?.serverName || '-'}`}
+            width={1080}
+          >
+            {state.sessionDetailError ? (
+              <Alert
+                description={state.sessionDetailError}
+                message="活动会话明细加载失败"
+                showIcon
+                type="error"
+              />
+            ) : null}
+            <Table
+              className="admin-session-table"
+              columns={[
+                { title: '平台用户', dataIndex: 'platformUserName', width: 120, render: (value) => value || '-' },
+                { title: '数据库账号', dataIndex: 'databaseUserName', width: 140, render: (value) => value || '-' },
+                { title: '会话 ID', dataIndex: 'sessionId', width: 100 },
+                { title: '数据库', dataIndex: 'databaseName', width: 120, render: (value) => value || '-' },
+                { title: '状态', dataIndex: 'sessionStatus', width: 110, render: (value) => value || '-' },
+                { title: '等待/命令', dataIndex: 'commandOrWait', width: 160, render: (value) => value || '-' },
+                { title: '运行秒数', dataIndex: 'runningSeconds', width: 100, render: (value) => (value == null ? '-' : value) },
+                {
+                  title: '开始时间',
+                  dataIndex: 'queryStartTime',
+                  width: 180,
+                  render: (value) => (value ? String(value).replace('T', ' ') : '-'),
+                },
+                {
+                  title: 'SQL',
+                  dataIndex: 'sqlText',
+                  render: (value) => (
+                    <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                      {value || '-'}
+                    </pre>
+                  ),
+                },
+              ]}
+              dataSource={state.sessionDetailRows}
+              loading={state.sessionDetailLoading}
+              locale={{
+                emptyText: state.sessionDetailLoading ? '加载中...' : '当前没有活动会话',
+              }}
+              pagination={{ pageSize: 10 }}
+              rowKey={(record) => `${record.sessionId || 'unknown'}-${record.queryLogCode || 'none'}`}
+              size="small"
+            />
+          </Drawer>
         </Content>
         <Footer className="admin-footer">JavaSqlWeb {formatVersionLabel(state.version)}</Footer>
       </Layout>

@@ -2,6 +2,7 @@ package org.guohai.javasqlweb.controller;
 
 import org.guohai.javasqlweb.beans.Result;
 import org.guohai.javasqlweb.beans.TargetPoolStatBean;
+import org.guohai.javasqlweb.beans.TargetSessionStatBean;
 import org.guohai.javasqlweb.service.BackstageService;
 import org.guohai.javasqlweb.service.PermissionsService;
 import org.junit.jupiter.api.BeforeEach;
@@ -62,5 +63,21 @@ class BackstageControllerTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value(true))
                 .andExpect(jsonPath("$.data").value("已重置目标库连接池并清除冷却状态"));
+    }
+
+    @Test
+    void serverRuntimeSessionsShouldReturnSessionList() throws Exception {
+        TargetSessionStatBean session = new TargetSessionStatBean();
+        session.setServerCode(9);
+        session.setSessionId("501");
+        session.setPlatformUserName("alice");
+        when(backstageService.getTargetPoolSessions(9)).thenReturn(new Result<>(true, "", List.of(session)));
+
+        mockMvc.perform(get("/api/backstage/server-runtime/9/sessions"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value(true))
+                .andExpect(jsonPath("$.data[0].serverCode").value(9))
+                .andExpect(jsonPath("$.data[0].sessionId").value("501"))
+                .andExpect(jsonPath("$.data[0].platformUserName").value("alice"));
     }
 }

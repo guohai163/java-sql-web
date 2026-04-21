@@ -8,6 +8,7 @@ import org.guohai.javasqlweb.beans.QueryLogBean;
 import org.guohai.javasqlweb.beans.QueryLogCursorResponse;
 import org.guohai.javasqlweb.beans.Result;
 import org.guohai.javasqlweb.beans.TargetPoolStatBean;
+import org.guohai.javasqlweb.beans.TargetSessionStatBean;
 import org.guohai.javasqlweb.beans.UserBean;
 import org.springframework.web.bind.annotation.RequestBody;
 
@@ -43,6 +44,13 @@ public interface BackstageService {
      * @return
      */
     Result<List<TargetPoolStatBean>> getTargetPoolStats();
+
+    /**
+     * 获取指定目标库的动态连接会话明细
+     * @param code 服务器编号
+     * @return 会话明细
+     */
+    Result<List<TargetSessionStatBean>> getTargetPoolSessions(Integer code);
 
     /**
      * 测试数据库连接性

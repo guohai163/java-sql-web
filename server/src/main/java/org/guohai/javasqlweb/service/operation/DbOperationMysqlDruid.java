@@ -28,6 +28,7 @@ public class DbOperationMysqlDruid implements DbOperation {
 
     private static final DateTimeFormatter MYSQL_DATETIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final DateTimeFormatter MYSQL_DATETIME_MILLIS_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS");
+    private static final String MYSQL_PROGRAM_NAME_PREFIX = "jsw-mysql-";
 
     /**
      * 日志
@@ -41,16 +42,19 @@ public class DbOperationMysqlDruid implements DbOperation {
 
     private int queryTimeoutSeconds;
 
+    private final String applicationName;
+
     /**
      * 构造方法
      * @param conn
      * @throws Exception
      */
     DbOperationMysqlDruid(ConnectConfigBean conn) throws Exception {
+        applicationName = MYSQL_PROGRAM_NAME_PREFIX + conn.getCode();
         sqlDs = HikariDataSourceUtils.createDataSource(
-                "jsw-mysql-" + conn.getCode(),
-                String.format("jdbc:mysql://%s:%s?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&allowMultiQueries=true",
-                        conn.getDbServerHost(), conn.getDbServerPort()),
+                applicationName,
+                String.format("jdbc:mysql://%s:%s?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&allowMultiQueries=true&connectionAttributes=program_name:%s",
+                        conn.getDbServerHost(), conn.getDbServerPort(), applicationName),
                 conn.getDbServerUsername(),
                 conn.getDbServerPassword(),
                 "select now()"
@@ -59,6 +63,7 @@ public class DbOperationMysqlDruid implements DbOperation {
 
     DbOperationMysqlDruid(DataSource dataSource) {
         this.sqlDs = dataSource;
+        this.applicationName = null;
     }
 
     /**
@@ -273,13 +278,23 @@ public class DbOperationMysqlDruid implements DbOperation {
      */
     @Override
     public Object[] queryDatabaseBySql(String dbName, String sql, Integer limit) throws SQLException {
+        return queryDatabaseBySqlWithSession(dbName, sql, limit, null).getRows();
+    }
+
+    @Override
+    public QueryExecutionResult queryDatabaseBySqlWithSession(String dbName, String sql, Integer limit, java.util.function.Consumer<String> onSessionReady) throws SQLException {
         Object[] result = new Object[3];
         List<Map<String, Object>> listData = new ArrayList<>();
         Connection conn = null;
         Statement st = null;
         ResultSet rs = null;
+        String sessionId = null;
         try{
             conn = sqlDs.getConnection();
+            sessionId = queryCurrentSessionId(conn);
+            if (onSessionReady != null) {
+                onSessionReady.accept(sessionId);
+            }
             st = conn.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE,ResultSet.CONCUR_READ_ONLY);
             if (queryTimeoutSeconds > 0) {
                 st.setQueryTimeout(queryTimeoutSeconds);
@@ -333,8 +348,10 @@ public class DbOperationMysqlDruid implements DbOperation {
             closeResource(rs,st,conn);
         }
 
-
-        return result;
+        QueryExecutionResult executionResult = new QueryExecutionResult();
+        executionResult.setDbSessionId(sessionId);
+        executionResult.setRows(result);
+        return executionResult;
     }
 
     @Override
@@ -360,6 +377,59 @@ public class DbOperationMysqlDruid implements DbOperation {
             bean.setThreadsAwaitingConnection(poolMxBean.getThreadsAwaitingConnection());
         }
         return bean;
+    }
+
+    @Override
+    public List<TargetSessionStatBean> listActiveSessions() throws SQLException {
+        if (applicationName == null || applicationName.isBlank()) {
+            return List.of();
+        }
+        List<TargetSessionStatBean> sessions = new ArrayList<>();
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = sqlDs.getConnection();
+            ps = conn.prepareStatement(
+                    "SELECT CAST(p.ID AS CHAR) AS session_id, " +
+                            "       p.USER AS database_user_name, " +
+                            "       p.HOST AS client_host, " +
+                            "       p.DB AS database_name, " +
+                            "       COALESCE(NULLIF(p.STATE, ''), p.COMMAND) AS session_status, " +
+                            "       p.COMMAND AS command_or_wait, " +
+                            "       CAST(p.TIME AS SIGNED) AS running_seconds, " +
+                            "       DATE_SUB(NOW(), INTERVAL p.TIME SECOND) AS query_start_time, " +
+                            "       COALESCE(esc.SQL_TEXT, p.INFO) AS sql_text " +
+                            "FROM information_schema.PROCESSLIST p " +
+                            "JOIN performance_schema.threads t ON t.PROCESSLIST_ID = p.ID " +
+                            "JOIN performance_schema.session_connect_attrs a " +
+                            "  ON a.PROCESSLIST_ID = p.ID AND a.ATTR_NAME = 'program_name' " +
+                            "LEFT JOIN performance_schema.events_statements_current esc ON esc.THREAD_ID = t.THREAD_ID " +
+                            "WHERE a.ATTR_VALUE = ? " +
+                            "  AND p.ID <> CONNECTION_ID() " +
+                            "  AND (p.COMMAND <> 'Sleep' OR COALESCE(esc.SQL_TEXT, p.INFO) IS NOT NULL) " +
+                            "ORDER BY p.TIME DESC, p.ID DESC"
+            );
+            ps.setString(1, applicationName);
+            rs = ps.executeQuery();
+            while (rs.next()) {
+                TargetSessionStatBean bean = new TargetSessionStatBean();
+                bean.setDbType("mysql");
+                bean.setSessionId(rs.getString("session_id"));
+                bean.setDatabaseUserName(rs.getString("database_user_name"));
+                bean.setClientHost(rs.getString("client_host"));
+                bean.setDatabaseName(rs.getString("database_name"));
+                bean.setSessionStatus(rs.getString("session_status"));
+                bean.setCommandOrWait(rs.getString("command_or_wait"));
+                bean.setRunningSeconds(parseLong(rs.getObject("running_seconds")));
+                bean.setQueryStartTime(rs.getTimestamp("query_start_time"));
+                bean.setSqlText(rs.getString("sql_text"));
+                sessions.add(bean);
+            }
+        } finally {
+            closeResource(rs, ps, conn);
+        }
+        return sessions;
     }
 
     private boolean isMysqlDateTimeColumn(String columnTypeName) {
@@ -422,6 +492,27 @@ public class DbOperationMysqlDruid implements DbOperation {
         try {
             return sqlDs.unwrap(HikariDataSource.class);
         } catch (SQLException ignored) {
+            return null;
+        }
+    }
+
+    private String queryCurrentSessionId(Connection conn) throws SQLException {
+        try (Statement statement = conn.createStatement();
+             ResultSet resultSet = statement.executeQuery("SELECT CONNECTION_ID() AS value")) {
+            if (resultSet.next()) {
+                return resultSet.getString("value");
+            }
+            return null;
+        }
+    }
+
+    private Long parseLong(Object value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return Long.parseLong(String.valueOf(value));
+        } catch (Exception ignored) {
             return null;
         }
     }

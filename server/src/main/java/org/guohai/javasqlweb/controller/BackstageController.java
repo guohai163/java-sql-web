@@ -75,6 +75,12 @@ public class BackstageController {
         return backstageService.getTargetPoolStats();
     }
 
+    @RequestMapping(value = "/server-runtime/{code}/sessions", method = RequestMethod.GET)
+    @ResponseBody
+    public Result<List<TargetSessionStatBean>> serverRuntimeSessions(@PathVariable("code") Integer code) {
+        return backstageService.getTargetPoolSessions(code);
+    }
+
     /**
      * 返回基础信息
      * @return

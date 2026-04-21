@@ -1,7 +1,9 @@
 package org.guohai.javasqlweb.service.operation;
 
 import com.zaxxer.hikari.HikariDataSource;
+import com.zaxxer.hikari.HikariPoolMXBean;
 import org.guohai.javasqlweb.beans.ConnectConfigBean;
+import org.guohai.javasqlweb.beans.PoolStatBean;
 import org.junit.jupiter.api.Test;
 
 import javax.sql.DataSource;
@@ -22,6 +24,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -207,6 +210,47 @@ class DbOperationClickHouseTests {
         assertFalse(queryDataSourceMap.containsKey("archive"));
         assertTrue(queryDataSourceMap.containsKey("core"));
         verify(idleDataSource).close();
+    }
+
+    @Test
+    void describeRuntimePoolAggregatesCachedDatabasePools() throws Exception {
+        DbOperationClickHouse operation = new DbOperationClickHouse(mock(DataSource.class), buildConnectConfig(), dbName -> mock(HikariDataSource.class));
+        HikariDataSource analyticsDataSource = mock(HikariDataSource.class);
+        HikariDataSource archiveDataSource = mock(HikariDataSource.class);
+        HikariPoolMXBean analyticsPool = mock(HikariPoolMXBean.class);
+        HikariPoolMXBean archivePool = mock(HikariPoolMXBean.class);
+        Map<String, Object> queryDataSourceMap = accessQueryDataSourceMap(operation);
+        long now = System.currentTimeMillis();
+
+        when(analyticsDataSource.getPoolName()).thenReturn("jsw-clickhouse-11-a1b2");
+        when(analyticsDataSource.getJdbcUrl()).thenReturn("jdbc:clickhouse://127.0.0.1:8123/analytics");
+        when(analyticsDataSource.getDriverClassName()).thenReturn("com.clickhouse.jdbc.ClickHouseDriver");
+        when(analyticsDataSource.getHikariPoolMXBean()).thenReturn(analyticsPool);
+        when(analyticsPool.getActiveConnections()).thenReturn(2);
+        when(analyticsPool.getIdleConnections()).thenReturn(1);
+        when(analyticsPool.getTotalConnections()).thenReturn(3);
+        when(analyticsPool.getThreadsAwaitingConnection()).thenReturn(0);
+
+        when(archiveDataSource.getPoolName()).thenReturn("jsw-clickhouse-11-c3d4");
+        when(archiveDataSource.getJdbcUrl()).thenReturn("jdbc:clickhouse://127.0.0.1:8123/archive");
+        when(archiveDataSource.getDriverClassName()).thenReturn("com.clickhouse.jdbc.ClickHouseDriver");
+        when(archiveDataSource.getHikariPoolMXBean()).thenReturn(archivePool);
+        when(archivePool.getActiveConnections()).thenReturn(1);
+        when(archivePool.getIdleConnections()).thenReturn(4);
+        when(archivePool.getTotalConnections()).thenReturn(5);
+        when(archivePool.getThreadsAwaitingConnection()).thenReturn(2);
+
+        queryDataSourceMap.put("analytics", newCachedDataSource(analyticsDataSource, now));
+        queryDataSourceMap.put("archive", newCachedDataSource(archiveDataSource, now));
+
+        PoolStatBean stat = operation.describeRuntimePool();
+
+        assertNotNull(stat);
+        assertEquals("jsw-clickhouse-11-a1b2 +1", stat.getPoolName());
+        assertEquals(3, stat.getActiveConnections());
+        assertEquals(5, stat.getIdleConnections());
+        assertEquals(8, stat.getTotalConnections());
+        assertEquals(2, stat.getThreadsAwaitingConnection());
     }
 
     @Test

@@ -31,6 +31,7 @@ CREATE TABLE `db_query_log` (
   `query_name` varchar(45) NOT NULL COMMENT '查询人',
   `query_database` varchar(45) NOT NULL COMMENT '查询语句的库',
   `server_code` int(11) NULL COMMENT '查询目标实例',
+  `db_session_id` varchar(64) NULL COMMENT '目标库会话ID',
   `query_sqlscript` varchar(8000) NOT NULL COMMENT '查询脚本',
   `query_consuming` int(11) NULL COMMENT '查询耗时',
   `result_row_count` int(11) NULL COMMENT '返回条数',
@@ -38,7 +39,8 @@ CREATE TABLE `db_query_log` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 ALTER TABLE `db_query_log`
-  ADD PRIMARY KEY (`code`);
+  ADD PRIMARY KEY (`code`),
+  ADD KEY `idx_server_session` (`server_code`,`db_session_id`);
 
 ALTER TABLE `db_query_log`
   MODIFY `code` int(11) NOT NULL AUTO_INCREMENT;
@@ -170,6 +172,9 @@ CREATE TABLE `webauthn_request_tb` (
 --ADD COLUMN `login_status` VARCHAR(45) NOT NULL DEFAULT 'LOGGING' AFTER `auth_status`;
 -- ALTER TABLE `javasqlweb_db`.`db_query_log`
 -- ADD COLUMN `query_database` VARCHAR(45) NULL AFTER `query_name`;
+-- ALTER TABLE `javasqlweb_db`.`db_query_log`
+-- ADD COLUMN `db_session_id` VARCHAR(64) NULL COMMENT '目标库会话ID' AFTER `server_code`,
+-- ADD KEY `idx_server_session` (`server_code`,`db_session_id`);
 
 -- ALTER TABLE `javasqlweb_db`.`db_connect_config_tb`
 -- ADD COLUMN `db_ssl_mode` VARCHAR(32) NOT NULL DEFAULT 'DEFAULT' COMMENT '连接安全模式' AFTER `db_server_type`,

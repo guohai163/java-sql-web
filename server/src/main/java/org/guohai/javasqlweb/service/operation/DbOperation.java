@@ -5,6 +5,7 @@ import org.guohai.javasqlweb.beans.*;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 
 /**
  * 单例工厂的抽象接口
@@ -89,6 +90,18 @@ public interface DbOperation {
      Object[] queryDatabaseBySql(String dbName, String sql, Integer limit) throws SQLException;
 
     /**
+     * 执行查询并返回数据库会话信息。
+     */
+    default QueryExecutionResult queryDatabaseBySqlWithSession(String dbName,
+                                                               String sql,
+                                                               Integer limit,
+                                                               Consumer<String> onSessionReady) throws SQLException {
+        QueryExecutionResult result = new QueryExecutionResult();
+        result.setRows(queryDatabaseBySql(dbName, sql, limit));
+        return result;
+    }
+
+    /**
      * 返回一个数据库的所有表和列集合
      * @param dbName
      * @return
@@ -114,6 +127,13 @@ public interface DbOperation {
      */
     default PoolStatBean describeRuntimePool() {
         return null;
+    }
+
+    /**
+     * Describe active database sessions that belong to the dynamic pool.
+     */
+    default List<TargetSessionStatBean> listActiveSessions() throws SQLException {
+        return List.of();
     }
 
     /**

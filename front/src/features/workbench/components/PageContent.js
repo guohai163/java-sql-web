@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import Pubsub from 'pubsub-js';
 import cookie from 'react-cookies';
 import { Controlled as CodeMirror } from 'react-codemirror2';
-import { Button, Empty, List, Modal, Spin, Switch, Tabs } from 'antd';
+import { Button, Empty, List, Modal, Result, Spin, Switch, Tabs } from 'antd';
 import { LoadingOutlined } from '@ant-design/icons';
 import { createClient } from '@/shared/api/apiClient';
 import dot from '@/features/workbench/assets/dot.gif';
@@ -27,6 +27,8 @@ const { confirm } = Modal;
 const antIcon = <LoadingOutlined style={{ fontSize: 34 }} spin />;
 const RENDER_MODE_STORAGE_KEY = 'jsw_query_render_mode';
 const LARGE_RESULT_SIZE = 2000;
+const QUERY_ERROR_TITLE = 'SQL 执行失败';
+const QUERY_ERROR_DEFAULT_DETAIL = '查询执行失败，请稍后重试';
 
 function showDialog(content, title = '提示') {
   confirm({
@@ -57,6 +59,9 @@ function createPane(overrides = {}) {
     sql: '',
     queryResult: [],
     dataAreaRefresh: [],
+    queryError: false,
+    queryErrorTitle: '',
+    queryErrorDetail: '',
     dataDisplayStyle: readRenderModePreference(),
     dashboardData: null,
     dashboardLoading: false,
@@ -76,6 +81,26 @@ function updatePaneByKey(panes, key, updater) {
   return panes.map((pane) =>
     pane.key === key ? updater({ ...pane }) : pane,
   );
+}
+
+function clearPaneQueryFeedback(pane) {
+  return {
+    ...pane,
+    queryError: false,
+    queryErrorTitle: '',
+    queryErrorDetail: '',
+  };
+}
+
+function buildQueryErrorFeedback(message) {
+  return {
+    queryError: true,
+    queryErrorTitle: QUERY_ERROR_TITLE,
+    queryErrorDetail:
+      typeof message === 'string' && message.trim() !== ''
+        ? message.trim()
+        : QUERY_ERROR_DEFAULT_DETAIL,
+  };
 }
 
 function readHistorySql(serverCode) {
@@ -521,8 +546,9 @@ function PageContent() {
       ...previous,
       queryLoading: true,
       panes: updatePaneByKey(previous.panes, currentPane.key, (pane) => ({
-        ...pane,
+        ...clearPaneQueryFeedback(pane),
         queryResult: [],
+        dataAreaRefresh: [],
       })),
     }));
 
@@ -568,7 +594,7 @@ function PageContent() {
           queryLoading: false,
           historySql: nextHistory,
           panes: updatePaneByKey(previous.panes, currentPane.key, (pane) => ({
-            ...pane,
+            ...clearPaneQueryFeedback(pane),
             contentTab: 'query',
             dataDisplayStyle: shouldUseModernDisplay,
             queryResult: response.jsonData.data,
@@ -579,16 +605,19 @@ function PageContent() {
       return;
     }
 
+    const queryError = buildQueryErrorFeedback(response.jsonData.message);
     setState((previous) => ({
       ...previous,
       queryLoading: false,
       panes: updatePaneByKey(previous.panes, currentPane.key, (pane) => ({
-        ...pane,
+        ...clearPaneQueryFeedback(pane),
         queryResult: [],
         dataAreaRefresh: [],
+        contentTab: 'query',
+        ...queryError,
       })),
     }));
-    showDialog(response.jsonData.message, '错误');
+    showDialog(queryError.queryErrorDetail, queryError.queryErrorTitle);
   };
 
   const historySqlToText = (sqlScript) => {
@@ -860,6 +889,14 @@ function PageContent() {
                           <div className="query_load workbench-loading">
                             <Spin indicator={antIcon} />
                             数据查询中...
+                          </div>
+                        ) : pane.queryError ? (
+                          <div className="query_load workbench-empty-state workbench-query-error-state">
+                            <Result
+                              status="error"
+                              subTitle={pane.queryErrorDetail}
+                              title={pane.queryErrorTitle}
+                            />
                           </div>
                         ) : pane.queryResult.length === 0 ? (
                           <div className="query_load workbench-empty-state">

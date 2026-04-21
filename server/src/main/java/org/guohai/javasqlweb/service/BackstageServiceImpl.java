@@ -147,6 +147,20 @@ public class BackstageServiceImpl implements BackstageService{
         return baseDataService.getTargetPoolStats();
     }
 
+    @Override
+    public Result<List<TargetSessionStatBean>> getTargetPoolSessions(Integer code) {
+        if (code == null || baseConfigDao.getConnectConfig(code) == null) {
+            return new Result<>(false, "无此服务器", null);
+        }
+        Result<List<TargetSessionStatBean>> sessionResult = baseDataService.getTargetPoolSessions(code);
+        if (!sessionResult.getStatus() || sessionResult.getData() == null) {
+            return sessionResult;
+        }
+        List<TargetSessionStatBean> sessions = new ArrayList<>(sessionResult.getData());
+        enrichPlatformUserNames(code, sessions);
+        return new Result<>(true, "", sessions);
+    }
+
     /**
      * 测试数据库连接性
      *
@@ -518,6 +532,41 @@ public class BackstageServiceImpl implements BackstageService{
             total += defaultInteger(stat == null ? null : stat.getThreadsAwaitingConnection());
         }
         return total;
+    }
+
+    private void enrichPlatformUserNames(Integer serverCode, List<TargetSessionStatBean> sessions) {
+        List<String> sessionIds = new ArrayList<>();
+        for (TargetSessionStatBean session : sessions) {
+            if (session != null && session.getSessionId() != null && !session.getSessionId().isBlank()) {
+                sessionIds.add(session.getSessionId());
+            }
+        }
+        if (sessionIds.isEmpty()) {
+            return;
+        }
+        List<QueryLogBean> queryLogs = baseConfigDao.getQueryLogsByServerAndSessionIds(serverCode, sessionIds);
+        Map<String, QueryLogBean> latestInFlightBySession = new LinkedHashMap<>();
+        for (QueryLogBean queryLog : queryLogs) {
+            if (queryLog == null || queryLog.getDbSessionId() == null || queryLog.getDbSessionId().isBlank()) {
+                continue;
+            }
+            if (queryLog.getQueryConsuming() != null) {
+                continue;
+            }
+            latestInFlightBySession.putIfAbsent(queryLog.getDbSessionId(), queryLog);
+        }
+        for (TargetSessionStatBean session : sessions) {
+            QueryLogBean queryLog = session == null ? null : latestInFlightBySession.get(session.getSessionId());
+            if (queryLog == null) {
+                session.setPlatformUserName(null);
+                session.setQueryLogCode(null);
+                session.setMatchedByPlatformTrace(false);
+                continue;
+            }
+            session.setPlatformUserName(queryLog.getQueryName());
+            session.setQueryLogCode(queryLog.getCode());
+            session.setMatchedByPlatformTrace(true);
+        }
     }
 
     private Integer normalizeLimit(Integer value, int defaultValue) {

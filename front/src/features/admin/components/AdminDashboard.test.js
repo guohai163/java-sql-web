@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import AdminDashboard from '@/features/admin/components/AdminDashboard';
 
 jest.mock('recharts', () => ({
@@ -30,6 +31,7 @@ beforeAll(() => {
 
 describe('AdminDashboard', () => {
   test('renders summary cards and recent query table from dashboard payload', () => {
+    const viewDetail = jest.fn();
     render(
       <AdminDashboard
         data={{
@@ -98,6 +100,7 @@ describe('AdminDashboard', () => {
         onRangeChange={() => {}}
         onGrainChange={() => {}}
         onRefresh={() => {}}
+        onViewDynamicPoolDetail={viewDetail}
       />,
     );
 
@@ -110,6 +113,43 @@ describe('AdminDashboard', () => {
     expect(screen.getAllByText('alice').length).toBeGreaterThan(0);
     expect(screen.getAllByText('order_db.orders').length).toBeGreaterThan(0);
     expect(screen.getByText('order-core')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '明细' })).toBeInTheDocument();
+  });
+
+  test('invokes detail callback for dynamic pool row', async () => {
+    const viewDetail = jest.fn();
+    render(
+      <AdminDashboard
+        data={{
+          summary: {},
+          trend: [],
+          userRanking: [],
+          databaseHotspots: [],
+          tableHotspots: [],
+          recentQueries: [],
+          dynamicTargetPools: [
+            {
+              serverCode: 9,
+              serverName: 'order-core',
+              dbType: 'mysql',
+              runtimeStatus: 'ok',
+              activeConnections: 12,
+            },
+          ],
+        }}
+        filter={{ range: '24h', grain: 'hour' }}
+        loading={false}
+        updatedAt=""
+        onRangeChange={() => {}}
+        onGrainChange={() => {}}
+        onRefresh={() => {}}
+        onViewDynamicPoolDetail={viewDetail}
+      />,
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: '明细' }));
+
+    expect(viewDetail).toHaveBeenCalledWith(expect.objectContaining({ serverCode: 9, serverName: 'order-core' }));
   });
 
   test('renders empty states when dashboard has no data', () => {
@@ -130,6 +170,7 @@ describe('AdminDashboard', () => {
         onRangeChange={() => {}}
         onGrainChange={() => {}}
         onRefresh={() => {}}
+        onViewDynamicPoolDetail={() => {}}
       />,
     );
 

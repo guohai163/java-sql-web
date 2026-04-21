@@ -1,5 +1,7 @@
 package org.guohai.javasqlweb.service.operation;
 
+import com.zaxxer.hikari.HikariDataSource;
+import com.zaxxer.hikari.HikariPoolMXBean;
 import org.guohai.javasqlweb.beans.*;
 import org.guohai.javasqlweb.util.HikariDataSourceUtils;
 
@@ -305,6 +307,50 @@ public class DbOperationClickHouse implements DbOperation{
         }
     }
 
+    @Override
+    public PoolStatBean describeRuntimePool() {
+        synchronized (queryDataSourceMap) {
+            cleanupQueryDataSources(System.currentTimeMillis(), null);
+            if (queryDataSourceMap.isEmpty()) {
+                return null;
+            }
+            PoolStatBean bean = new PoolStatBean();
+            int poolCount = 0;
+            String firstPoolName = null;
+            for (CachedDataSource cachedDataSource : queryDataSourceMap.values()) {
+                PoolStatBean current = describeDataSourcePool(cachedDataSource.dataSource);
+                if (current == null) {
+                    continue;
+                }
+                poolCount++;
+                if (firstPoolName == null && current.getPoolName() != null && !current.getPoolName().isBlank()) {
+                    firstPoolName = current.getPoolName();
+                }
+                if (bean.getJdbcUrl() == null) {
+                    bean.setJdbcUrl(current.getJdbcUrl());
+                }
+                if (bean.getDriverClassName() == null) {
+                    bean.setDriverClassName(current.getDriverClassName());
+                }
+                bean.setActiveConnections(defaultInteger(bean.getActiveConnections()) + defaultInteger(current.getActiveConnections()));
+                bean.setIdleConnections(defaultInteger(bean.getIdleConnections()) + defaultInteger(current.getIdleConnections()));
+                bean.setTotalConnections(defaultInteger(bean.getTotalConnections()) + defaultInteger(current.getTotalConnections()));
+                bean.setThreadsAwaitingConnection(defaultInteger(bean.getThreadsAwaitingConnection()) + defaultInteger(current.getThreadsAwaitingConnection()));
+            }
+            if (poolCount == 0) {
+                return null;
+            }
+            if (poolCount == 1) {
+                bean.setPoolName(firstPoolName);
+            } else if (firstPoolName != null && !firstPoolName.isBlank()) {
+                bean.setPoolName(firstPoolName + " +" + (poolCount - 1));
+            } else {
+                bean.setPoolName("jsw-clickhouse-pools(" + poolCount + ")");
+            }
+            return bean;
+        }
+    }
+
     private boolean isNullableClickHouseType(String columnType) {
         return columnType != null && columnType.contains("Nullable(");
     }
@@ -425,6 +471,25 @@ public class DbOperationClickHouse implements DbOperation{
         }
     }
 
+    private PoolStatBean describeDataSourcePool(DataSource dataSource) {
+        HikariDataSource hikariDataSource = unwrapHikariDataSource(dataSource);
+        if (hikariDataSource == null) {
+            return null;
+        }
+        PoolStatBean bean = new PoolStatBean();
+        bean.setPoolName(hikariDataSource.getPoolName());
+        bean.setJdbcUrl(hikariDataSource.getJdbcUrl());
+        bean.setDriverClassName(hikariDataSource.getDriverClassName());
+        HikariPoolMXBean poolMxBean = hikariDataSource.getHikariPoolMXBean();
+        if (poolMxBean != null) {
+            bean.setActiveConnections(poolMxBean.getActiveConnections());
+            bean.setIdleConnections(poolMxBean.getIdleConnections());
+            bean.setTotalConnections(poolMxBean.getTotalConnections());
+            bean.setThreadsAwaitingConnection(poolMxBean.getThreadsAwaitingConnection());
+        }
+        return bean;
+    }
+
     private DataSource createQueryDataSourceSafely(String dbName) throws SQLException {
         try {
             return queryDataSourceFactory.create(dbName);
@@ -441,5 +506,20 @@ public class DbOperationClickHouse implements DbOperation{
 
     private String encodeDatabaseName(String dbName) {
         return URLEncoder.encode(dbName, StandardCharsets.UTF_8).replace("+", "%20");
+    }
+
+    private HikariDataSource unwrapHikariDataSource(DataSource dataSource) {
+        if (dataSource instanceof HikariDataSource hikariDataSource) {
+            return hikariDataSource;
+        }
+        try {
+            return dataSource.unwrap(HikariDataSource.class);
+        } catch (SQLException ignored) {
+            return null;
+        }
+    }
+
+    private int defaultInteger(Integer value) {
+        return value == null ? 0 : value;
     }
 }

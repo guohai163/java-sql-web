@@ -1,5 +1,7 @@
 package org.guohai.javasqlweb.service.operation;
 
+import com.zaxxer.hikari.HikariDataSource;
+import com.zaxxer.hikari.HikariPoolMXBean;
 import org.guohai.javasqlweb.beans.*;
 import org.guohai.javasqlweb.util.HikariDataSourceUtils;
 
@@ -29,6 +31,8 @@ public class DbOperationPostgresqlDruid implements DbOperation {
      */
     private ConnectConfigBean connect;
 
+    private final String applicationNamePrefix;
+
     private static final class CachedDataSource {
         private final DataSource dataSource;
         private long lastAccessAt;
@@ -47,6 +51,7 @@ public class DbOperationPostgresqlDruid implements DbOperation {
     DbOperationPostgresqlDruid(ConnectConfigBean conn) throws Exception {
 
         connect = conn;
+        applicationNamePrefix = "jsw-postgresql-" + conn.getCode();
         sqlDs = createDataSource("postgres");
     }
 
@@ -388,14 +393,24 @@ public class DbOperationPostgresqlDruid implements DbOperation {
      */
     @Override
     public Object[] queryDatabaseBySql(String dbName, String sql, Integer limit) throws SQLException {
+        return queryDatabaseBySqlWithSession(dbName, sql, limit, null).getRows();
+    }
+
+    @Override
+    public QueryExecutionResult queryDatabaseBySqlWithSession(String dbName, String sql, Integer limit, java.util.function.Consumer<String> onSessionReady) throws SQLException {
         Object[] result = new Object[3];
         List<Map<String, Object>> listData = new ArrayList<>();
         DataSource dataSource = acquireDataSource(dbName);
         Connection conn = null;
         Statement st = null;
         ResultSet rs = null;
+        String sessionId = null;
         try{
             conn = dataSource.getConnection();
+            sessionId = queryCurrentSessionId(conn);
+            if (onSessionReady != null) {
+                onSessionReady.accept(sessionId);
+            }
             st = conn.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE,ResultSet.CONCUR_READ_ONLY);
             rs = st.executeQuery(String.format("%s;", sql));
             // 获得结果集结构信息,元数据
@@ -431,8 +446,10 @@ public class DbOperationPostgresqlDruid implements DbOperation {
             releaseDataSource(dbName);
         }
 
-
-        return result;
+        QueryExecutionResult executionResult = new QueryExecutionResult();
+        executionResult.setDbSessionId(sessionId);
+        executionResult.setRows(result);
+        return executionResult;
     }
 
     /**
@@ -499,6 +516,96 @@ public class DbOperationPostgresqlDruid implements DbOperation {
         }
     }
 
+    @Override
+    public PoolStatBean describeRuntimePool() {
+        synchronized (postgresMap) {
+            cleanupCachedDataSources(System.currentTimeMillis(), null);
+            if (postgresMap.isEmpty()) {
+                return null;
+            }
+            PoolStatBean bean = new PoolStatBean();
+            int poolCount = 0;
+            String firstPoolName = null;
+            for (CachedDataSource cachedDataSource : postgresMap.values()) {
+                PoolStatBean current = describeDataSourcePool(cachedDataSource.dataSource);
+                if (current == null) {
+                    continue;
+                }
+                poolCount++;
+                if (firstPoolName == null && current.getPoolName() != null && !current.getPoolName().isBlank()) {
+                    firstPoolName = current.getPoolName();
+                }
+                if (bean.getJdbcUrl() == null) {
+                    bean.setJdbcUrl(current.getJdbcUrl());
+                }
+                if (bean.getDriverClassName() == null) {
+                    bean.setDriverClassName(current.getDriverClassName());
+                }
+                bean.setActiveConnections(defaultInteger(bean.getActiveConnections()) + defaultInteger(current.getActiveConnections()));
+                bean.setIdleConnections(defaultInteger(bean.getIdleConnections()) + defaultInteger(current.getIdleConnections()));
+                bean.setTotalConnections(defaultInteger(bean.getTotalConnections()) + defaultInteger(current.getTotalConnections()));
+                bean.setThreadsAwaitingConnection(defaultInteger(bean.getThreadsAwaitingConnection()) + defaultInteger(current.getThreadsAwaitingConnection()));
+            }
+            if (poolCount == 0) {
+                return null;
+            }
+            if (poolCount == 1) {
+                bean.setPoolName(firstPoolName);
+            } else if (firstPoolName != null && !firstPoolName.isBlank()) {
+                bean.setPoolName(firstPoolName + " +" + (poolCount - 1));
+            } else {
+                bean.setPoolName("jsw-postgresql-pools(" + poolCount + ")");
+            }
+            return bean;
+        }
+    }
+
+    @Override
+    public List<TargetSessionStatBean> listActiveSessions() throws SQLException {
+        List<TargetSessionStatBean> sessions = new ArrayList<>();
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = sqlDs.getConnection();
+            ps = conn.prepareStatement(
+                    "SELECT pid::text AS session_id, " +
+                            "       usename AS database_user_name, " +
+                            "       COALESCE(client_addr::text, client_hostname, '') AS client_host, " +
+                            "       datname AS database_name, " +
+                            "       state AS session_status, " +
+                            "       COALESCE(wait_event_type || ':' || wait_event, state) AS command_or_wait, " +
+                            "       CAST(EXTRACT(EPOCH FROM now() - COALESCE(query_start, state_change)) AS bigint) AS running_seconds, " +
+                            "       query_start AS query_start_time, " +
+                            "       query AS sql_text " +
+                            "FROM pg_stat_activity " +
+                            "WHERE application_name LIKE ? " +
+                            "  AND pid <> pg_backend_pid() " +
+                            "  AND state <> 'idle' " +
+                            "ORDER BY running_seconds DESC, pid DESC"
+            );
+            ps.setString(1, applicationNamePrefix + "-%");
+            rs = ps.executeQuery();
+            while (rs.next()) {
+                TargetSessionStatBean bean = new TargetSessionStatBean();
+                bean.setDbType("postgresql");
+                bean.setSessionId(rs.getString("session_id"));
+                bean.setDatabaseUserName(rs.getString("database_user_name"));
+                bean.setClientHost(rs.getString("client_host"));
+                bean.setDatabaseName(rs.getString("database_name"));
+                bean.setSessionStatus(rs.getString("session_status"));
+                bean.setCommandOrWait(rs.getString("command_or_wait"));
+                bean.setRunningSeconds(parseLong(rs.getObject("running_seconds")));
+                bean.setQueryStartTime(rs.getTimestamp("query_start_time"));
+                bean.setSqlText(rs.getString("sql_text"));
+                sessions.add(bean);
+            }
+        } finally {
+            closeResource(rs, ps, conn);
+        }
+        return sessions;
+    }
+
 
     /**
      * 通过库名制造一个连接串
@@ -507,9 +614,9 @@ public class DbOperationPostgresqlDruid implements DbOperation {
      */
     private DataSource createDataSource(String dbName){
         return HikariDataSourceUtils.createDataSource(
-                "jsw-postgresql-" + dbName,
-                String.format("jdbc:postgresql://%s:%s/%s",
-                        connect.getDbServerHost(), connect.getDbServerPort(), dbName),
+                applicationNamePrefix + "-" + dbName,
+                String.format("jdbc:postgresql://%s:%s/%s?ApplicationName=%s",
+                        connect.getDbServerHost(), connect.getDbServerPort(), dbName, applicationNamePrefix + "-" + dbName),
                 connect.getDbServerUsername(),
                 connect.getDbServerPassword(),
                 "select now()"
@@ -588,6 +695,61 @@ public class DbOperationPostgresqlDruid implements DbOperation {
         CachedDataSource cachedDataSource = postgresMap.remove(dbName);
         if (cachedDataSource != null) {
             HikariDataSourceUtils.closeDataSource(cachedDataSource.dataSource);
+        }
+    }
+
+    private PoolStatBean describeDataSourcePool(DataSource dataSource) {
+        HikariDataSource hikariDataSource = unwrapHikariDataSource(dataSource);
+        if (hikariDataSource == null) {
+            return null;
+        }
+        PoolStatBean bean = new PoolStatBean();
+        bean.setPoolName(hikariDataSource.getPoolName());
+        bean.setJdbcUrl(hikariDataSource.getJdbcUrl());
+        bean.setDriverClassName(hikariDataSource.getDriverClassName());
+        HikariPoolMXBean poolMxBean = hikariDataSource.getHikariPoolMXBean();
+        if (poolMxBean != null) {
+            bean.setActiveConnections(poolMxBean.getActiveConnections());
+            bean.setIdleConnections(poolMxBean.getIdleConnections());
+            bean.setTotalConnections(poolMxBean.getTotalConnections());
+            bean.setThreadsAwaitingConnection(poolMxBean.getThreadsAwaitingConnection());
+        }
+        return bean;
+    }
+
+    private HikariDataSource unwrapHikariDataSource(DataSource dataSource) {
+        if (dataSource instanceof HikariDataSource hikariDataSource) {
+            return hikariDataSource;
+        }
+        try {
+            return dataSource.unwrap(HikariDataSource.class);
+        } catch (SQLException ignored) {
+            return null;
+        }
+    }
+
+    private int defaultInteger(Integer value) {
+        return value == null ? 0 : value;
+    }
+
+    private String queryCurrentSessionId(Connection conn) throws SQLException {
+        try (Statement statement = conn.createStatement();
+             ResultSet resultSet = statement.executeQuery("SELECT pg_backend_pid()::text AS value")) {
+            if (resultSet.next()) {
+                return resultSet.getString("value");
+            }
+            return null;
+        }
+    }
+
+    private Long parseLong(Object value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return Long.parseLong(String.valueOf(value));
+        } catch (Exception ignored) {
+            return null;
         }
     }
 

@@ -40,6 +40,12 @@ public class QueryLogBean {
      * 查询实例名称
      */
     private String serverName;
+
+    /**
+     * 数据库会话ID
+     */
+    private String dbSessionId;
+
     /**
      * 查询脚本
      */

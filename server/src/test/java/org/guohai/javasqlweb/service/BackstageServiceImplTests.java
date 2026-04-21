@@ -219,4 +219,31 @@ class BackstageServiceImplTests {
         assertTrue(result.getStatus());
         verify(baseDataService).invalidateServerResources(11);
     }
+
+    @Test
+    void getTargetPoolSessionsEnrichesPlatformUserFromInFlightQueryLog() {
+        ConnectConfigBean existingServer = new ConnectConfigBean();
+        existingServer.setCode(12);
+        TargetSessionStatBean session = new TargetSessionStatBean();
+        session.setServerCode(12);
+        session.setSessionId("301");
+        session.setDatabaseUserName("report_user");
+        QueryLogBean queryLogBean = new QueryLogBean();
+        queryLogBean.setCode(88);
+        queryLogBean.setDbSessionId("301");
+        queryLogBean.setQueryName("alice");
+        queryLogBean.setQueryConsuming(null);
+
+        when(baseConfigDao.getConnectConfig(12)).thenReturn(existingServer);
+        when(baseDataService.getTargetPoolSessions(12)).thenReturn(new Result<>(true, "", List.of(session)));
+        when(baseConfigDao.getQueryLogsByServerAndSessionIds(12, List.of("301"))).thenReturn(List.of(queryLogBean));
+
+        Result<List<TargetSessionStatBean>> result = backstageService.getTargetPoolSessions(12);
+
+        assertTrue(result.getStatus());
+        assertEquals(1, result.getData().size());
+        assertEquals("alice", result.getData().get(0).getPlatformUserName());
+        assertEquals(Integer.valueOf(88), result.getData().get(0).getQueryLogCode());
+        assertTrue(Boolean.TRUE.equals(result.getData().get(0).getMatchedByPlatformTrace()));
+    }
 }

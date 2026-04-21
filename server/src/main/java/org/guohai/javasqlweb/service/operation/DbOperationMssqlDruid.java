@@ -1,5 +1,7 @@
 package org.guohai.javasqlweb.service.operation;
 
+import com.zaxxer.hikari.HikariDataSource;
+import com.zaxxer.hikari.HikariPoolMXBean;
 import org.guohai.javasqlweb.beans.*;
 import org.guohai.javasqlweb.util.HikariDataSourceUtils;
 import org.slf4j.Logger;
@@ -7,6 +9,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -35,6 +38,8 @@ public class DbOperationMssqlDruid implements DbOperation {
      */
     private DataSource sqlDs;
 
+    private final String applicationName;
+
 
     /**
      * 构造方法
@@ -42,8 +47,9 @@ public class DbOperationMssqlDruid implements DbOperation {
      * @throws Exception
      */
     DbOperationMssqlDruid(ConnectConfigBean conn) throws Exception {
+        applicationName = "jsw-mssql-" + conn.getCode();
         sqlDs = HikariDataSourceUtils.createDataSource(
-                "jsw-mssql-" + conn.getCode(),
+                applicationName,
                 buildJdbcUrl(conn),
                 conn.getDbServerUsername(),
                 conn.getDbServerPassword(),
@@ -271,12 +277,21 @@ public class DbOperationMssqlDruid implements DbOperation {
      */
     @Override
     public Object[] queryDatabaseBySql(String dbName, String sql, Integer limit) throws SQLException {
+        return queryDatabaseBySqlWithSession(dbName, sql, limit, null).getRows();
+    }
+
+    @Override
+    public QueryExecutionResult queryDatabaseBySqlWithSession(String dbName, String sql, Integer limit, java.util.function.Consumer<String> onSessionReady) throws SQLException {
         Object[] result = new Object[3];
         List<Map<String, Object>> listData = new ArrayList<>();
         Connection conn = sqlDs.getConnection();
         Statement st = conn.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE,ResultSet.CONCUR_READ_ONLY);
         st.setMaxRows(limit);
         ResultSet rs = null;
+        String sessionId = queryCurrentSessionId(conn);
+        if (onSessionReady != null) {
+            onSessionReady.accept(sessionId);
+        }
         try{
             rs = st.executeQuery(String.format("use [%s];" +
                     "%s;", dbName, sql));
@@ -309,7 +324,10 @@ public class DbOperationMssqlDruid implements DbOperation {
             finally {
             closeResource(rs,st,conn);
         }
-        return result;
+        QueryExecutionResult executionResult = new QueryExecutionResult();
+        executionResult.setDbSessionId(sessionId);
+        executionResult.setRows(result);
+        return executionResult;
     }
 
 
@@ -333,19 +351,124 @@ public class DbOperationMssqlDruid implements DbOperation {
         HikariDataSourceUtils.closeDataSource(sqlDs);
     }
 
+    @Override
+    public PoolStatBean describeRuntimePool() {
+        HikariDataSource hikariDataSource = unwrapHikariDataSource(sqlDs);
+        if (hikariDataSource == null) {
+            return null;
+        }
+        PoolStatBean bean = new PoolStatBean();
+        bean.setPoolName(hikariDataSource.getPoolName());
+        bean.setJdbcUrl(hikariDataSource.getJdbcUrl());
+        bean.setDriverClassName(hikariDataSource.getDriverClassName());
+        HikariPoolMXBean poolMxBean = hikariDataSource.getHikariPoolMXBean();
+        if (poolMxBean != null) {
+            bean.setActiveConnections(poolMxBean.getActiveConnections());
+            bean.setIdleConnections(poolMxBean.getIdleConnections());
+            bean.setTotalConnections(poolMxBean.getTotalConnections());
+            bean.setThreadsAwaitingConnection(poolMxBean.getThreadsAwaitingConnection());
+        }
+        return bean;
+    }
+
+    @Override
+    public List<TargetSessionStatBean> listActiveSessions() throws SQLException {
+        if (applicationName == null || applicationName.isBlank()) {
+            return List.of();
+        }
+        List<TargetSessionStatBean> sessions = new ArrayList<>();
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = sqlDs.getConnection();
+            ps = conn.prepareStatement(
+                    "SELECT CAST(s.session_id AS nvarchar(20)) AS session_id, " +
+                            "       s.login_name AS database_user_name, " +
+                            "       s.host_name AS client_host, " +
+                            "       DB_NAME(COALESCE(r.database_id, s.database_id)) AS database_name, " +
+                            "       COALESCE(r.status, s.status) AS session_status, " +
+                            "       COALESCE(r.wait_type, r.command, s.status) AS command_or_wait, " +
+                            "       DATEDIFF(SECOND, COALESCE(r.start_time, s.last_request_start_time), SYSDATETIME()) AS running_seconds, " +
+                            "       COALESCE(r.start_time, s.last_request_start_time) AS query_start_time, " +
+                            "       CONVERT(nvarchar(max), st.text) AS sql_text " +
+                            "FROM sys.dm_exec_sessions s " +
+                            "LEFT JOIN sys.dm_exec_requests r ON s.session_id = r.session_id " +
+                            "OUTER APPLY sys.dm_exec_sql_text(r.sql_handle) st " +
+                            "WHERE s.program_name = ? " +
+                            "  AND s.session_id <> @@SPID " +
+                            "  AND (r.session_id IS NOT NULL OR s.status <> 'sleeping') " +
+                            "ORDER BY running_seconds DESC, s.session_id DESC"
+            );
+            ps.setString(1, applicationName);
+            rs = ps.executeQuery();
+            while (rs.next()) {
+                TargetSessionStatBean bean = new TargetSessionStatBean();
+                bean.setDbType("mssql");
+                bean.setSessionId(rs.getString("session_id"));
+                bean.setDatabaseUserName(rs.getString("database_user_name"));
+                bean.setClientHost(rs.getString("client_host"));
+                bean.setDatabaseName(rs.getString("database_name"));
+                bean.setSessionStatus(rs.getString("session_status"));
+                bean.setCommandOrWait(rs.getString("command_or_wait"));
+                bean.setRunningSeconds(parseLong(rs.getObject("running_seconds")));
+                bean.setQueryStartTime(rs.getTimestamp("query_start_time"));
+                bean.setSqlText(rs.getString("sql_text"));
+                sessions.add(bean);
+            }
+        } finally {
+            closeResource(rs, ps, conn);
+        }
+        return sessions;
+    }
+
     private String buildJdbcUrl(ConnectConfigBean conn) {
         String sslMode = conn.getDbSslMode() == null ? SSL_MODE_DEFAULT : conn.getDbSslMode();
+        String applicationSegment = String.format(";applicationName=%s", applicationName);
         if (SSL_MODE_DISABLE_ENCRYPTION.equalsIgnoreCase(sslMode)) {
-            return String.format("jdbc:sqlserver://%s:%s;encrypt=false", conn.getDbServerHost(), conn.getDbServerPort());
+            return String.format("jdbc:sqlserver://%s:%s;encrypt=false%s", conn.getDbServerHost(), conn.getDbServerPort(), applicationSegment);
         }
         if (SSL_MODE_LEGACY_TLS.equalsIgnoreCase(sslMode)) {
             return String.format(
-                    "jdbc:sqlserver://%s:%s;encrypt=true;trustServerCertificate=true",
+                    "jdbc:sqlserver://%s:%s;encrypt=true;trustServerCertificate=true%s",
                     conn.getDbServerHost(),
-                    conn.getDbServerPort()
+                    conn.getDbServerPort(),
+                    applicationSegment
             );
         }
-        return String.format("jdbc:sqlserver://%s:%s;encrypt=true", conn.getDbServerHost(), conn.getDbServerPort());
+        return String.format("jdbc:sqlserver://%s:%s;encrypt=true%s", conn.getDbServerHost(), conn.getDbServerPort(), applicationSegment);
+    }
+
+    private HikariDataSource unwrapHikariDataSource(DataSource dataSource) {
+        if (dataSource instanceof HikariDataSource hikariDataSource) {
+            return hikariDataSource;
+        }
+        try {
+            return dataSource.unwrap(HikariDataSource.class);
+        } catch (SQLException ignored) {
+            return null;
+        }
+    }
+
+    private String queryCurrentSessionId(Connection conn) throws SQLException {
+        try (Statement statement = conn.createStatement();
+             ResultSet resultSet = statement.executeQuery("SELECT CONVERT(nvarchar(20), @@SPID) AS value")) {
+            if (resultSet.next()) {
+                return resultSet.getString("value");
+            }
+            return null;
+        }
+    }
+
+    private Long parseLong(Object value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return Long.parseLong(String.valueOf(value));
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
 }
