@@ -175,6 +175,11 @@ function PageContent() {
   const newTabIndexRef = useRef(2);
   const stateRef = useRef(state);
   const editorRef = useRef(null);
+  const editorInteractionRef = useRef({
+    beforeSql: '',
+    rearSql: '',
+    selectedSql: '',
+  });
 
   useEffect(() => {
     stateRef.current = state;
@@ -188,6 +193,14 @@ function PageContent() {
       editorRef.current.scrollTo(null, 0);
       editorRef.current.setCursor({ line: 0, ch: 0 });
     });
+  };
+
+  const resetEditorInteraction = () => {
+    editorInteractionRef.current = {
+      beforeSql: '',
+      rearSql: '',
+      selectedSql: '',
+    };
   };
 
   useEffect(() => {
@@ -321,13 +334,14 @@ function PageContent() {
           database: data.selectDatabase,
         })),
       }));
+      resetEditorInteraction();
       resetEditorViewport();
       return;
     }
 
     if (data.type === 'tableName') {
       setState((previous) => {
-        const sql = `${previous.beforeSql} ${data.selectTable} ${previous.rearSql}`;
+        const sql = `${editorInteractionRef.current.beforeSql} ${data.selectTable} ${editorInteractionRef.current.rearSql}`;
         return {
           ...previous,
           panes: updatePaneByKey(previous.panes, previous.activeKey, (pane) => ({
@@ -342,7 +356,7 @@ function PageContent() {
 
     if (data.type === 'column') {
       setState((previous) => {
-        const sql = `${previous.beforeSql} ${data.selectColumn} ${previous.rearSql}`;
+        const sql = `${editorInteractionRef.current.beforeSql} ${data.selectColumn} ${editorInteractionRef.current.rearSql}`;
         return {
           ...previous,
           panes: updatePaneByKey(previous.panes, previous.activeKey, (pane) => ({
@@ -377,6 +391,7 @@ function PageContent() {
           database: data.selectDatabase,
         })),
       }));
+      resetEditorInteraction();
       resetEditorViewport();
       return;
     }
@@ -405,6 +420,7 @@ function PageContent() {
           sql: response.jsonData.data.viewData,
         })),
       }));
+      resetEditorInteraction();
       resetEditorViewport();
       return;
     }
@@ -454,6 +470,7 @@ function PageContent() {
           contentTab: 'dashboard',
         })),
       }));
+      resetEditorInteraction();
       void loadDashboardForPane({
         server: data.selectServer,
         database: data.selectDatabase,
@@ -486,51 +503,36 @@ function PageContent() {
           database: '',
         })),
       }));
+      resetEditorInteraction();
     }
   };
 
-  const saveCursorValue = (editor) => {
-    const totalLine = editor.lineCount();
+  const saveCursorValue = (editor, sqlValue = editor.getValue(), selectedSql = editor.getSelection()) => {
     const currentCursor = editor.getCursor();
     let beforeCount = 0;
-    let rearCount = 0;
+    const lines = String(sqlValue || '').split('\n');
 
-    for (let index = 0; index < totalLine; index += 1) {
-      const lineText = editor.getLine(index);
-      if (currentCursor.line > index) {
-        beforeCount += lineText.length;
-      } else if (currentCursor.line < index) {
-        rearCount += lineText.length;
-      } else {
-        beforeCount += currentCursor.ch;
-        rearCount += lineText.length - currentCursor.ch;
-      }
+    for (let index = 0; index < currentCursor.line; index += 1) {
+      beforeCount += (lines[index] || '').length + 1;
     }
 
-    const sqlValue = editor.getValue();
-    setState((previous) => ({
-      ...previous,
-      beforeSql: sqlValue.substring(0, beforeCount + 1),
-      rearSql: sqlValue.substring(beforeCount + 1),
-    }));
+    beforeCount += currentCursor.ch;
+    editorInteractionRef.current = {
+      beforeSql: sqlValue.substring(0, beforeCount),
+      rearSql: sqlValue.substring(beforeCount),
+      selectedSql,
+    };
   };
 
   const mouseSelected = (editor) => {
     saveCursorValue(editor);
-
-    setState((previous) => ({
-      ...previous,
-      panes: updatePaneByKey(previous.panes, previous.activeKey, (pane) => ({
-        ...pane,
-        selectedSql: editor.getSelection(),
-      })),
-    }));
   };
 
   const executeSql = async () => {
     const current = stateRef.current;
     const currentPane = getPaneByKey(current.panes, current.activeKey);
-    const sql = currentPane.selectedSql === '' ? currentPane.sql : currentPane.selectedSql;
+    const selectedSql = editorInteractionRef.current.selectedSql;
+    const sql = selectedSql === '' ? currentPane.sql : selectedSql;
 
     if (sql === '') {
       showDialog('请输入SQL语句后再执行');
@@ -628,6 +630,7 @@ function PageContent() {
         sql: sqlScript,
       })),
     }));
+    resetEditorInteraction();
     resetEditorViewport();
   };
 
@@ -694,6 +697,7 @@ function PageContent() {
         },
       };
     });
+    resetEditorInteraction();
   };
 
   const handleContentTabChange = (paneKey, contentTab) => {
@@ -721,6 +725,7 @@ function PageContent() {
         }),
       ],
     }));
+    resetEditorInteraction();
   };
 
   const removeTab = (targetKey) => {
@@ -742,6 +747,7 @@ function PageContent() {
         historySql: nextPane?.server ? readHistorySql(nextPane.server) : [],
       };
     });
+    resetEditorInteraction();
   };
 
   const handleTabsEdit = (targetKey, action) => {
@@ -795,6 +801,7 @@ function PageContent() {
                             editor.scrollTo(null, 0);
                           }}
                           onBeforeChange={(editor, metadata, value) => {
+                            saveCursorValue(editor, value, '');
                             setState((previous) => ({
                               ...previous,
                               panes: updatePaneByKey(previous.panes, pane.key, (currentPane) => ({

@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Modal } from 'antd';
 import PageContent from '@/features/workbench/components/PageContent';
@@ -42,12 +42,37 @@ jest.mock('@/shared/api/apiClient', () => ({
 
 jest.mock('react-codemirror2', () => {
   const React = require('react');
+  const toCursor = (value, index) => {
+    const lines = String(value || '').slice(0, index).split('\n');
+    return {
+      line: lines.length - 1,
+      ch: lines[lines.length - 1]?.length || 0,
+    };
+  };
   return {
-    Controlled: ({ editorDidMount, onBeforeChange, value }) => {
+    Controlled: ({ editorDidMount, onBeforeChange, onCursorActivity, value }) => {
+      const textareaRef = React.useRef(null);
       const editor = React.useMemo(
         () => ({
           scrollTo: jest.fn(),
           setCursor: jest.fn(),
+          lineCount: () => String(textareaRef.current?.value || '').split('\n').length,
+          getLine: (index) => String(textareaRef.current?.value || '').split('\n')[index] || '',
+          getValue: () => textareaRef.current?.value || '',
+          getSelection: () => {
+            const node = textareaRef.current;
+            if (!node) {
+              return '';
+            }
+            return node.value.substring(node.selectionStart, node.selectionEnd);
+          },
+          getCursor: () => {
+            const node = textareaRef.current;
+            if (!node) {
+              return { line: 0, ch: 0 };
+            }
+            return toCursor(node.value, node.selectionEnd);
+          },
         }),
         [],
       );
@@ -59,7 +84,11 @@ jest.mock('react-codemirror2', () => {
       return (
         <textarea
           aria-label="sql-editor"
+          onMouseUp={() => onCursorActivity?.(editor)}
           onChange={(event) => onBeforeChange?.(editor, null, event.target.value)}
+          onSelect={() => onCursorActivity?.(editor)}
+          onKeyUp={() => onCursorActivity?.(editor)}
+          ref={textareaRef}
           value={value}
         />
       );
@@ -168,6 +197,11 @@ async function fillSql(sql) {
   await waitFor(() => {
     expect(editor).toHaveValue(sql);
   });
+}
+
+function updateSelection(editor, selectionStart, selectionEnd = selectionStart) {
+  editor.setSelectionRange(selectionStart, selectionEnd);
+  fireEvent.select(editor);
 }
 
 async function executeSql() {
@@ -319,5 +353,48 @@ describe('PageContent', () => {
     if (hiddenError) {
       expect(hiddenError).not.toBeVisible();
     }
+  });
+
+  test('executes selected SQL without relying on pane selection state', async () => {
+    mockApi.post.mockResolvedValueOnce(buildQueryResponse(true, '', [{ id: 4, name: 'delta' }]));
+
+    render(<PageContent />);
+    await publishDatabaseSelection();
+    await fillSql('SELECT 1; SELECT 2;');
+
+    const activePanel = getActiveWorkbenchPanel();
+    const editor = within(activePanel).getByLabelText('sql-editor');
+    updateSelection(editor, 10, 19);
+    await executeSql();
+
+    await waitFor(() => {
+      expect(mockApi.post).toHaveBeenCalledWith(
+        '/database/query/1/demo',
+        expect.objectContaining({
+          body: 'SELECT 2;',
+        }),
+      );
+    });
+  });
+
+  test('inserts selected table name at cursor without swallowing the next character', async () => {
+    render(<PageContent />);
+    await publishDatabaseSelection();
+    await fillSql('SELECT * FROM demo');
+
+    const activePanel = getActiveWorkbenchPanel();
+    const editor = within(activePanel).getByLabelText('sql-editor');
+    updateSelection(editor, 14);
+
+    await act(async () => {
+      mockPubsub.handler?.('', {
+        type: 'tableName',
+        selectTable: 'orders',
+      });
+    });
+
+    await waitFor(() => {
+      expect(editor).toHaveValue('SELECT * FROM  orders demo');
+    });
   });
 });
