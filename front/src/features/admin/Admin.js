@@ -195,6 +195,8 @@ function Admin() {
     druidList: [],
     userList: [],
     userSearchKeyword: '',
+    serverSearchKeyword: '',
+    serverTypeFilter: 'all',
     linkVisible: false,
     issuedLinkTitle: '',
     issuedLinkData: null,
@@ -970,6 +972,17 @@ function Admin() {
     });
   };
 
+  const openSessionDetailByServer = (serverRecord) => {
+    if (!serverRecord?.code) {
+      return;
+    }
+    void loadTargetSessionDetails({
+      serverCode: serverRecord.code,
+      serverName: serverRecord.dbServerName,
+      dbType: serverRecord.dbServerType,
+    });
+  };
+
   const queryLogColumns = [
     { title: '查询时间', dataIndex: 'queryTime', width: 168 },
     { title: '查询者', dataIndex: 'queryName', width: 120 },
@@ -1068,6 +1081,9 @@ function Admin() {
           </Button>
           <Button type="link" onClick={() => showEditServerBtn(record.code)}>
             编辑
+          </Button>
+          <Button type="link" onClick={() => openSessionDetailByServer(record)}>
+            会话
           </Button>
           <Button
             type="link"
@@ -1282,6 +1298,20 @@ function Admin() {
             .includes(normalizedUserSearchKeyword),
         );
 
+  const normalizedServerSearchKeyword = state.serverSearchKeyword.trim().toLowerCase();
+  const filteredConnList = state.connList.filter((server) => {
+    const matchKeyword =
+      normalizedServerSearchKeyword === ''
+      || (server.dbServerName || '').toLowerCase().includes(normalizedServerSearchKeyword);
+    const matchType = state.serverTypeFilter === 'all' || server.dbServerType === state.serverTypeFilter;
+    return matchKeyword && matchType;
+  });
+  const serverTypeFilterOptions = [...new Set(
+    state.connList
+      .map((item) => item.dbServerType)
+      .filter((item) => typeof item === 'string' && item.trim() !== ''),
+  )].sort();
+
   const menuItems = [
     { key: '1', icon: <EditOutlined />, label: '基础信息' },
     { key: '2', icon: <UserOutlined />, label: '账号管理' },
@@ -1437,12 +1467,42 @@ function Admin() {
           {state.menuSelect === '3'
             ? renderPageSection(
                 '服务器管理',
-                <Button type="primary" onClick={serverAddBtn}>
-                  增加服务器
-                </Button>,
+                <div className="admin-toolbar">
+                  <Button type="primary" onClick={serverAddBtn}>
+                    增加服务器
+                  </Button>
+                  <Input
+                    allowClear
+                    className="admin-search-input"
+                    placeholder="按服务器名搜索"
+                    value={state.serverSearchKeyword}
+                    onChange={(event) => {
+                      setStatePatch({
+                        serverSearchKeyword: event.target.value,
+                      });
+                    }}
+                  />
+                  <Select
+                    className="admin-dashboard-select"
+                    style={{ width: 160 }}
+                    value={state.serverTypeFilter}
+                    onChange={(value) => {
+                      setStatePatch({
+                        serverTypeFilter: value || 'all',
+                      });
+                    }}
+                  >
+                    <Select.Option key="all" value="all">全部类型</Select.Option>
+                    {serverTypeFilterOptions.map((type) => (
+                      <Select.Option key={type} value={type}>
+                        {getServerTypeLabel(type)}
+                      </Select.Option>
+                    ))}
+                  </Select>
+                </div>,
                 <Table
                   columns={connListColumns}
-                  dataSource={state.connList}
+                  dataSource={filteredConnList}
                   pagination={{ pageSize: 25 }}
                   rowKey="code"
                   size="small"
