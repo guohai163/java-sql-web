@@ -108,7 +108,7 @@
     font-size: 0.8rem;
 }
 
-.CodeMirror {
+.cm-editor {
     height: 300px;
     border: 1px solid rgba(15, 23, 42, 0.08);
     border-radius: 14px;
@@ -116,11 +116,11 @@
     font-size: 14px;
 }
 
-.CodeMirror-scroll {
+.cm-editor .cm-scroller {
     min-height: 300px;
 }
 
-.CodeMirror pre {
+.cm-editor .cm-content {
     line-height: 1.55;
 }
 

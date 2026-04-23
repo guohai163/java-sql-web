@@ -1,27 +1,22 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Pubsub from 'pubsub-js';
 import cookie from 'react-cookies';
-import { Controlled as CodeMirror } from 'react-codemirror2';
+import { EditorSelection } from '@codemirror/state';
+import { EditorView } from '@codemirror/view';
 import { Button, Empty, List, Modal, Result, Spin, Switch, Tabs } from 'antd';
 import { LoadingOutlined } from '@ant-design/icons';
 import { createClient } from '@/shared/api/apiClient';
 import dot from '@/features/workbench/assets/dot.gif';
 import DataDisplayFast from '@/features/workbench/components/DataDisplayFast';
+import SqlEditor from '@/features/workbench/components/SqlEditor';
 import Spreadsheet from '@/features/workbench/components/Spreadsheet';
 import WorkbenchDashboard from '@/features/workbench/components/WorkbenchDashboard';
 import {
-  getEditorMode,
   getServerTypeLabel,
   isMysqlFamily,
   normalizeServerType,
 } from '@/features/workbench/lib/serverType';
 import '@/features/workbench/styles/PageContent.css';
-import 'codemirror/lib/codemirror.css';
-import 'codemirror/addon/hint/show-hint.css';
-import 'codemirror/addon/hint/show-hint.js';
-import 'codemirror/addon/hint/sql-hint.js';
-import 'codemirror/mode/sql/sql';
-import 'codemirror/theme/idea.css';
 
 const { confirm } = Modal;
 const antIcon = <LoadingOutlined style={{ fontSize: 34 }} spin />;
@@ -68,6 +63,7 @@ function createPane(overrides = {}) {
     dashboardError: '',
     dashboardUpdatedAt: '',
     contentTab: 'dashboard',
+    schemaTables: {},
     selectedSql: '',
     ...overrides,
   };
@@ -159,14 +155,8 @@ function PageContent() {
     token: cookie.load('token'),
     queryLoading: false,
     historySql: [],
-    beforeSql: '',
-    rearSql: '',
-    options: {
-      lineNumbers: true,
-      mode: { name: getEditorMode('mysql') },
-      extraKeys: { Ctrl: 'autocomplete' },
-      theme: 'idea',
-    },
+    editorServerType: 'mysql',
+    editorSchemaTables: {},
     activeKey: initialPanes[0].key,
     panes: initialPanes,
     deskHeight: document.body.clientHeight - 460,
@@ -190,8 +180,14 @@ function PageContent() {
       if (!editorRef.current) {
         return;
       }
-      editorRef.current.scrollTo(null, 0);
-      editorRef.current.setCursor({ line: 0, ch: 0 });
+      editorRef.current.dispatch({
+        selection: EditorSelection.cursor(0),
+        effects: EditorView.scrollIntoView(0, { y: 'start' }),
+      });
+      if (editorRef.current.scrollDOM) {
+        editorRef.current.scrollDOM.scrollTop = 0;
+      }
+      editorRef.current.focus();
     });
   };
 
@@ -324,6 +320,7 @@ function PageContent() {
         selectServer: data.selectServer,
         selectDatabase: data.selectDatabase,
         selectTable: data.selectTable,
+        editorServerType: serverType,
         historySql: readHistorySql(data.selectServer),
         panes: updatePaneByKey(previous.panes, previous.activeKey, (pane) => ({
           ...pane,
@@ -441,28 +438,28 @@ function PageContent() {
         ...previous,
         selectServer: data.selectServer,
         selectDatabase: data.selectDatabase,
+        editorServerType: serverType,
+        editorSchemaTables:
+          tableColumnResponse.jsonData.status
+          && tableColumnResponse.jsonData.data
+          && typeof tableColumnResponse.jsonData.data === 'object'
+          && !Array.isArray(tableColumnResponse.jsonData.data)
+            ? tableColumnResponse.jsonData.data
+            : {},
         historySql: readHistorySql(data.selectServer),
-        options: {
-          lineNumbers: true,
-          mode: { name: getEditorMode(serverType) },
-          extraKeys: { Ctrl: 'autocomplete' },
-          hintOptions: {
-            tables:
-              tableColumnResponse.jsonData.status &&
-              tableColumnResponse.jsonData.data &&
-              typeof tableColumnResponse.jsonData.data === 'object' &&
-              !Array.isArray(tableColumnResponse.jsonData.data)
-                ? tableColumnResponse.jsonData.data
-                : {},
-          },
-          theme: 'idea',
-        },
         panes: updatePaneByKey(previous.panes, previous.activeKey, (pane) => ({
           ...pane,
           server: data.selectServer,
           database: data.selectDatabase,
           serverName: serverResponse.jsonData.data.dbServerName,
           serverType,
+          schemaTables:
+            tableColumnResponse.jsonData.status
+            && tableColumnResponse.jsonData.data
+            && typeof tableColumnResponse.jsonData.data === 'object'
+            && !Array.isArray(tableColumnResponse.jsonData.data)
+              ? tableColumnResponse.jsonData.data
+              : {},
           dashboardData: null,
           dashboardLoading: false,
           dashboardError: '',
@@ -490,10 +487,8 @@ function PageContent() {
         ...previous,
         selectServer: data.selectServer,
         selectDatabase: '',
-        options: {
-          ...previous.options,
-          mode: { name: getEditorMode(serverType) },
-        },
+        editorServerType: serverType,
+        editorSchemaTables: {},
         historySql: readHistorySql(data.selectServer),
         panes: updatePaneByKey(previous.panes, previous.activeKey, (pane) => ({
           ...clearPaneDashboard(pane),
@@ -501,31 +496,22 @@ function PageContent() {
           serverName: response.jsonData.data.dbServerName,
           serverType,
           database: '',
+          schemaTables: {},
         })),
       }));
       resetEditorInteraction();
     }
   };
 
-  const saveCursorValue = (editor, sqlValue = editor.getValue(), selectedSql = editor.getSelection()) => {
-    const currentCursor = editor.getCursor();
-    let beforeCount = 0;
-    const lines = String(sqlValue || '').split('\n');
-
-    for (let index = 0; index < currentCursor.line; index += 1) {
-      beforeCount += (lines[index] || '').length + 1;
+  const saveCursorValue = (snapshot) => {
+    if (!snapshot) {
+      return;
     }
-
-    beforeCount += currentCursor.ch;
     editorInteractionRef.current = {
-      beforeSql: sqlValue.substring(0, beforeCount),
-      rearSql: sqlValue.substring(beforeCount),
-      selectedSql,
+      beforeSql: snapshot.beforeSql || '',
+      rearSql: snapshot.rearSql || '',
+      selectedSql: snapshot.selectedSql || '',
     };
-  };
-
-  const mouseSelected = (editor) => {
-    saveCursorValue(editor);
   };
 
   const executeSql = async () => {
@@ -690,11 +676,9 @@ function PageContent() {
         activeKey,
         selectServer: pane.server || previous.selectServer,
         selectDatabase: pane.database || '',
+        editorServerType: pane.serverType || 'mysql',
+        editorSchemaTables: pane.schemaTables || {},
         historySql: pane.server ? readHistorySql(pane.server) : [],
-        options: {
-          ...previous.options,
-          mode: { name: getEditorMode(pane.serverType) },
-        },
       };
     });
     resetEditorInteraction();
@@ -795,13 +779,9 @@ function PageContent() {
                             <p>支持对象补全、选中执行和快速切换库表</p>
                           </div>
                         </div>
-                        <CodeMirror
-                          editorDidMount={(editor) => {
-                            editorRef.current = editor;
-                            editor.scrollTo(null, 0);
-                          }}
-                          onBeforeChange={(editor, metadata, value) => {
-                            saveCursorValue(editor, value, '');
+                        <SqlEditor
+                          onChange={(value, snapshot) => {
+                            saveCursorValue(snapshot);
                             setState((previous) => ({
                               ...previous,
                               panes: updatePaneByKey(previous.panes, pane.key, (currentPane) => ({
@@ -810,12 +790,21 @@ function PageContent() {
                               })),
                             }));
                           }}
-                          onCursorActivity={mouseSelected}
-                          options={state.options}
+                          onMount={(editorView) => {
+                            editorRef.current = editorView;
+                            if (editorView.scrollDOM) {
+                              editorView.scrollDOM.scrollTop = 0;
+                            }
+                          }}
+                          onSelectionChange={(snapshot) => {
+                            saveCursorValue(snapshot);
+                          }}
+                          schemaTables={state.editorSchemaTables}
+                          serverType={state.editorServerType}
                           value={pane.sql}
                         />
                         <div className="workbench-editor-tip">
-                          敲入关键字首字母后可使用 Ctrl 快速补全，选中部分 SQL 时只执行选中语句。
+                          敲入关键字首字母后可使用 Ctrl+Space 快速补全，选中部分 SQL 时只执行选中语句。
                         </div>
                       </div>
                       <div id="tablefieldscontainer" className="workbench-history-panel">

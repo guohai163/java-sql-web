@@ -2,6 +2,22 @@
 
 本文件记录当前 `master` 分支之后到当前 `develop` 工作区的主要变更，按版本和当前未发布改动整理。
 
+## v2.9.4 - 2026-04-23
+
+### Changed
+- 工作台 SQL 编辑器从 CodeMirror 5 迁移到 CodeMirror 6，前端依赖切换为 `@uiw/react-codemirror` 与 `@codemirror/lang-sql` 体系。
+- SQL 编辑器保持多数据库语法切换和动态对象补全能力，并将快捷补全键统一为 `Ctrl+Space`。
+- 工作台样式同步迁移到 CM6 的 `.cm-*` 结构，保持原有布局高度和整体视觉风格。
+
+### Fixed
+- 增加中文输入法组合输入保护，避免 composition 期间受控回写干扰，修复中文输入显示异常与双击选中后误删内容的问题。
+- 选区快照更新改为基于 CM6 原生 selection 状态，减少双击/拖拽选择在复杂输入时序下的异常行为。
+
+### Tests
+- 迁移并扩展 PageContent 编辑器测试 mock，覆盖 CM6 事件链。
+- 新增中文输入法 composition 回归用例，验证中文上屏与选区稳定性。
+- 回归前端 `PageContent`、`AdminDashboard` 测试与生产构建，确认迁移后功能可用。
+
 ## v2.9.3 - 2026-04-22
 
 ### Added

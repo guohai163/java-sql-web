@@ -40,59 +40,79 @@ jest.mock('@/shared/api/apiClient', () => ({
   createClient: jest.fn(() => mockApi),
 }));
 
-jest.mock('react-codemirror2', () => {
+jest.mock('@/features/workbench/components/SqlEditor', () => {
   const React = require('react');
-  const toCursor = (value, index) => {
-    const lines = String(value || '').slice(0, index).split('\n');
+  const buildSnapshot = (value, selectionStart, selectionEnd) => {
+    const start = Math.min(selectionStart, selectionEnd);
+    const end = Math.max(selectionStart, selectionEnd);
     return {
-      line: lines.length - 1,
-      ch: lines[lines.length - 1]?.length || 0,
+      beforeSql: value.substring(0, selectionEnd),
+      rearSql: value.substring(selectionEnd),
+      selectedSql: value.substring(start, end),
     };
   };
-  return {
-    Controlled: ({ editorDidMount, onBeforeChange, onCursorActivity, value }) => {
-      const textareaRef = React.useRef(null);
-      const editor = React.useMemo(
-        () => ({
-          scrollTo: jest.fn(),
-          setCursor: jest.fn(),
-          lineCount: () => String(textareaRef.current?.value || '').split('\n').length,
-          getLine: (index) => String(textareaRef.current?.value || '').split('\n')[index] || '',
-          getValue: () => textareaRef.current?.value || '',
-          getSelection: () => {
-            const node = textareaRef.current;
-            if (!node) {
-              return '';
-            }
-            return node.value.substring(node.selectionStart, node.selectionEnd);
-          },
-          getCursor: () => {
-            const node = textareaRef.current;
-            if (!node) {
-              return { line: 0, ch: 0 };
-            }
-            return toCursor(node.value, node.selectionEnd);
-          },
-        }),
-        [],
-      );
+  return function MockSqlEditor({
+    onChange,
+    onMount,
+    onSelectionChange,
+    value,
+  }) {
+    const textareaRef = React.useRef(null);
+    const composingRef = React.useRef(false);
+    const pendingValueRef = React.useRef('');
 
-      React.useEffect(() => {
-        editorDidMount?.(editor);
-      }, [editorDidMount, editor]);
+    React.useEffect(() => {
+      onMount?.({
+        dispatch: jest.fn(),
+        focus: jest.fn(),
+        scrollDOM: { scrollTop: 0 },
+      });
+    }, [onMount]);
 
-      return (
-        <textarea
-          aria-label="sql-editor"
-          onMouseUp={() => onCursorActivity?.(editor)}
-          onChange={(event) => onBeforeChange?.(editor, null, event.target.value)}
-          onSelect={() => onCursorActivity?.(editor)}
-          onKeyUp={() => onCursorActivity?.(editor)}
-          ref={textareaRef}
-          value={value}
-        />
+    const emitSelection = () => {
+      const node = textareaRef.current;
+      if (!node) {
+        return;
+      }
+      onSelectionChange?.(
+        buildSnapshot(node.value, node.selectionStart, node.selectionEnd),
       );
-    },
+    };
+
+    return (
+      <textarea
+        aria-label="sql-editor"
+        onChange={(event) => {
+          const nextValue = event.target.value;
+          if (composingRef.current) {
+            pendingValueRef.current = nextValue;
+            return;
+          }
+          onChange?.(
+            nextValue,
+            buildSnapshot(nextValue, event.target.selectionStart, event.target.selectionEnd),
+          );
+        }}
+        onCompositionEnd={(event) => {
+          composingRef.current = false;
+          const nextValue = pendingValueRef.current || event.target.value;
+          pendingValueRef.current = '';
+          onChange?.(
+            nextValue,
+            buildSnapshot(nextValue, event.target.selectionStart, event.target.selectionEnd),
+          );
+          onSelectionChange?.(
+            buildSnapshot(nextValue, event.target.selectionStart, event.target.selectionEnd),
+          );
+        }}
+        onCompositionStart={() => {
+          composingRef.current = true;
+        }}
+        onSelect={emitSelection}
+        ref={textareaRef}
+        value={value}
+      />
+    );
   };
 });
 
@@ -395,6 +415,63 @@ describe('PageContent', () => {
 
     await waitFor(() => {
       expect(editor).toHaveValue('SELECT * FROM  orders demo');
+    });
+  });
+
+  test('keeps composed Chinese input after composition end', async () => {
+    render(<PageContent />);
+    await publishDatabaseSelection();
+
+    const activePanel = getActiveWorkbenchPanel();
+    const editor = within(activePanel).getByLabelText('sql-editor');
+
+    fireEvent.compositionStart(editor);
+    fireEvent.change(editor, {
+      target: {
+        value: 'SELECT * FROM 用户表',
+        selectionStart: 16,
+        selectionEnd: 16,
+      },
+    });
+    fireEvent.compositionEnd(editor, {
+      target: {
+        value: 'SELECT * FROM 用户表',
+        selectionStart: 16,
+        selectionEnd: 16,
+      },
+    });
+
+    await waitFor(() => {
+      expect(editor).toHaveValue('SELECT * FROM 用户表');
+    });
+  });
+
+  test('does not remove Chinese selection when selecting after composition', async () => {
+    render(<PageContent />);
+    await publishDatabaseSelection();
+
+    const activePanel = getActiveWorkbenchPanel();
+    const editor = within(activePanel).getByLabelText('sql-editor');
+
+    fireEvent.compositionStart(editor);
+    fireEvent.change(editor, {
+      target: {
+        value: '中文查询',
+        selectionStart: 4,
+        selectionEnd: 4,
+      },
+    });
+    fireEvent.compositionEnd(editor, {
+      target: {
+        value: '中文查询',
+        selectionStart: 4,
+        selectionEnd: 4,
+      },
+    });
+    updateSelection(editor, 0, 2);
+
+    await waitFor(() => {
+      expect(editor).toHaveValue('中文查询');
     });
   });
 });
