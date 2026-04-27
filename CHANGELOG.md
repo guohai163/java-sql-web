@@ -2,6 +2,14 @@
 
 本文件记录当前 `master` 分支之后到当前 `develop` 工作区的主要变更，按版本和当前未发布改动整理。
 
+## v2.9.6 - 2026-04-27
+
+### Fixed
+- 修复安全任务 `bind-otp` 会话校验误判问题：`getUserByCode` 查询补齐 `token` 字段后，`OTP绑定会话无效` 不再被错误触发。
+
+### Tests
+- 新增 `UserSecurityTaskServiceImplTests` 回归用例，覆盖 `bindOtp` 使用持久化 `token` 校验会话的链路，防止后续回归。
+
 ## v2.9.5 - 2026-04-27
 
 ### Fixed

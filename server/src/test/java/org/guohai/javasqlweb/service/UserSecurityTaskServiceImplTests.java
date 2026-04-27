@@ -112,6 +112,31 @@ class UserSecurityTaskServiceImplTests {
     }
 
     @Test
+    void bindOtpUsesPersistedUserTokenWhenValidatingSession() {
+        UserSecurityTaskBean task = new UserSecurityTaskBean();
+        task.setCode(11);
+        task.setUserCode(2);
+        task.setUserName("alice");
+        task.setTaskType(UserSecurityTaskType.RESET_OTP);
+        task.setTaskStatus(UserSecurityTaskStatus.PENDING_OTP);
+        task.setExpireTime(Date.from(Instant.now().plus(1, ChronoUnit.HOURS)));
+
+        UserBean user = new UserBean();
+        user.setCode(2);
+        user.setUserName("alice");
+        user.setToken("token-123");
+        user.setAuthSecret("AABBCCDDEEFFGGHH");
+
+        when(userSecurityTaskDao.getTaskByHash(anyString())).thenReturn(task);
+        when(userManageDao.getUserByCode(2)).thenReturn(user);
+
+        Result<String> result = userSecurityTaskService.bindOtp("uuid-123", "token-123", "abc");
+
+        assertFalse(result.getStatus());
+        assertEquals("动态码格式错误", result.getMessage());
+    }
+
+    @Test
     void getTaskInfoExpiresOutdatedTask() {
         UserSecurityTaskBean task = new UserSecurityTaskBean();
         task.setCode(1);

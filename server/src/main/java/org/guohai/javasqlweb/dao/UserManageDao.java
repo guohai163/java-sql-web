@@ -44,7 +44,7 @@ public interface UserManageDao {
      * @param userCode 用户编号
      * @return 用户
      */
-    @Select("SELECT code,user_name,email,create_time,pass_word,auth_status,auth_secret,login_status,account_status,access_token_hash,access_token_expire_time " +
+    @Select("SELECT code,user_name,email,create_time,pass_word,token,auth_status,auth_secret,login_status,account_status,access_token_hash,access_token_expire_time " +
             "FROM user_tb WHERE code=#{userCode}")
     UserBean getUserByCode(@Param("userCode") Integer userCode);
 
