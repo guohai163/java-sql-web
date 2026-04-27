@@ -232,7 +232,7 @@ public class WebAuthService {
         } catch (AssertionFailedException e) {
             LOG.error("Passkey sign in failed. configuredDomain={}, configuredHost={}, allowedOrigins={}, message={}",
                     relyingPartyDomain, relyingPartyHost, rp.getOrigins(), e.getMessage(), e);
-            return new Result<>(false, e.toString(), null);
+            return new Result<>(false, resolveAssertionFailureMessage(e), null);
         }
 
         return new Result<>(false, "登录失败", null);
@@ -332,6 +332,17 @@ public class WebAuthService {
             return PASSKEY_ORIGIN_MISMATCH_MESSAGE + "，当前配置为 " + relyingPartyHost;
         }
         return "处理失败";
+    }
+
+    private String resolveAssertionFailureMessage(AssertionFailedException exception) {
+        String message = exception.getMessage();
+        if (message != null && message.contains("Unknown credential")) {
+            return "passkey 凭证不存在或已失效，请在登录后重新绑定 passkey";
+        }
+        if (message != null && message.contains("Incorrect origin")) {
+            return PASSKEY_ORIGIN_MISMATCH_MESSAGE + "，当前配置为 " + relyingPartyHost;
+        }
+        return message == null || message.isBlank() ? "passkey 登录失败" : message;
     }
 
     record AssertionVerificationResult(boolean success, String userName) {

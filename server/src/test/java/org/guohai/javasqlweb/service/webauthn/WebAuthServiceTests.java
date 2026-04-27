@@ -8,6 +8,7 @@ import com.yubico.webauthn.data.PublicKeyCredentialParameters;
 import com.yubico.webauthn.data.PublicKeyCredentialType;
 import com.yubico.webauthn.data.RelyingPartyIdentity;
 import com.yubico.webauthn.data.UserIdentity;
+import com.yubico.webauthn.exception.AssertionFailedException;
 import com.yubico.webauthn.exception.RegistrationFailedException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.guohai.javasqlweb.beans.Result;
@@ -248,6 +249,32 @@ class WebAuthServiceTests {
         assertFalse(result.getStatus());
         assertEquals("passkey 请求已失效，请重新发起", result.getMessage());
         verify(webAuthnRequestDao).deleteExpiredByTypeAndKey(eq(WebAuthnRequestType.ASSERTION), eq("session-3"), any(Date.class));
+    }
+
+    @Test
+    void signInReturnsFriendlyMessageWhenCredentialUnknown() throws Exception {
+        WebAuthService spyService = spy(createService());
+        AssertionRequest request = spyService.startAssertionRequest();
+
+        WebAuthnRequestBean storedRequest = new WebAuthnRequestBean();
+        storedRequest.setCode(23);
+        storedRequest.setRequestType(WebAuthnRequestType.ASSERTION);
+        storedRequest.setRequestKey("session-4");
+        storedRequest.setRequestJson(request.toJson());
+        storedRequest.setCreatedTime(new Date());
+        storedRequest.setExpireTime(new Date(System.currentTimeMillis() + 60_000L));
+
+        when(webAuthnRequestDao.getActiveRequestForUpdate(eq(WebAuthnRequestType.ASSERTION), eq("session-4"), any(Date.class)))
+                .thenReturn(storedRequest);
+        when(webAuthnRequestDao.deleteByCode(23)).thenReturn(1);
+        doThrow(new AssertionFailedException(
+                new IllegalArgumentException("Unknown credential: ByteArray(9c3a9bc69efcf655f41dd5e144d0e09dbac217a1)")))
+                .when(spyService).verifyAssertion(eq("assertion-body"), any(AssertionRequest.class));
+
+        Result<UserBean> result = spyService.signIn("assertion-body", "session-4");
+
+        assertFalse(result.getStatus());
+        assertEquals("passkey 凭证不存在或已失效，请在登录后重新绑定 passkey", result.getMessage());
     }
 
     private WebAuthService createService() {

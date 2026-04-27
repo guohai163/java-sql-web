@@ -2,6 +2,21 @@
 
 本文件记录当前 `master` 分支之后到当前 `develop` 工作区的主要变更，按版本和当前未发布改动整理。
 
+## v2.9.5 - 2026-04-27
+
+### Fixed
+- 修复 Passkey 登录时凭证仓储错误返回用户名字节导致的 `Unknown credential` 认证失败问题。
+- 修复 Passkey 凭证匹配仅按单一编码查询的问题，新增 `base64/base64url` 双格式兼容，降低历史数据编码差异引发的登录失败。
+- 优化 Passkey 登录失败提示，`Unknown credential` 场景返回可操作文案，引导用户重新绑定凭证。
+
+### Changed
+- 调整 WebAuthn DAO 参数绑定，补齐多参数查询的显式 `@Param` 标注，提升参数映射稳定性。
+- 凭证解析流程增加异常编码行的容错与日志告警，避免脏数据直接触发空指针或中断认证链路。
+
+### Tests
+- 扩展 `MyCredentialRepositoryTests`，覆盖按用户名读取 credentialId/userHandle、base64url 回退匹配等关键路径。
+- 新增 `WebAuthServiceTests` 用例，验证 `Unknown credential` 登录失败会返回友好提示。
+
 ## v2.9.4 - 2026-04-23
 
 ### Changed
