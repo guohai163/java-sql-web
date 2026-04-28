@@ -254,7 +254,7 @@ class BackstageServiceImplTests {
         DbOperation successOperation = mock(DbOperation.class);
         DbOperation failedOperation = mock(DbOperation.class);
 
-        when(baseConfigDao.getConnData()).thenReturn(List.of(serverA, serverB));
+        when(baseConfigDao.getConnDataForSync()).thenReturn(List.of(serverA, serverB));
         doReturn(successOperation)
                 .doReturn(failedOperation)
                 .when(backstageService).createTemporaryDbOperation(org.mockito.ArgumentMatchers.any(ConnectConfigBean.class));
@@ -277,6 +277,32 @@ class BackstageServiceImplTests {
         verify(baseConfigDao, never()).deleteServerDatabaseSnapshots(2);
         verify(successOperation).close();
         verify(failedOperation).close();
+    }
+
+    @Test
+    void syncServerDatabasesShouldExposeInnermostAccessDeniedMessage() throws Exception {
+        ConnectConfigBean server = new ConnectConfigBean();
+        server.setCode(39);
+        server.setDbServerName("public-battery");
+        server.setDbServerType("mysql");
+        DbOperation failedOperation = mock(DbOperation.class);
+        RuntimeException wrappedError = new RuntimeException(
+                "jsw-mysql-39 - Connection is not available",
+                new java.sql.SQLException("Access denied for user 'devpower_reader'@'10.12.54.32' (using password: NO)")
+        );
+
+        when(baseConfigDao.getConnDataForSync()).thenReturn(List.of(server));
+        doReturn(failedOperation)
+                .when(backstageService).createTemporaryDbOperation(org.mockito.ArgumentMatchers.any(ConnectConfigBean.class));
+        when(failedOperation.getDbList()).thenThrow(wrappedError);
+
+        Result<ServerDatabaseSyncResult> result = backstageService.syncServerDatabases();
+
+        assertTrue(result.getStatus());
+        assertEquals(1, result.getData().getFailCount());
+        assertEquals(1, result.getData().getFailures().size());
+        assertTrue(result.getData().getFailures().get(0).getMessage().contains("Access denied"));
+        verify(baseConfigDao, never()).deleteServerDatabaseSnapshots(39);
     }
 
     @Test

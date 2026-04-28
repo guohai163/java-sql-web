@@ -140,7 +140,7 @@ public class BackstageServiceImpl implements BackstageService{
 
     @Override
     public Result<ServerDatabaseSyncResult> syncServerDatabases() {
-        List<ConnectConfigBean> listConn = DbServerTypeUtils.normalize(baseConfigDao.getConnData());
+        List<ConnectConfigBean> listConn = DbServerTypeUtils.normalize(baseConfigDao.getConnDataForSync());
         ServerDatabaseSyncResult syncResult = new ServerDatabaseSyncResult();
         List<ServerDatabaseSyncFailure> failures = new ArrayList<>();
         int successCount = 0;
@@ -760,6 +760,18 @@ public class BackstageServiceImpl implements BackstageService{
     }
 
     private String resolveSyncErrorMessage(Exception error) {
+        Throwable current = error;
+        String lastNonEmptyMessage = null;
+        while (current != null) {
+            String message = current.getMessage();
+            if (message != null && !message.trim().isEmpty()) {
+                lastNonEmptyMessage = message.trim();
+            }
+            current = current.getCause();
+        }
+        if (lastNonEmptyMessage != null) {
+            return lastNonEmptyMessage;
+        }
         if (error == null || error.getMessage() == null || error.getMessage().trim().isEmpty()) {
             return "同步失败";
         }

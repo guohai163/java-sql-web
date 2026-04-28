@@ -2,6 +2,18 @@
 
 本文件记录当前 `master` 分支之后到当前 `develop` 工作区的主要变更，按版本和当前未发布改动整理。
 
+## v2.10.1 - 2026-04-28
+
+### Fixed
+- 修复后台“同步所有实例库名”错误复用脱敏连接配置的问题；同步改为读取完整连接配置（含密码）建立数据库连接，避免出现 `using password: NO` 导致的认证失败。
+
+### Changed
+- 同步失败摘要优化为优先展示异常链路中更底层、可运维的数据库错误信息（如 `Access denied`），减少连接池外层超时噪音对排障的干扰。
+
+### Tests
+- 扩展 `BackstageServiceImplTests`，覆盖同步使用含密码配置分支、`Access denied` 错误可读性以及“部分失败不影响其它实例同步”回归场景。
+- 回归执行 `BackstageServiceImplTests` 与 `BackstageControllerTests` 共 17 个用例通过。
+
 ## v2.10.0 - 2026-04-28
 
 ### Added

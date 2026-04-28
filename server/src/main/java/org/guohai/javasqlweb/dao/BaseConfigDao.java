@@ -176,6 +176,13 @@ public interface BaseConfigDao {
             "FROM `db_connect_config_tb`;")
     List<ConnectConfigBean> getConnData();
 
+    /**
+     * 获取用于后台同步任务的完整连接配置（含密码）
+     * @return
+     */
+    @Select("SELECT * FROM `db_connect_config_tb`;")
+    List<ConnectConfigBean> getConnDataForSync();
+
     @Delete("DELETE FROM db_server_database_snapshot_tb WHERE server_code = #{serverCode}")
     Boolean deleteServerDatabaseSnapshots(@Param("serverCode") Integer serverCode);
 
