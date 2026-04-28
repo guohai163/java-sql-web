@@ -4,6 +4,7 @@ import com.zaxxer.hikari.HikariDataSource;
 import com.zaxxer.hikari.HikariPoolMXBean;
 import org.guohai.javasqlweb.beans.PoolStatBean;
 import org.guohai.javasqlweb.beans.ConnectConfigBean;
+import org.guohai.javasqlweb.beans.TablesNameBean;
 import org.guohai.javasqlweb.beans.TargetSessionStatBean;
 import org.junit.jupiter.api.Test;
 
@@ -11,6 +12,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.sql.Connection;
+import java.sql.Statement;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.Map;
@@ -22,8 +24,43 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.argThat;
 
 class DbOperationPostgresqlDruidTests {
+
+    @Test
+    void getTableListOrdersByTableNameAscending() throws Exception {
+        DbOperationPostgresqlDruid operation = new DbOperationPostgresqlDruid(buildConnectConfig());
+        com.zaxxer.hikari.HikariDataSource dataSource = mock(com.zaxxer.hikari.HikariDataSource.class);
+        Connection connection = mock(Connection.class);
+        Statement statement = mock(Statement.class);
+        ResultSet resultSet = mock(ResultSet.class);
+        long now = System.currentTimeMillis();
+        try {
+            accessPostgresMap(operation).put("demo", newCachedDataSource(mock(com.zaxxer.hikari.HikariDataSource.class), now));
+            accessPostgresMap(operation).put("analytics", newCachedDataSource(dataSource, now));
+
+            when(dataSource.getConnection()).thenReturn(connection);
+            when(connection.createStatement()).thenReturn(statement);
+            when(statement.executeQuery(argThat(sql ->
+                    sql != null
+                            && sql.contains("select relname as TABLE_NAME")
+                            && sql.contains("order by TABLE_NAME asc;")
+            ))).thenReturn(resultSet);
+            when(resultSet.next()).thenReturn(true, false);
+            when(resultSet.getString("TABLE_NAME")).thenReturn("A_table");
+            when(resultSet.getLong("rowCounts")).thenReturn(88L);
+
+            java.util.List<TablesNameBean> tables = operation.getTableList("analytics");
+
+            assertEquals(1, tables.size());
+            assertEquals("A_table", tables.get(0).getTableName());
+            assertEquals(88L, tables.get(0).getTableRows());
+            verify(statement).executeQuery(argThat(sql -> sql != null && sql.contains("order by TABLE_NAME asc;")));
+        } finally {
+            operation.close();
+        }
+    }
 
     @Test
     void cleanupCachedDataSourcesClosesIdlePools() throws Exception {

@@ -103,7 +103,7 @@ public class DbOperationPostgresqlDruid implements DbOperation {
             rs = st.executeQuery(String.format(
                     "select relname as TABLE_NAME, reltuples as rowCounts from pg_class\n" +
                             "where relkind = 'r' and relnamespace = (select oid from pg_namespace where nspname='public')\n" +
-                            "order by rowCounts desc;", dbName));
+                            "order by TABLE_NAME asc;", dbName));
             while (rs.next()){
                 listTnb.add(new TablesNameBean(rs.getString("TABLE_NAME"),
                         rs.getLong("rowCounts")));

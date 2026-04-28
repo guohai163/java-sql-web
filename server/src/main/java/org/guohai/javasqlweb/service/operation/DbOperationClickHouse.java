@@ -103,7 +103,7 @@ public class DbOperationClickHouse implements DbOperation{
         Connection conn = sqlDs.getConnection();
         Statement st = conn.createStatement();
         ResultSet rs = st.executeQuery(String.format(
-                "SELECT name,total_rows FROM system.tables where database='%s' ORDER BY name DESC; ", dbName));
+                "SELECT name,total_rows FROM system.tables where database='%s' ORDER BY name ASC; ", dbName));
         while (rs.next()){
             listTnb.add(new TablesNameBean(rs.getString("name"),
                     rs.getLong("total_rows")));

@@ -232,6 +232,32 @@
     font-weight: 600;
 }
 
+.workbench-table-row {
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr);
+    align-items: center;
+    column-gap: 2px;
+}
+
+.workbench-table-row > .block {
+    float: none !important;
+}
+
+.workbench-table-row > .workbench-table-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.workbench-table-row > .clearfloat {
+    display: none;
+}
+
+.workbench-table-row > .list_container {
+    grid-column: 1 / -1;
+}
+
 #navigation_tree .list_container {
     margin: 6px 0 0 16px;
     padding: 6px 0 2px 12px;

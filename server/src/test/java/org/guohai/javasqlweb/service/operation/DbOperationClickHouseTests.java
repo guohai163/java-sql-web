@@ -4,6 +4,7 @@ import com.zaxxer.hikari.HikariDataSource;
 import com.zaxxer.hikari.HikariPoolMXBean;
 import org.guohai.javasqlweb.beans.ConnectConfigBean;
 import org.guohai.javasqlweb.beans.PoolStatBean;
+import org.guohai.javasqlweb.beans.TablesNameBean;
 import org.junit.jupiter.api.Test;
 
 import javax.sql.DataSource;
@@ -34,6 +35,30 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class DbOperationClickHouseTests {
+
+    @Test
+    void getTableListOrdersByNameAscending() throws Exception {
+        DataSource dataSource = mock(DataSource.class);
+        Connection connection = mock(Connection.class);
+        Statement statement = mock(Statement.class);
+        ResultSet resultSet = mock(ResultSet.class);
+        DbOperationClickHouse operation = new DbOperationClickHouse(dataSource);
+
+        when(dataSource.getConnection()).thenReturn(connection);
+        when(connection.createStatement()).thenReturn(statement);
+        when(statement.executeQuery(anyString())).thenReturn(resultSet);
+        when(resultSet.next()).thenReturn(true, false);
+        when(resultSet.getString("name")).thenReturn("A_table");
+        when(resultSet.getLong("total_rows")).thenReturn(21L);
+
+        List<TablesNameBean> tables = operation.getTableList("analytics");
+
+        assertEquals(1, tables.size());
+        assertEquals("A_table", tables.get(0).getTableName());
+        assertEquals(21L, tables.get(0).getTableRows());
+        verify(statement).executeQuery(
+                "SELECT name,total_rows FROM system.tables where database='analytics' ORDER BY name ASC; ");
+    }
 
     @Test
     void queryDatabaseBySqlUsesDatabaseScopedDatasourceAndKeepsTruncationHint() throws Exception {

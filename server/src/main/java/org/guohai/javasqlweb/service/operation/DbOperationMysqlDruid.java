@@ -100,7 +100,7 @@ public class DbOperationMysqlDruid implements DbOperation {
         Statement st = conn.createStatement();
         ResultSet rs = st.executeQuery(String.format(
                 "SELECT table_name ,table_rows " +
-                "FROM `information_schema`.`tables` WHERE TABLE_SCHEMA = '%s' ORDER BY table_name DESC;", dbName));
+                "FROM `information_schema`.`tables` WHERE TABLE_SCHEMA = '%s' ORDER BY table_name ASC;", dbName));
         while (rs.next()){
             listTnb.add(new TablesNameBean(rs.getString("table_name"),
                     rs.getLong("table_rows")));

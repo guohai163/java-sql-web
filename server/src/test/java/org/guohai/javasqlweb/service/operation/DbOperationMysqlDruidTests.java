@@ -4,6 +4,7 @@ import com.zaxxer.hikari.HikariDataSource;
 import com.zaxxer.hikari.HikariPoolMXBean;
 import org.guohai.javasqlweb.beans.PoolStatBean;
 import org.guohai.javasqlweb.beans.QueryExecutionResult;
+import org.guohai.javasqlweb.beans.TablesNameBean;
 import org.guohai.javasqlweb.beans.TargetSessionStatBean;
 import org.junit.jupiter.api.Test;
 
@@ -25,6 +26,30 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class DbOperationMysqlDruidTests {
+
+    @Test
+    void getTableListOrdersByTableNameAscending() throws Exception {
+        DataSource dataSource = mock(DataSource.class);
+        Connection connection = mock(Connection.class);
+        Statement statement = mock(Statement.class);
+        ResultSet resultSet = mock(ResultSet.class);
+        DbOperationMysqlDruid operation = new DbOperationMysqlDruid(dataSource);
+
+        when(dataSource.getConnection()).thenReturn(connection);
+        when(connection.createStatement()).thenReturn(statement);
+        when(statement.executeQuery(anyString())).thenReturn(resultSet);
+        when(resultSet.next()).thenReturn(true, false);
+        when(resultSet.getString("table_name")).thenReturn("A_table");
+        when(resultSet.getLong("table_rows")).thenReturn(123L);
+
+        List<TablesNameBean> tables = operation.getTableList("analytics");
+
+        assertEquals(1, tables.size());
+        assertEquals("A_table", tables.get(0).getTableName());
+        assertEquals(123L, tables.get(0).getTableRows());
+        verify(statement).executeQuery(
+                "SELECT table_name ,table_rows FROM `information_schema`.`tables` WHERE TABLE_SCHEMA = 'analytics' ORDER BY table_name ASC;");
+    }
 
     @Test
     void queryDatabaseBySqlAppliesConfiguredTimeoutToAllStatements() throws Exception {

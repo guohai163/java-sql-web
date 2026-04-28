@@ -78,6 +78,27 @@ function normalizeArray(value) {
   return Array.isArray(value) ? value : [];
 }
 
+function compareAscii(left, right) {
+  const leftValue = String(left ?? '');
+  const rightValue = String(right ?? '');
+  const minLength = Math.min(leftValue.length, rightValue.length);
+
+  for (let index = 0; index < minLength; index += 1) {
+    const charDiff = leftValue.charCodeAt(index) - rightValue.charCodeAt(index);
+    if (charDiff !== 0) {
+      return charDiff;
+    }
+  }
+
+  return leftValue.length - rightValue.length;
+}
+
+function sortTablesByAsciiName(list) {
+  return normalizeArray(list)
+    .slice()
+    .sort((left, right) => compareAscii(left?.tableName, right?.tableName));
+}
+
 function Navigation() {
   const navigate = useNavigate();
   const [state, setState] = useState({
@@ -196,9 +217,10 @@ function Navigation() {
     const tableData = cache.get(requestKey);
 
     if (tableData !== null) {
+      const sortedTables = sortTablesByAsciiName(tableData);
       setStatePatch({
-        tableList: tableData,
-        filterTableList: tableData,
+        tableList: sortedTables,
+        filterTableList: sortedTables,
         tableLoading: false,
       });
       return;
@@ -210,12 +232,13 @@ function Navigation() {
     });
 
     if (response.jsonData.status) {
+      const sortedTables = sortTablesByAsciiName(response.jsonData.data);
       setStatePatch({
-        tableList: response.jsonData.data,
-        filterTableList: response.jsonData.data,
+        tableList: sortedTables,
+        filterTableList: sortedTables,
         tableLoading: false,
       });
-      cache.set(requestKey, response.jsonData.data, CACHE_TTL);
+      cache.set(requestKey, sortedTables, CACHE_TTL);
       return;
     }
 
@@ -782,7 +805,7 @@ function Navigation() {
                       {state.selectDatabase !== db.dbName
                         ? null
                         : state.filterTableList.map((table) => (
-                            <li className="view" key={table.tableName}>
+                            <li className="view workbench-table-row" key={table.tableName}>
                               <div className="block">
                                 <i></i>
                                 <a className="expander" href="/">
@@ -815,7 +838,7 @@ function Navigation() {
                                 </a>
                               </div>
                               <a
-                                className="hover_show_full workbench-tree-link"
+                                className="hover_show_full workbench-tree-link workbench-table-name"
                                 href="/"
                                 title=""
                                 onClick={(event) => handleLink(event, () => sendTableName(table.tableName))}

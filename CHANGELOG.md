@@ -2,6 +2,16 @@
 
 本文件记录当前 `master` 分支之后到当前 `develop` 工作区的主要变更，按版本和当前未发布改动整理。
 
+## v2.9.7 - 2026-04-28
+
+### Changed
+- 工作台左侧表列表改为按 ASCII 升序展示，统一不同数据库类型下的表名排序体验。
+- 优化表项布局，确保展开图标与表名保持同一行显示，长表名按单行省略处理。
+
+### Tests
+- 新增 MySQL、PostgreSQL、ClickHouse 的 `getTableList` 排序单测，校验均按表名升序返回。
+- 回归执行 `DbOperationMysqlDruidTests`、`DbOperationPostgresqlDruidTests`、`DbOperationClickHouseTests` 共 17 个用例通过。
+
 ## v2.9.6 - 2026-04-27
 
 ### Fixed
