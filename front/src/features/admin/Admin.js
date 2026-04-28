@@ -100,6 +100,45 @@ function buildServerRuntimeMap(runtimeList) {
   }, {});
 }
 
+export function buildConnListQuery(keyword, serverType) {
+  const query = new URLSearchParams();
+  const normalizedKeyword = (keyword || '').trim();
+  const normalizedType = (serverType || '').trim();
+
+  if (normalizedKeyword) {
+    query.set('keyword', normalizedKeyword);
+    query.set('dbName', normalizedKeyword);
+  }
+  if (normalizedType && normalizedType !== 'all') {
+    query.set('serverType', normalizedType);
+  }
+
+  return query.toString();
+}
+
+export function summarizeSyncResult(result) {
+  const failures = Array.isArray(result?.failures) ? result.failures : [];
+  const summaryLines = [
+    `总实例数：${result?.totalServers ?? 0}`,
+    `成功：${result?.successCount ?? 0}`,
+    `失败：${result?.failCount ?? 0}`,
+    `同步时间：${result?.syncedAt || '-'}`,
+  ];
+
+  if (failures.length === 0) {
+    return summaryLines.join('\n');
+  }
+
+  const failureLines = failures.map((failure) => {
+    const serverName = failure?.serverName || '-';
+    const serverCode = failure?.serverCode == null ? '-' : failure.serverCode;
+    const detail = failure?.message || '同步失败';
+    return `${serverName}(${serverCode})：${detail}`;
+  });
+
+  return `${summaryLines.join('\n')}\n失败明细：\n${failureLines.join('\n')}`;
+}
+
 function getServerRuntimeMeta(status) {
   switch (status) {
     case 'ok':
@@ -186,6 +225,8 @@ function Admin() {
     serverTestResults: {},
     testingServerCode: null,
     resettingServerCode: null,
+    syncingServerDatabases: false,
+    latestServerDatabaseSyncTime: '',
     testingConfigServer: false,
     configVisible: false,
     userAddVisible: false,
@@ -332,6 +373,39 @@ function Admin() {
     return [];
   };
 
+  const loadServerManagement = async (overrides = {}) => {
+    const nextKeyword =
+      Object.prototype.hasOwnProperty.call(overrides, 'keyword')
+        ? overrides.keyword
+        : state.serverSearchKeyword;
+    const nextServerType =
+      Object.prototype.hasOwnProperty.call(overrides, 'serverType')
+        ? overrides.serverType
+        : state.serverTypeFilter;
+
+    const client = createClient();
+    const headers = {
+      headers: {
+        'Content-Type': 'text/plain',
+        'User-Token': state.token,
+      },
+    };
+    const queryString = buildConnListQuery(nextKeyword, nextServerType);
+    const connlistPath = queryString === '' ? '/api/backstage/connlist' : `/api/backstage/connlist?${queryString}`;
+    const [connResponse, runtimeList] = await Promise.all([
+      client.get(connlistPath, headers),
+      loadServerRuntime(client, headers),
+    ]);
+    const connList = connResponse.jsonData.data || [];
+    setStatePatch((previous) => ({
+      serverSearchKeyword: nextKeyword,
+      serverTypeFilter: nextServerType,
+      connList,
+      serverRuntimeMap: buildServerRuntimeMap(runtimeList),
+      serverTestResults: pruneServerTestResults(connList, previous.serverTestResults),
+    }));
+  };
+
   const loadTargetSessionDetails = async (serverRecord, options = {}) => {
     const serverCode = serverRecord?.serverCode;
     if (serverCode == null) {
@@ -401,16 +475,7 @@ function Admin() {
         break;
       }
       case '3': {
-        const [connResponse, runtimeList] = await Promise.all([
-          client.get('/api/backstage/connlist', headers),
-          loadServerRuntime(client, headers),
-        ]);
-        const connList = connResponse.jsonData.data || [];
-        setStatePatch((previous) => ({
-          connList,
-          serverRuntimeMap: buildServerRuntimeMap(runtimeList),
-          serverTestResults: pruneServerTestResults(connList, previous.serverTestResults),
-        }));
+        await loadServerManagement();
         break;
       }
       case '4': {
@@ -772,6 +837,40 @@ function Admin() {
         dbSslMode: 'DEFAULT',
       },
     });
+  };
+
+  const syncServerDatabases = async () => {
+    setStatePatch({
+      syncingServerDatabases: true,
+    });
+
+    try {
+      const client = createClient();
+      const response = await client.post('/api/backstage/server-databases/sync', {
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Token': state.token,
+        },
+      });
+
+      if (response.jsonData.status === true) {
+        const syncData = response.jsonData.data || {};
+        setStatePatch({
+          latestServerDatabaseSyncTime: syncData.syncedAt || '',
+        });
+        showDialog(summarizeSyncResult(syncData), '实例库名同步结果');
+        await loadServerManagement();
+        return;
+      }
+
+      showDialog(response.jsonData.message || response.jsonData.data || '同步失败');
+    } catch (error) {
+      showDialog(error?.message || '同步请求失败，请检查网络或服务状态');
+    } finally {
+      setStatePatch({
+        syncingServerDatabases: false,
+      });
+    }
   };
 
   const userAddBtn = () => {
@@ -1298,14 +1397,6 @@ function Admin() {
             .includes(normalizedUserSearchKeyword),
         );
 
-  const normalizedServerSearchKeyword = state.serverSearchKeyword.trim().toLowerCase();
-  const filteredConnList = state.connList.filter((server) => {
-    const matchKeyword =
-      normalizedServerSearchKeyword === ''
-      || (server.dbServerName || '').toLowerCase().includes(normalizedServerSearchKeyword);
-    const matchType = state.serverTypeFilter === 'all' || server.dbServerType === state.serverTypeFilter;
-    return matchKeyword && matchType;
-  });
   const serverTypeFilterOptions = [...new Set(
     state.connList
       .map((item) => item.dbServerType)
@@ -1471,14 +1562,20 @@ function Admin() {
                   <Button type="primary" onClick={serverAddBtn}>
                     增加服务器
                   </Button>
+                  <Button
+                    loading={state.syncingServerDatabases}
+                    onClick={syncServerDatabases}
+                  >
+                    同步所有实例库名
+                  </Button>
                   <Input
                     allowClear
                     className="admin-search-input"
-                    placeholder="按服务器名搜索"
+                    placeholder="按服务器名或库名搜索（库名全等）"
                     value={state.serverSearchKeyword}
                     onChange={(event) => {
-                      setStatePatch({
-                        serverSearchKeyword: event.target.value,
+                      void loadServerManagement({
+                        keyword: event.target.value,
                       });
                     }}
                   />
@@ -1487,8 +1584,8 @@ function Admin() {
                     style={{ width: 160 }}
                     value={state.serverTypeFilter}
                     onChange={(value) => {
-                      setStatePatch({
-                        serverTypeFilter: value || 'all',
+                      void loadServerManagement({
+                        serverType: value || 'all',
                       });
                     }}
                   >
@@ -1499,10 +1596,13 @@ function Admin() {
                       </Select.Option>
                     ))}
                   </Select>
+                  <span className="admin-dashboard-meta">
+                    最近同步：{state.latestServerDatabaseSyncTime || '-'}
+                  </span>
                 </div>,
                 <Table
                   columns={connListColumns}
-                  dataSource={filteredConnList}
+                  dataSource={state.connList}
                   pagination={{ pageSize: 25 }}
                   rowKey="code"
                   size="small"

@@ -23,6 +23,23 @@ ALTER TABLE `db_connect_config_tb`
 ALTER TABLE `db_connect_config_tb`
   MODIFY `code` int(11) NOT NULL AUTO_INCREMENT;
 
+-- 服务器库名快照表
+CREATE TABLE `db_server_database_snapshot_tb` (
+  `id` bigint(20) NOT NULL COMMENT '自增值',
+  `server_code` int(11) NOT NULL COMMENT '实例编号',
+  `database_name` varchar(128) NOT NULL COMMENT '库名',
+  `synced_at` datetime NOT NULL COMMENT '同步时间'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+ALTER TABLE `db_server_database_snapshot_tb`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uk_server_database` (`server_code`,`database_name`),
+  ADD KEY `idx_database_name` (`database_name`),
+  ADD KEY `idx_synced_at` (`synced_at`);
+
+ALTER TABLE `db_server_database_snapshot_tb`
+  MODIFY `id` bigint(20) NOT NULL AUTO_INCREMENT;
+
 
 -- 使用都日志表
 CREATE TABLE `db_query_log` (

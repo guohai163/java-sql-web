@@ -221,6 +221,65 @@ class BackstageServiceImplTests {
     }
 
     @Test
+    void getConnDataShouldMatchServerNameOrExactDbName() {
+        ConnectConfigBean serverA = new ConnectConfigBean();
+        serverA.setCode(1);
+        serverA.setDbServerName("mysql-core");
+        serverA.setDbServerType("mysql");
+        ConnectConfigBean serverB = new ConnectConfigBean();
+        serverB.setCode(2);
+        serverB.setDbServerName("analytics-node");
+        serverB.setDbServerType("mysql");
+
+        when(baseConfigDao.getConnData()).thenReturn(List.of(serverA, serverB));
+        when(baseConfigDao.getServerCodesByDatabaseName("order_db")).thenReturn(List.of(2));
+
+        Result<List<ConnectConfigBean>> result = backstageService.getConnData("order_db", "mysql", "order_db");
+
+        assertTrue(result.getStatus());
+        assertEquals(1, result.getData().size());
+        assertEquals(Integer.valueOf(2), result.getData().get(0).getCode());
+    }
+
+    @Test
+    void syncServerDatabasesShouldContinueWhenPartiallyFailed() throws Exception {
+        ConnectConfigBean serverA = new ConnectConfigBean();
+        serverA.setCode(1);
+        serverA.setDbServerName("core");
+        serverA.setDbServerType("mysql");
+        ConnectConfigBean serverB = new ConnectConfigBean();
+        serverB.setCode(2);
+        serverB.setDbServerName("archive");
+        serverB.setDbServerType("mysql");
+        DbOperation successOperation = mock(DbOperation.class);
+        DbOperation failedOperation = mock(DbOperation.class);
+
+        when(baseConfigDao.getConnData()).thenReturn(List.of(serverA, serverB));
+        doReturn(successOperation)
+                .doReturn(failedOperation)
+                .when(backstageService).createTemporaryDbOperation(org.mockito.ArgumentMatchers.any(ConnectConfigBean.class));
+        when(successOperation.getDbList()).thenReturn(List.of(new DatabaseNameBean("order_db"), new DatabaseNameBean("audit_db")));
+        when(failedOperation.getDbList()).thenThrow(new RuntimeException("connect timeout"));
+        when(baseConfigDao.getLatestServerDatabaseSnapshotTime()).thenReturn("2026-04-28 18:01:00");
+
+        Result<ServerDatabaseSyncResult> result = backstageService.syncServerDatabases();
+
+        assertTrue(result.getStatus());
+        assertEquals(2, result.getData().getTotalServers());
+        assertEquals(1, result.getData().getSuccessCount());
+        assertEquals(1, result.getData().getFailCount());
+        assertEquals("2026-04-28 18:01:00", result.getData().getSyncedAt());
+        assertEquals(1, result.getData().getFailures().size());
+        assertEquals(Integer.valueOf(2), result.getData().getFailures().get(0).getServerCode());
+        assertEquals("archive", result.getData().getFailures().get(0).getServerName());
+        verify(baseConfigDao).deleteServerDatabaseSnapshots(1);
+        verify(baseConfigDao).addServerDatabaseSnapshots(1, List.of("order_db", "audit_db"));
+        verify(baseConfigDao, never()).deleteServerDatabaseSnapshots(2);
+        verify(successOperation).close();
+        verify(failedOperation).close();
+    }
+
+    @Test
     void getTargetPoolSessionsEnrichesPlatformUserFromInFlightQueryLog() {
         ConnectConfigBean existingServer = new ConnectConfigBean();
         existingServer.setCode(12);

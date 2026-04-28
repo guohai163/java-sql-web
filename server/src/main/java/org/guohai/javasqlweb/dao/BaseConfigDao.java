@@ -176,6 +176,24 @@ public interface BaseConfigDao {
             "FROM `db_connect_config_tb`;")
     List<ConnectConfigBean> getConnData();
 
+    @Delete("DELETE FROM db_server_database_snapshot_tb WHERE server_code = #{serverCode}")
+    Boolean deleteServerDatabaseSnapshots(@Param("serverCode") Integer serverCode);
+
+    @Insert("<script>" +
+            "INSERT INTO db_server_database_snapshot_tb (server_code, database_name, synced_at) VALUES " +
+            "<foreach collection='databaseNames' item='databaseName' separator=','>" +
+            "(#{serverCode}, #{databaseName}, NOW())" +
+            "</foreach>" +
+            "</script>")
+    Boolean addServerDatabaseSnapshots(@Param("serverCode") Integer serverCode,
+                                       @Param("databaseNames") List<String> databaseNames);
+
+    @Select("SELECT DISTINCT server_code FROM db_server_database_snapshot_tb WHERE database_name = #{dbName}")
+    List<Integer> getServerCodesByDatabaseName(@Param("dbName") String dbName);
+
+    @Select("SELECT DATE_FORMAT(MAX(synced_at), '%Y-%m-%d %H:%i:%s') FROM db_server_database_snapshot_tb")
+    String getLatestServerDatabaseSnapshotTime();
+
     /**
      * 获得指定name的连接属性
      * @param name

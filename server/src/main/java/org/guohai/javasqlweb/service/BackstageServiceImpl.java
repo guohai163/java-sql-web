@@ -24,9 +24,11 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 后台服务
@@ -115,9 +117,73 @@ public class BackstageServiceImpl implements BackstageService{
      */
     @Override
     public Result<List<ConnectConfigBean>> getConnData() {
-        List<ConnectConfigBean> listConn = DbServerTypeUtils.normalize(baseConfigDao.getConnData());
+        return getConnData(null, null, null);
+    }
 
-        return new Result<>(true, "", listConn);
+    @Override
+    public Result<List<ConnectConfigBean>> getConnData(String keyword, String serverType, String dbName) {
+        List<ConnectConfigBean> listConn = DbServerTypeUtils.normalize(baseConfigDao.getConnData());
+        String normalizedKeyword = normalizeKeyword(keyword);
+        String normalizedType = normalizeKeyword(serverType);
+        String normalizedDbName = normalizeKeyword(dbName);
+        final Set<Integer> dbNameMatchedServerCodes = normalizedDbName.isEmpty()
+                ? Collections.emptySet()
+                : new LinkedHashSet<>(baseConfigDao.getServerCodesByDatabaseName(normalizedDbName));
+
+        List<ConnectConfigBean> filteredList = listConn.stream()
+                .filter(server -> matchServerType(server, normalizedType))
+                .filter(server -> matchServerByKeywordOrDatabase(server, normalizedKeyword, dbNameMatchedServerCodes))
+                .toList();
+
+        return new Result<>(true, "", filteredList);
+    }
+
+    @Override
+    public Result<ServerDatabaseSyncResult> syncServerDatabases() {
+        List<ConnectConfigBean> listConn = DbServerTypeUtils.normalize(baseConfigDao.getConnData());
+        ServerDatabaseSyncResult syncResult = new ServerDatabaseSyncResult();
+        List<ServerDatabaseSyncFailure> failures = new ArrayList<>();
+        int successCount = 0;
+
+        for (ConnectConfigBean server : listConn) {
+            DbOperation operation = null;
+            Integer serverCode = server == null ? null : server.getCode();
+            try {
+                operation = createTemporaryDbOperation(server);
+                List<DatabaseNameBean> dbList = operation.getDbList();
+                baseConfigDao.deleteServerDatabaseSnapshots(serverCode);
+
+                Set<String> databaseNames = new LinkedHashSet<>();
+                for (DatabaseNameBean db : dbList) {
+                    String databaseName = db == null ? null : db.getDbName();
+                    if (databaseName == null || databaseName.trim().isEmpty()) {
+                        continue;
+                    }
+                    databaseNames.add(databaseName.trim());
+                }
+
+                if (!databaseNames.isEmpty()) {
+                    baseConfigDao.addServerDatabaseSnapshots(serverCode, new ArrayList<>(databaseNames));
+                }
+                successCount++;
+            } catch (Exception e) {
+                ServerDatabaseSyncFailure failure = new ServerDatabaseSyncFailure();
+                failure.setServerCode(serverCode);
+                failure.setServerName(server == null ? "" : server.getDbServerName());
+                failure.setMessage(resolveSyncErrorMessage(e));
+                failures.add(failure);
+                LOG.warn("Sync server databases failed, serverCode={}, serverName={}", serverCode, server == null ? "" : server.getDbServerName(), e);
+            } finally {
+                closeOperationQuietly(serverCode, operation);
+            }
+        }
+
+        syncResult.setTotalServers(listConn.size());
+        syncResult.setSuccessCount(successCount);
+        syncResult.setFailCount(failures.size());
+        syncResult.setFailures(failures);
+        syncResult.setSyncedAt(baseConfigDao.getLatestServerDatabaseSnapshotTime());
+        return new Result<>(true, "", syncResult);
     }
 
     @Override
@@ -662,6 +728,42 @@ public class BackstageServiceImpl implements BackstageService{
 
     private boolean hasExistingNewerQueryLog(Integer code) {
         return code != null && Boolean.TRUE.equals(baseConfigDao.existsNewerQueryLog(code));
+    }
+
+    private String normalizeKeyword(String value) {
+        return value == null ? "" : value.trim();
+    }
+
+    private boolean matchServerType(ConnectConfigBean server, String normalizedType) {
+        if (normalizedType == null || normalizedType.isEmpty() || "all".equalsIgnoreCase(normalizedType)) {
+            return true;
+        }
+        String serverType = server == null ? null : server.getDbServerType();
+        return serverType != null && serverType.equalsIgnoreCase(normalizedType);
+    }
+
+    private boolean matchServerByKeywordOrDatabase(ConnectConfigBean server,
+                                                   String normalizedKeyword,
+                                                   Set<Integer> dbNameMatchedServerCodes) {
+        if (normalizedKeyword == null || normalizedKeyword.isEmpty()) {
+            return true;
+        }
+
+        String serverName = server == null ? "" : String.valueOf(server.getDbServerName());
+        boolean matchServerName = serverName.toLowerCase().contains(normalizedKeyword.toLowerCase());
+        boolean matchDbName = server != null
+                && server.getCode() != null
+                && dbNameMatchedServerCodes != null
+                && dbNameMatchedServerCodes.contains(server.getCode());
+
+        return matchServerName || matchDbName;
+    }
+
+    private String resolveSyncErrorMessage(Exception error) {
+        if (error == null || error.getMessage() == null || error.getMessage().trim().isEmpty()) {
+            return "同步失败";
+        }
+        return error.getMessage().trim();
     }
 
     DbOperation createTemporaryDbOperation(ConnectConfigBean server) throws Exception {

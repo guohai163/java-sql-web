@@ -55,8 +55,17 @@ public class BackstageController {
      */
     @ResponseBody
     @RequestMapping(value = "/connlist")
-    public Result<List<ConnectConfigBean>> getConnData(){
-        return backstageService.getConnData();
+    public Result<List<ConnectConfigBean>> getConnData(
+            @RequestParam(value = "keyword", required = false) String keyword,
+            @RequestParam(value = "serverType", required = false) String serverType,
+            @RequestParam(value = "dbName", required = false) String dbName){
+        return backstageService.getConnData(keyword, serverType, dbName);
+    }
+
+    @ResponseBody
+    @RequestMapping(value = "/server-databases/sync", method = RequestMethod.POST)
+    public Result<ServerDatabaseSyncResult> syncServerDatabases(){
+        return backstageService.syncServerDatabases();
     }
 
     /**

@@ -7,6 +7,7 @@ import org.guohai.javasqlweb.beans.PoolStatBean;
 import org.guohai.javasqlweb.beans.QueryLogBean;
 import org.guohai.javasqlweb.beans.QueryLogCursorResponse;
 import org.guohai.javasqlweb.beans.Result;
+import org.guohai.javasqlweb.beans.ServerDatabaseSyncResult;
 import org.guohai.javasqlweb.beans.TargetPoolStatBean;
 import org.guohai.javasqlweb.beans.TargetSessionStatBean;
 import org.guohai.javasqlweb.beans.UserBean;
@@ -32,6 +33,21 @@ public interface BackstageService {
      * @return
      */
     Result<List<ConnectConfigBean>> getConnData();
+
+    /**
+     * 获取连接表（支持关键字、类型、库名筛选）
+     * @param keyword 服务器名关键字（包含匹配）
+     * @param serverType 服务器类型
+     * @param dbName 数据库名（全等匹配）
+     * @return
+     */
+    Result<List<ConnectConfigBean>> getConnData(String keyword, String serverType, String dbName);
+
+    /**
+     * 同步所有实例的库名快照
+     * @return 同步统计结果
+     */
+    Result<ServerDatabaseSyncResult> syncServerDatabases();
 
     /**
      * 获取连接池摘要

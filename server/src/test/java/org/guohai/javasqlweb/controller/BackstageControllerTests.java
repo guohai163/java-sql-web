@@ -1,6 +1,8 @@
 package org.guohai.javasqlweb.controller;
 
 import org.guohai.javasqlweb.beans.Result;
+import org.guohai.javasqlweb.beans.ConnectConfigBean;
+import org.guohai.javasqlweb.beans.ServerDatabaseSyncResult;
 import org.guohai.javasqlweb.beans.TargetPoolStatBean;
 import org.guohai.javasqlweb.beans.TargetSessionStatBean;
 import org.guohai.javasqlweb.service.BackstageService;
@@ -17,6 +19,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import java.util.List;
 
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -53,6 +56,44 @@ class BackstageControllerTests {
                 .andExpect(jsonPath("$.status").value(true))
                 .andExpect(jsonPath("$.data[0].serverCode").value(9))
                 .andExpect(jsonPath("$.data[0].runtimeStatus").value("warning"));
+    }
+
+    @Test
+    void connListShouldSupportKeywordAndDbNameFilter() throws Exception {
+        ConnectConfigBean server = new ConnectConfigBean();
+        server.setCode(8);
+        server.setDbServerName("core");
+        when(backstageService.getConnData("order_db", "mysql", "order_db"))
+                .thenReturn(new Result<>(true, "", List.of(server)));
+
+        mockMvc.perform(get("/api/backstage/connlist")
+                        .param("keyword", "order_db")
+                        .param("serverType", "mysql")
+                        .param("dbName", "order_db"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value(true))
+                .andExpect(jsonPath("$.data[0].code").value(8))
+                .andExpect(jsonPath("$.data[0].dbServerName").value("core"));
+
+        verify(backstageService).getConnData("order_db", "mysql", "order_db");
+    }
+
+    @Test
+    void syncServerDatabasesShouldReturnSummary() throws Exception {
+        ServerDatabaseSyncResult result = new ServerDatabaseSyncResult();
+        result.setTotalServers(2);
+        result.setSuccessCount(1);
+        result.setFailCount(1);
+        result.setSyncedAt("2026-04-28 12:00:00");
+        when(backstageService.syncServerDatabases()).thenReturn(new Result<>(true, "", result));
+
+        mockMvc.perform(post("/api/backstage/server-databases/sync"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value(true))
+                .andExpect(jsonPath("$.data.totalServers").value(2))
+                .andExpect(jsonPath("$.data.successCount").value(1))
+                .andExpect(jsonPath("$.data.failCount").value(1))
+                .andExpect(jsonPath("$.data.syncedAt").value("2026-04-28 12:00:00"));
     }
 
     @Test

@@ -2,6 +2,22 @@
 
 本文件记录当前 `master` 分支之后到当前 `develop` 工作区的主要变更，按版本和当前未发布改动整理。
 
+## v2.10.0 - 2026-04-28
+
+### Added
+- 后台“服务器管理”新增“同步所有实例库名”按钮，支持批量拉取并持久化实例库名快照，返回成功/失败统计与失败明细。
+- 新增管理员接口 `POST /api/backstage/server-databases/sync`，用于触发库名快照同步并返回同步摘要。
+- 数据库新增 `db_server_database_snapshot_tb` 快照表，并补充初始化脚本与升级脚本。
+
+### Changed
+- `GET /api/backstage/connlist` 新增 `keyword`、`serverType`、`dbName` 可选参数，支持“服务器名包含 + 库名全等 + 类型筛选”联合检索。
+- 服务器管理页搜索逻辑改为后端筛选，输入关键字可按库名全等命中实例，并显示最近一次库名同步时间。
+
+### Tests
+- 新增 `BackstageControllerTests` 对 `connlist` 参数透传和同步接口返回结构的断言。
+- 扩展 `BackstageServiceImplTests` 覆盖库名匹配筛选与“部分失败继续同步”行为。
+- 新增 `front/src/features/admin/Admin.test.js`，覆盖查询参数构造与同步结果摘要渲染。
+
 ## v2.9.7 - 2026-04-28
 
 ### Changed
