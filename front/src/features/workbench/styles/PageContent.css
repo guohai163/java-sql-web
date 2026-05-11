@@ -1,5 +1,5 @@
 .right_area {
-    margin-left: 264px;
+    margin-left: var(--workbench-nav-width);
     min-height: 100vh;
     padding: 14px 16px 18px;
     background: #f6fbfb;
@@ -401,7 +401,7 @@
 
 @media (max-width: 1180px) {
     .right_area {
-        margin-left: 264px;
+        margin-left: var(--workbench-nav-width);
         padding: 14px;
     }
 

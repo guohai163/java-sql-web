@@ -177,6 +177,44 @@ function Navigation() {
     });
   };
 
+  useEffect(() => {
+    const resizer = document.getElementById('navigation_resizer');
+    const nav = document.getElementById('navigation');
+    let isResizing = false;
+
+    const startResizing = () => {
+      isResizing = true;
+      resizer?.classList.add('resizing');
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    };
+
+    const stopResizing = () => {
+      isResizing = false;
+      resizer?.classList.remove('resizing');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    const resize = (event) => {
+      if (!isResizing || !nav) return;
+      const newWidth = event.clientX;
+      if (newWidth > 200 && newWidth < 800) {
+        document.documentElement.style.setProperty('--workbench-nav-width', `${newWidth}px`);
+      }
+    };
+
+    resizer?.addEventListener('mousedown', startResizing);
+    window.addEventListener('mousemove', resize);
+    window.addEventListener('mouseup', stopResizing);
+
+    return () => {
+      resizer?.removeEventListener('mousedown', startResizing);
+      window.removeEventListener('mousemove', resize);
+      window.removeEventListener('mouseup', stopResizing);
+    };
+  }, []);
+
   const getServerList = async () => {
     try {
       const client = createClient();
