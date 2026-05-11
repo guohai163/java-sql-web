@@ -62,7 +62,8 @@ function createPane(overrides = {}) {
     dashboardLoading: false,
     dashboardError: '',
     dashboardUpdatedAt: '',
-    contentTab: 'dashboard',
+    dashboardFetched: false,
+    contentTab: 'query',
     schemaTables: {},
     selectedSql: '',
     ...overrides,
@@ -250,7 +251,7 @@ function PageContent() {
     dashboardLoading: false,
     dashboardError: '',
     dashboardUpdatedAt: '',
-    contentTab: pane.queryResult.length > 0 ? pane.contentTab : 'dashboard',
+    dashboardFetched: false,
   });
 
   const loadDashboardForPane = async ({
@@ -275,7 +276,6 @@ function PageContent() {
         ...pane,
         dashboardLoading: true,
         dashboardError: '',
-        contentTab: pane.queryResult.length === 0 ? 'dashboard' : pane.contentTab,
       })),
     }));
 
@@ -291,6 +291,7 @@ function PageContent() {
           ...pane,
           dashboardLoading: false,
           dashboardError: '',
+          dashboardFetched: true,
           dashboardUpdatedAt: formatDashboardUpdatedAt(),
           dashboardData: {
             ...(response.jsonData.data || {}),
@@ -307,6 +308,7 @@ function PageContent() {
         ...pane,
         dashboardLoading: false,
         dashboardError: response.jsonData.message || 'dashboard 加载失败',
+        dashboardFetched: true,
         dashboardData: null,
       })),
     }));
@@ -480,15 +482,11 @@ function PageContent() {
           dashboardLoading: false,
           dashboardError: '',
           dashboardUpdatedAt: '',
-          contentTab: 'dashboard',
+          dashboardFetched: false,
+          contentTab: 'query',
         })),
       }));
       resetEditorInteraction();
-      void loadDashboardForPane({
-        server: data.selectServer,
-        database: data.selectDatabase,
-        paneKey: current.activeKey,
-      });
       return;
     }
 
@@ -701,13 +699,30 @@ function PageContent() {
   };
 
   const handleContentTabChange = (paneKey, contentTab) => {
+    const current = stateRef.current;
+    const pane = getPaneByKey(current.panes, paneKey);
+
     setState((previous) => ({
       ...previous,
-      panes: updatePaneByKey(previous.panes, paneKey, (pane) => ({
-        ...pane,
+      panes: updatePaneByKey(previous.panes, paneKey, (currentPane) => ({
+        ...currentPane,
         contentTab,
       })),
     }));
+
+    if (
+      contentTab === 'dashboard'
+      && pane.server
+      && pane.database
+      && !pane.dashboardLoading
+      && !pane.dashboardFetched
+    ) {
+      void loadDashboardForPane({
+        server: pane.server,
+        database: pane.database,
+        paneKey,
+      });
+    }
   };
 
   const addTab = () => {
@@ -878,25 +893,6 @@ function PageContent() {
                     className="workbench-content-tabs"
                     items={[
                       {
-                        key: 'dashboard',
-                        label: 'Dashboard',
-                        children: (
-                          <WorkbenchDashboard
-                            data={pane.dashboardData}
-                            error={pane.dashboardError}
-                            loading={pane.dashboardLoading}
-                            onRefresh={() =>
-                              void loadDashboardForPane({
-                                server: pane.server,
-                                database: pane.database,
-                                paneKey: pane.key,
-                                forceRefresh: true,
-                              })
-                            }
-                          />
-                        ),
-                      },
-                      {
                         key: 'query',
                         label: '查询结果',
                         children: state.queryLoading ? (
@@ -939,6 +935,25 @@ function PageContent() {
                               )}
                             </div>
                           </div>
+                        ),
+                      },
+                      {
+                        key: 'dashboard',
+                        label: 'Dashboard',
+                        children: (
+                          <WorkbenchDashboard
+                            data={pane.dashboardData}
+                            error={pane.dashboardError}
+                            loading={pane.dashboardLoading}
+                            onRefresh={() =>
+                              void loadDashboardForPane({
+                                server: pane.server,
+                                database: pane.database,
+                                paneKey: pane.key,
+                                forceRefresh: true,
+                              })
+                            }
+                          />
                         ),
                       },
                     ]}

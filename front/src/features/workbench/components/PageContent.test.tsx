@@ -279,6 +279,33 @@ describe('PageContent', () => {
     expect(screen.queryByText('还没有查询结果')).not.toBeInTheDocument();
   });
 
+  test('does not request dashboard immediately after selecting database', async () => {
+    render(<PageContent />);
+
+    await publishDatabaseSelection();
+
+    expect(
+      mockApi.get.mock.calls.filter(([url]) => url.startsWith('/database/dashboard/')),
+    ).toHaveLength(0);
+  });
+
+  test('loads dashboard only after clicking dashboard tab', async () => {
+    render(<PageContent />);
+
+    await publishDatabaseSelection();
+
+    const activePanel = getActiveWorkbenchPanel();
+    await act(async () => {
+      await userEvent.click(within(activePanel).getByRole('tab', { name: 'Dashboard' }));
+    });
+
+    await waitFor(() => {
+      expect(
+        mockApi.get.mock.calls.filter(([url]) => url.startsWith('/database/dashboard/')),
+      ).toHaveLength(1);
+    });
+  });
+
   test('falls back to default query error detail when backend message is blank', async () => {
     mockApi.post.mockResolvedValueOnce(buildQueryResponse(false, '', null));
 
