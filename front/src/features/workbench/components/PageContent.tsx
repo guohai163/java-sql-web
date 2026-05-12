@@ -89,6 +89,38 @@ function clearPaneQueryFeedback(pane) {
   };
 }
 
+function findSeedPane(panes, selectServer, selectDatabase, activeKey) {
+  const activePane = getPaneByKey(panes, activeKey);
+  const normalizedServer = selectServer && selectServer !== '0' ? selectServer : '';
+  const normalizedDatabase = selectDatabase || '';
+
+  if (
+    activePane
+    && activePane.server === normalizedServer
+    && activePane.database === normalizedDatabase
+  ) {
+    return activePane;
+  }
+
+  const exactMatchPane = [...panes]
+    .reverse()
+    .find(
+      (pane) => pane.server === normalizedServer && pane.database === normalizedDatabase,
+    );
+  if (exactMatchPane) {
+    return exactMatchPane;
+  }
+
+  const serverMatchPane = [...panes]
+    .reverse()
+    .find((pane) => pane.server === normalizedServer);
+  if (serverMatchPane) {
+    return serverMatchPane;
+  }
+
+  return [...panes].reverse().find((pane) => pane.server || pane.database) || activePane;
+}
+
 function buildQueryErrorFeedback(message) {
   return {
     queryError: true,
@@ -728,18 +760,41 @@ function PageContent() {
   const addTab = () => {
     const activeKey = `Tab${newTabIndexRef.current++}`;
 
-    setState((previous) => ({
-      ...previous,
-      activeKey,
-      panes: [
-        ...previous.panes,
-        createPane({
-          title: `Tab ${activeKey}`,
-          key: activeKey,
-          closable: true,
-        }),
-      ],
-    }));
+    setState((previous) => {
+      const nextServer =
+        previous.selectServer && previous.selectServer !== '0' ? previous.selectServer : '';
+      const nextDatabase = previous.selectDatabase || '';
+      const seedPane = findSeedPane(
+        previous.panes,
+        previous.selectServer,
+        previous.selectDatabase,
+        previous.activeKey,
+      );
+      const nextPane = createPane({
+        title: `Tab ${activeKey}`,
+        key: activeKey,
+        closable: true,
+        server: nextServer,
+        serverName: seedPane?.server === nextServer ? seedPane.serverName : '',
+        serverType: seedPane?.server === nextServer ? seedPane.serverType : '',
+        database: nextDatabase,
+        schemaTables:
+          seedPane?.server === nextServer && seedPane?.database === nextDatabase
+            ? seedPane.schemaTables || {}
+            : {},
+      });
+
+      return {
+        ...previous,
+        activeKey,
+        selectServer: nextServer || '0',
+        selectDatabase: nextDatabase,
+        editorServerType: nextPane.serverType || 'mysql',
+        editorSchemaTables: nextPane.schemaTables || {},
+        historySql: nextServer ? readHistorySql(nextServer) : [],
+        panes: [...previous.panes, nextPane],
+      };
+    });
     resetEditorInteraction();
   };
 
