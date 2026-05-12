@@ -233,6 +233,15 @@ async function executeSql() {
   });
 }
 
+async function addWorkbenchTab() {
+  const addButton = document.querySelector('.workbench-tabs .ant-tabs-nav-add');
+  expect(addButton).not.toBeNull();
+
+  await act(async () => {
+    await userEvent.click(addButton);
+  });
+}
+
 describe('PageContent', () => {
   beforeEach(() => {
     mockPubsub.handler = null;
@@ -354,12 +363,25 @@ describe('PageContent', () => {
     expect(screen.queryByText('对象名无效。')).not.toBeInTheDocument();
   });
 
+  test('inherits previous server and database when adding a new tab', async () => {
+    render(<PageContent />);
+    await publishDatabaseSelection('analytics', '9');
+
+    await addWorkbenchTab();
+
+    await waitFor(() => {
+      const activePanel = getActiveWorkbenchPanel();
+      expect(activePanel.querySelector('.workbench-serverinfo')).toHaveTextContent('服务器: 测试实例');
+      expect(activePanel.querySelector('.workbench-serverinfo')).toHaveTextContent('数据库: analytics');
+    });
+  });
+
   test('keeps query error isolated to the tab where the failure occurred', async () => {
     mockApi.post
       .mockResolvedValueOnce(buildQueryResponse(false, '第一标签页执行失败。', null))
       .mockResolvedValueOnce(buildQueryResponse(true, '', [{ id: 3, name: 'gamma' }]));
 
-    const { container } = render(<PageContent />);
+    render(<PageContent />);
     await publishDatabaseSelection('demo', '1');
     await fillSql('SELECT * FROM broken_table');
     await executeSql();
@@ -368,9 +390,7 @@ describe('PageContent', () => {
       expect(screen.getByText('第一标签页执行失败。')).toBeInTheDocument();
     });
 
-    const addTabButton = container.querySelector('.ant-tabs-nav-add');
-    expect(addTabButton).not.toBeNull();
-    await userEvent.click(addTabButton);
+    await addWorkbenchTab();
 
     await waitFor(() => {
       expect(screen.getByRole('tab', { name: 'Tab Tab2' })).toBeInTheDocument();
