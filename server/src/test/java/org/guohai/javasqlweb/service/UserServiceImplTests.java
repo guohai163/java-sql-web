@@ -1,6 +1,7 @@
 package org.guohai.javasqlweb.service;
 
 import org.guohai.javasqlweb.beans.AccountStatus;
+import org.guohai.javasqlweb.beans.OtpAuthStatus;
 import org.guohai.javasqlweb.beans.Result;
 import org.guohai.javasqlweb.beans.UserBean;
 import org.guohai.javasqlweb.beans.UserLoginStatus;
@@ -76,5 +77,42 @@ class UserServiceImplTests {
 
         assertTrue(result.getStatus());
         verify(userManageDao).changeUserPasswordByCode(eq(1), anyString());
+    }
+
+    @Test
+    void loginGeneratesOtpSecretWhenUserIsUnbound() {
+        UserBean user = new UserBean();
+        user.setUserName("oidc-new-user");
+        user.setPassWord(PasswordUtils.encode("Abcd1234!"));
+        user.setAccountStatus(AccountStatus.ACTIVE);
+        user.setAuthStatus(OtpAuthStatus.UNBIND);
+
+        when(userManageDao.getUserLoginDataByName("oidc-new-user")).thenReturn(user);
+
+        Result<UserBean> result = userService.login("oidc-new-user", "Abcd1234!");
+
+        assertTrue(result.getStatus());
+        assertEquals(OtpAuthStatus.UNBIND, result.getData().getAuthStatus());
+        verify(userManageDao).setUserSecret(anyString(), anyString(), eq("oidc-new-user"));
+        verify(userManageDao, never()).setUserToken(eq("oidc-new-user"), anyString());
+    }
+
+    @Test
+    void loginDoesNotRegenerateOtpSecretWhenUserIsAlreadyBound() {
+        UserBean user = new UserBean();
+        user.setUserName("oidc-bound-user");
+        user.setPassWord(PasswordUtils.encode("Abcd1234!"));
+        user.setAccountStatus(AccountStatus.ACTIVE);
+        user.setAuthStatus(OtpAuthStatus.BIND);
+        user.setAuthSecret("ABC123SECRET");
+
+        when(userManageDao.getUserLoginDataByName("oidc-bound-user")).thenReturn(user);
+        when(userManageDao.setUserToken(eq("oidc-bound-user"), anyString())).thenReturn(true);
+
+        Result<UserBean> result = userService.login("oidc-bound-user", "Abcd1234!");
+
+        assertTrue(result.getStatus());
+        verify(userManageDao, never()).setUserSecret(anyString(), anyString(), eq("oidc-bound-user"));
+        verify(userManageDao).setUserToken(eq("oidc-bound-user"), anyString());
     }
 }

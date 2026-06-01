@@ -2,6 +2,15 @@
 
 本文件记录当前 `master` 分支之后到当前 `develop` 工作区的主要变更，按版本和当前未发布改动整理。
 
+## v2.11.14 - 2026-06-01
+
+### Fixed
+- 修复新 OIDC 用户初始 OTP 状态写错的问题：新用户不再以 `auth_status=BIND` 且 `auth_secret` 为空的矛盾状态入库，避免首次 OIDC 登录被误导到 OTP 验证流程。
+- OIDC 新用户改为以 `UNBIND` 初始状态创建，首次成功授权后再沿用现有登录状态机生成 OTP secret 并进入 `BINDING` 绑定流程。
+
+### Tests
+- 补充 `UserServiceImplTests` 回归用例，覆盖未绑定用户登录会生成 OTP secret、已绑定用户登录不会重复生成 secret 的两条关键路径。
+
 ## v2.11.13 - 2026-06-01
 
 ### Fixed

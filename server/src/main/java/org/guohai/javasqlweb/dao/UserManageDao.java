@@ -269,7 +269,7 @@ public interface UserManageDao {
     Boolean updateOidcSub(@Param("userCode") Integer userCode, @Param("sub") String sub);
 
     /**
-     * 创建 OIDC 来源用户（免 OTP）
+     * 创建 OIDC 来源用户（初始为未绑定 OTP）
      * @param userName 用户名
      * @param email 邮箱
      * @param passwordHash 随机密码哈希
@@ -278,7 +278,7 @@ public interface UserManageDao {
      */
     @Insert("INSERT INTO user_tb " +
             "(user_name, email, create_time, pass_word, token, account_status, auth_status, login_status, oidc_sub) " +
-            "VALUES (#{name}, #{email}, NOW(), #{passwordHash}, '', 'ACTIVE', 'BIND', 'LOGOUT', #{oidcSub})")
+            "VALUES (#{name}, #{email}, NOW(), #{passwordHash}, '', 'ACTIVE', 'UNBIND', 'LOGOUT', #{oidcSub})")
     Boolean addNewOidcUser(@Param("name") String userName,
                            @Param("email") String email,
                            @Param("passwordHash") String passwordHash,
