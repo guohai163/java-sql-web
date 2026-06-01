@@ -2,6 +2,16 @@
 
 本文件记录当前 `master` 分支之后到当前 `develop` 工作区的主要变更，按版本和当前未发布改动整理。
 
+## v2.11.15 - 2026-06-01
+
+### Fixed
+- OIDC 登录回调新增对授权失败参数 `error` / `error_description` 的友好处理；用户取消授权时不再因为缺少 `code/state` 直接报错，而是回跳登录页展示清晰提示。
+- 登录页新增 OIDC 授权失败 notice 展示与 URL 清理逻辑，保留重新发起 OIDC 登录或改用账号密码登录的入口。
+
+### Tests
+- 新增 `OidcSsfControllerTests`，覆盖 OIDC 登录回调失败重定向与成功回调兼容行为。
+- 新增 `Login.test.tsx`，覆盖授权拒绝提示展示及现有 OTP 绑定/验证回调路径不回归。
+
 ## v2.11.14 - 2026-06-01
 
 ### Fixed

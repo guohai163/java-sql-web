@@ -72,6 +72,16 @@ function buildPasskeyDomainMessage(rpId: string): string {
   return `当前页面域名 ${currentHost} 与 passkey 依赖域 ${rpId} 不一致，浏览器不会拉起系统 passkey。请切换到 ${rpId} 对应站点再使用 passkey。`;
 }
 
+function buildOidcErrorMessage(error: string | null, errorDescription: string | null): string {
+  if (errorDescription && errorDescription.trim()) {
+    return `${errorDescription.trim()}。你可以重新发起 OIDC 登录或使用账号密码登录。`;
+  }
+  if (error === 'access_denied') {
+    return '你已取消本次 OIDC 授权登录。你可以重新发起 OIDC 登录或使用账号密码登录。';
+  }
+  return 'OIDC 授权失败，请稍后重试。你可以重新发起 OIDC 登录或使用账号密码登录。';
+}
+
 function Login() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -209,6 +219,24 @@ function Login() {
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
     const userName = searchParams.get('username');
+    const oidcError = searchParams.get('oidc_error');
+    const oidcErrorDescription = searchParams.get('oidc_error_description');
+
+    if (oidcError) {
+      updateState({
+        loginStep: 'LOGIN',
+        token: '',
+        authSecret: '',
+        qrCode: '',
+        otpDigits: [...EMPTY_OTP_DIGITS],
+        notice: {
+          type: 'warning',
+          message: buildOidcErrorMessage(oidcError, oidcErrorDescription),
+        },
+      });
+      window.history.replaceState({}, '', '/login');
+      return;
+    }
 
     // 处理 OIDC 登录回调 token
     const oidcToken = searchParams.get('oidc_token');
