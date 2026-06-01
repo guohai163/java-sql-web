@@ -11,6 +11,7 @@ import org.guohai.javasqlweb.dao.UserManageDao;
 import org.guohai.javasqlweb.util.PasswordUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import jakarta.servlet.http.HttpServletRequest;
@@ -42,6 +43,7 @@ public class OidcSsfServiceImpl implements OidcSsfService {
     private final OidcConfigDao oidcConfigDao;
     private final OidcLoginStateDao oidcLoginStateDao;
     private final UserManageDao userManageDao;
+    private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
 
@@ -60,15 +62,21 @@ public class OidcSsfServiceImpl implements OidcSsfService {
     private static final int MAX_EVENT_LOG = 500;
     /** OIDC state 有效期：10 分钟 */
     private static final long OIDC_STATE_EXPIRE_MS = 10 * 60 * 1000L;
+    private static final String OIDC_SUB_COLUMN = "oidc_sub";
     private static final String STATE_USAGE_ADMIN = "admin";
     private static final String STATE_USAGE_LOGIN = "login";
+    /** user_tb 是否已经具备 oidc_sub 列，避免每次登录都访问 information_schema */
+    private volatile Boolean oidcSubColumnPresent;
 
     public OidcSsfServiceImpl(OidcConfigDao oidcConfigDao,
                               OidcLoginStateDao oidcLoginStateDao,
-                              UserManageDao userManageDao, ObjectMapper objectMapper) {
+                              UserManageDao userManageDao,
+                              JdbcTemplate jdbcTemplate,
+                              ObjectMapper objectMapper) {
         this.oidcConfigDao = oidcConfigDao;
         this.oidcLoginStateDao = oidcLoginStateDao;
         this.userManageDao = userManageDao;
+        this.jdbcTemplate = jdbcTemplate;
         this.objectMapper = objectMapper;
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(10))
@@ -814,19 +822,28 @@ public class OidcSsfServiceImpl implements OidcSsfService {
      * 按 sub → email → 创建 的优先级查找/创建用户
      */
     private UserBean findOrCreateOidcUser(String sub, String email, String preferredUsername, String displayName) {
-        // 1. 按 oidc_sub 查找
-        UserBean user = userManageDao.getUserByOidcSub(sub);
-        if (user != null) {
-            LOG.info("OIDC login: found existing user by sub={}: {}", sub, user.getUserName());
-            return user;
+        boolean hasOidcSubColumn = hasOidcSubColumn();
+
+        // 1. 新结构优先按 oidc_sub 查找；旧结构则跳过这一层，避免直接打出 SQLSyntaxErrorException。
+        UserBean user = null;
+        if (hasOidcSubColumn) {
+            user = userManageDao.getUserByOidcSub(sub);
+            if (user != null) {
+                LOG.info("OIDC login: found existing user by sub={}: {}", sub, user.getUserName());
+                return user;
+            }
         }
 
-        // 2. 按 email 匹配并绑定
+        // 2. 按 email 匹配；如果库结构已经升级，则顺带把 sub 绑定回去。
         if (email != null && !email.isBlank()) {
             user = userManageDao.getUserByEmail(email);
             if (user != null) {
-                userManageDao.updateOidcSub(user.getCode(), sub);
-                LOG.info("OIDC login: linked sub={} to existing user {} by email", sub, user.getUserName());
+                if (hasOidcSubColumn) {
+                    userManageDao.updateOidcSub(user.getCode(), sub);
+                    LOG.info("OIDC login: linked sub={} to existing user {} by email", sub, user.getUserName());
+                } else {
+                    LOG.warn("OIDC login: user_tb is missing oidc_sub, fallback to email match for user {}", user.getUserName());
+                }
                 return user;
             }
         }
@@ -839,13 +856,56 @@ public class OidcSsfServiceImpl implements OidcSsfService {
         String randomPassword = PasswordUtils.encode(UUID.randomUUID().toString());
 
         try {
-            userManageDao.addNewOidcUser(userName, email, randomPassword, sub);
-            user = userManageDao.getUserByOidcSub(sub);
+            if (hasOidcSubColumn) {
+                userManageDao.addNewOidcUser(userName, email, randomPassword, sub);
+                user = userManageDao.getUserByOidcSub(sub);
+            } else {
+                // 旧库结构先按普通用户创建，后续补列并执行迁移后即可绑定 sub。
+                userManageDao.addNewUser(userName, email, randomPassword, "ACTIVE");
+                user = userManageDao.getUserByEmail(email);
+                if (user == null) {
+                    user = userManageDao.getUserByName(userName);
+                }
+                LOG.warn("OIDC login: created fallback user {} without oidc_sub binding because column is missing", userName);
+            }
             LOG.info("OIDC login: created new user {} for sub={}", userName, sub);
             return user;
         } catch (Exception e) {
             LOG.error("Failed to create OIDC user: {}", userName, e);
             return null;
+        }
+    }
+
+    /**
+     * 检查 user_tb 是否已经完成 oidc_sub 升级。
+     * 结果会被缓存，只有首次访问或启动后才会查询 information_schema。
+     * @return true 表示列存在
+     */
+    private boolean hasOidcSubColumn() {
+        Boolean cached = oidcSubColumnPresent;
+        if (cached != null) {
+            return cached;
+        }
+        synchronized (this) {
+            if (oidcSubColumnPresent != null) {
+                return oidcSubColumnPresent;
+            }
+            try {
+                Integer count = jdbcTemplate.queryForObject(
+                        "SELECT COUNT(*) FROM information_schema.columns " +
+                                "WHERE table_schema = DATABASE() AND table_name = 'user_tb' AND column_name = ?",
+                        Integer.class,
+                        OIDC_SUB_COLUMN
+                );
+                oidcSubColumnPresent = count != null && count > 0;
+            } catch (Exception e) {
+                LOG.warn("Failed to inspect user_tb.oidc_sub, fallback to legacy-compatible OIDC login flow", e);
+                oidcSubColumnPresent = false;
+            }
+            if (!oidcSubColumnPresent) {
+                LOG.warn("user_tb is missing oidc_sub. OIDC login will run in legacy compatibility mode until DB migration is applied.");
+            }
+            return oidcSubColumnPresent;
         }
     }
 
