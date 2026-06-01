@@ -6,11 +6,13 @@ import com.warrenstrange.googleauth.GoogleAuthenticator;
 import com.warrenstrange.googleauth.GoogleAuthenticatorKey;
 import org.guohai.javasqlweb.beans.*;
 import org.guohai.javasqlweb.dao.OidcConfigDao;
+import org.guohai.javasqlweb.dao.OidcLoginStateDao;
 import org.guohai.javasqlweb.dao.UserManageDao;
 import org.guohai.javasqlweb.util.PasswordUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import jakarta.servlet.http.HttpServletRequest;
 
 import java.io.IOException;
@@ -25,7 +27,6 @@ import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
@@ -39,6 +40,7 @@ public class OidcSsfServiceImpl implements OidcSsfService {
     private static final Logger LOG = LoggerFactory.getLogger(OidcSsfServiceImpl.class);
 
     private final OidcConfigDao oidcConfigDao;
+    private final OidcLoginStateDao oidcLoginStateDao;
     private final UserManageDao userManageDao;
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
@@ -53,16 +55,19 @@ public class OidcSsfServiceImpl implements OidcSsfService {
     /** 存储的用户信息 */
     private volatile OidcUserInfo storedUserInfo;
 
-    /** PKCE state → code_verifier 映射 */
-    private final ConcurrentHashMap<String, String> pkceStore = new ConcurrentHashMap<>();
-
     /** 事件日志 (最多保留 500 条) */
     private final CopyOnWriteArrayList<SsfEvent> eventLog = new CopyOnWriteArrayList<>();
     private static final int MAX_EVENT_LOG = 500;
+    /** OIDC state 有效期：10 分钟 */
+    private static final long OIDC_STATE_EXPIRE_MS = 10 * 60 * 1000L;
+    private static final String STATE_USAGE_ADMIN = "admin";
+    private static final String STATE_USAGE_LOGIN = "login";
 
     public OidcSsfServiceImpl(OidcConfigDao oidcConfigDao,
+                              OidcLoginStateDao oidcLoginStateDao,
                               UserManageDao userManageDao, ObjectMapper objectMapper) {
         this.oidcConfigDao = oidcConfigDao;
+        this.oidcLoginStateDao = oidcLoginStateDao;
         this.userManageDao = userManageDao;
         this.objectMapper = objectMapper;
         this.httpClient = HttpClient.newBuilder()
@@ -203,8 +208,7 @@ public class OidcSsfServiceImpl implements OidcSsfService {
         String codeVerifier = generateRandomString(64);
         String codeChallenge = computeS256Challenge(codeVerifier);
         String nonce = computeS256Challenge(codeVerifier);
-
-        pkceStore.put(state, codeVerifier);
+        persistOidcState(STATE_USAGE_ADMIN, state, codeVerifier);
 
         OidcConfigBean effectiveConfig = getDbConfig();
         if (!isConfiguredAndEnabled(effectiveConfig)) {
@@ -228,8 +232,9 @@ public class OidcSsfServiceImpl implements OidcSsfService {
     }
 
     @Override
+    @Transactional
     public Result<OidcTokenInfo> exchangeCodeForTokens(String code, String state, HttpServletRequest request) {
-        String codeVerifier = pkceStore.remove(state);
+        String codeVerifier = consumeOidcState(STATE_USAGE_ADMIN, state);
         if (codeVerifier == null) {
             return new Result<>(false, "Invalid state parameter", null);
         }
@@ -336,7 +341,6 @@ public class OidcSsfServiceImpl implements OidcSsfService {
     public Result<String> disconnect() {
         storedTokens = null;
         storedUserInfo = null;
-        pkceStore.clear();
         return new Result<>(true, "Disconnected", null);
     }
 
@@ -641,8 +645,7 @@ public class OidcSsfServiceImpl implements OidcSsfService {
         String codeVerifier = generateRandomString(64);
         String codeChallenge = computeS256Challenge(codeVerifier);
         String nonce = computeS256Challenge(codeVerifier);
-
-        pkceStore.put(state, codeVerifier);
+        persistOidcState(STATE_USAGE_LOGIN, state, codeVerifier);
 
         OidcConfigBean effectiveConfig = getDbConfig();
         if (!isConfiguredAndEnabled(effectiveConfig)) {
@@ -666,8 +669,9 @@ public class OidcSsfServiceImpl implements OidcSsfService {
     }
 
     @Override
+    @Transactional
     public Result<UserBean> handleLoginCallback(String code, String state, HttpServletRequest request) {
-        String codeVerifier = pkceStore.remove(state);
+        String codeVerifier = consumeOidcState(STATE_USAGE_LOGIN, state);
         if (codeVerifier == null) {
             return new Result<>(false, "Invalid state parameter", null);
         }
@@ -761,6 +765,49 @@ public class OidcSsfServiceImpl implements OidcSsfService {
         user.setToken(jswToken);
         LOG.info("OIDC login successful: sub={}, user={}", sub, user.getUserName());
         return new Result<>(true, "OIDC login success", user);
+    }
+
+    /**
+     * 将 OIDC state 持久化到数据库，支持多副本共享和重启恢复。
+     * 这里会顺手清理历史过期数据，避免短期一次性记录无限增长。
+     * @param usageType state 用途
+     * @param state OIDC state
+     * @param codeVerifier PKCE code_verifier
+     */
+    private void persistOidcState(String usageType, String state, String codeVerifier) {
+        Date now = new Date();
+        oidcLoginStateDao.deleteExpired(now);
+
+        OidcLoginStateBean stateRecord = new OidcLoginStateBean();
+        stateRecord.setUsageType(usageType);
+        stateRecord.setStateKey(state);
+        stateRecord.setCodeVerifier(codeVerifier);
+        stateRecord.setCreatedTime(now);
+        stateRecord.setExpireTime(new Date(now.getTime() + OIDC_STATE_EXPIRE_MS));
+        if (!Boolean.TRUE.equals(oidcLoginStateDao.saveState(stateRecord))) {
+            throw new IllegalStateException("Failed to persist OIDC state");
+        }
+    }
+
+    /**
+     * 以一次性方式消费 OIDC state。
+     * 通过事务内先锁定再删除，确保多副本并发回调时只有一个请求可以成功消费。
+     * @param usageType state 用途
+     * @param state OIDC state
+     * @return 对应的 code_verifier；不存在或已过期时返回 null
+     */
+    private String consumeOidcState(String usageType, String state) {
+        Date now = new Date();
+        OidcLoginStateBean stateRecord = oidcLoginStateDao.getActiveStateForUpdate(usageType, state, now);
+        if (stateRecord == null) {
+            oidcLoginStateDao.deleteExpiredByUsageAndState(usageType, state, now);
+            return null;
+        }
+        Integer deleted = oidcLoginStateDao.deleteByCode(stateRecord.getCode());
+        if (deleted == null || deleted < 1) {
+            return null;
+        }
+        return stateRecord.getCodeVerifier();
     }
 
     /**

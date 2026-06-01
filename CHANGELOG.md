@@ -2,6 +2,15 @@
 
 本文件记录当前 `master` 分支之后到当前 `develop` 工作区的主要变更，按版本和当前未发布改动整理。
 
+## v2.11.13 - 2026-06-01
+
+### Fixed
+- 修复 OIDC 登录在多副本部署下的 `Invalid state parameter` 问题：OIDC 授权 `state/code_verifier` 不再保存在单机内存，而是持久化到数据库，避免回调落到其它副本或实例重启后丢失状态。
+- OIDC Admin 授权回调和登录回调改为以事务方式一次性消费数据库中的 `state` 记录，避免并发回调、重复访问或刷新回调页时重复消费同一授权状态。
+
+### Added
+- 新增数据库升级脚本 `deploy/upgrade/2026-06-01-oidc-login-state.sql`，创建 `oidc_login_state_tb` 用于存储短期 OIDC PKCE state。
+
 ## v2.11.10 - 2026-05-11
 
 ### Changed
