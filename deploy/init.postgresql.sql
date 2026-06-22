@@ -259,3 +259,73 @@ COMMENT ON COLUMN oidc_login_state_tb.state_key IS 'OIDC 授权请求中的 stat
 COMMENT ON COLUMN oidc_login_state_tb.code_verifier IS '与 state 绑定的 PKCE code_verifier';
 COMMENT ON COLUMN oidc_login_state_tb.expire_time IS '过期时间';
 COMMENT ON COLUMN oidc_login_state_tb.created_time IS '创建时间';
+
+-- 兼容历史 MySQL/MariaDB 元库结构补丁。
+-- 这部分可以在迁移后的 PostgreSQL 数据库中单独重复执行，用于补齐旧结构缺失字段。
+
+ALTER TABLE db_connect_config_tb
+  ADD COLUMN IF NOT EXISTS db_ssl_mode varchar(32) NOT NULL DEFAULT 'DEFAULT',
+  ADD COLUMN IF NOT EXISTS db_group varchar(45) NOT NULL DEFAULT 'default';
+COMMENT ON COLUMN db_connect_config_tb.db_ssl_mode IS '连接安全模式';
+COMMENT ON COLUMN db_connect_config_tb.db_group IS '数据库分组';
+
+ALTER TABLE db_query_log
+  ADD COLUMN IF NOT EXISTS query_database varchar(45) NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS server_code integer NULL,
+  ADD COLUMN IF NOT EXISTS db_session_id varchar(64) NULL,
+  ADD COLUMN IF NOT EXISTS query_consuming integer NULL,
+  ADD COLUMN IF NOT EXISTS result_row_count integer NULL;
+CREATE INDEX IF NOT EXISTS idx_server_session ON db_query_log (server_code, db_session_id);
+COMMENT ON COLUMN db_query_log.query_database IS '查询语句的库';
+COMMENT ON COLUMN db_query_log.server_code IS '查询目标实例';
+COMMENT ON COLUMN db_query_log.db_session_id IS '目标库会话ID';
+COMMENT ON COLUMN db_query_log.query_consuming IS '查询耗时';
+COMMENT ON COLUMN db_query_log.result_row_count IS '返回条数';
+
+ALTER TABLE user_tb
+  ALTER COLUMN pass_word TYPE varchar(100),
+  ADD COLUMN IF NOT EXISTS auth_secret varchar(45) NULL,
+  ADD COLUMN IF NOT EXISTS auth_status varchar(45) NOT NULL DEFAULT 'UNBIND',
+  ADD COLUMN IF NOT EXISTS login_status varchar(45) NOT NULL DEFAULT 'LOGGING',
+  ADD COLUMN IF NOT EXISTS account_status varchar(45) NOT NULL DEFAULT 'ACTIVE',
+  ADD COLUMN IF NOT EXISTS oidc_sub varchar(256) NULL,
+  ADD COLUMN IF NOT EXISTS access_token_hash varchar(64) NULL,
+  ADD COLUMN IF NOT EXISTS access_token_expire_time timestamp NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uk_oidc_sub ON user_tb (oidc_sub);
+COMMENT ON COLUMN user_tb.auth_secret IS '二次验证密钥';
+COMMENT ON COLUMN user_tb.auth_status IS '密保绑定状态';
+COMMENT ON COLUMN user_tb.login_status IS '登录状态';
+COMMENT ON COLUMN user_tb.account_status IS '账号状态';
+COMMENT ON COLUMN user_tb.oidc_sub IS 'OIDC Subject 标识';
+COMMENT ON COLUMN user_tb.access_token_hash IS '长期访问令牌哈希';
+COMMENT ON COLUMN user_tb.access_token_expire_time IS '访问令牌过期时间';
+
+ALTER TABLE oidc_config_tb
+  ADD COLUMN IF NOT EXISTS ssf_configuration_url varchar(512) NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS callback_url varchar(512) NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS enabled boolean NOT NULL DEFAULT true,
+  ADD COLUMN IF NOT EXISTS created_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  ADD COLUMN IF NOT EXISTS updated_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP;
+COMMENT ON COLUMN oidc_config_tb.ssf_configuration_url IS 'SSF Discovery URL';
+COMMENT ON COLUMN oidc_config_tb.callback_url IS 'OIDC 回调地址（兼容保留，不再使用）';
+COMMENT ON COLUMN oidc_config_tb.enabled IS '是否启用';
+COMMENT ON COLUMN oidc_config_tb.created_time IS '创建时间';
+COMMENT ON COLUMN oidc_config_tb.updated_time IS '更新时间';
+
+ALTER TABLE webauthn_request_tb
+  ADD COLUMN IF NOT EXISTS request_key varchar(128) NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS request_json text NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS created_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP;
+CREATE UNIQUE INDEX IF NOT EXISTS uk_type_key ON webauthn_request_tb (request_type, request_key);
+CREATE INDEX IF NOT EXISTS idx_expire_time ON webauthn_request_tb (expire_time);
+COMMENT ON COLUMN webauthn_request_tb.request_key IS '请求关联键';
+COMMENT ON COLUMN webauthn_request_tb.request_json IS '序列化后的请求';
+COMMENT ON COLUMN webauthn_request_tb.created_time IS '创建时间';
+
+ALTER TABLE oidc_login_state_tb
+  ADD COLUMN IF NOT EXISTS state_key varchar(128) NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS created_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP;
+CREATE UNIQUE INDEX IF NOT EXISTS uk_usage_state ON oidc_login_state_tb (usage_type, state_key);
+CREATE INDEX IF NOT EXISTS idx_oidc_login_state_expire_time ON oidc_login_state_tb (expire_time);
+COMMENT ON COLUMN oidc_login_state_tb.state_key IS 'OIDC 授权请求中的 state 参数';
+COMMENT ON COLUMN oidc_login_state_tb.created_time IS '创建时间';

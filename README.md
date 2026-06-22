@@ -187,6 +187,10 @@ deploy/java-security/legacy-tls.security
 
 ### 2.2 从 MariaDB/MySQL 元库停机迁移到 PostgreSQL
 
+Docker Compose 模式下的完整迁移步骤、常见问题和回滚方案见：
+
+- [doc/docker-compose-mysql-to-postgresql-migration.md](./doc/docker-compose-mysql-to-postgresql-migration.md)
+
 推荐先发布同时兼容 MySQL/MariaDB 和 PostgreSQL 的服务端版本，但线上环境变量仍保持旧元库：
 
 ```shell
