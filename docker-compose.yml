@@ -1,16 +1,17 @@
 services:
   jsw-db:
-    image: mariadb:10.11
+    image: pgvector/pgvector:pg18
     container_name: jsw-db
     restart: unless-stopped
     environment:
-      MARIADB_ROOT_PASSWORD: ${DB_PASSWORD:-my-secret-pw}
-      MARIADB_DATABASE: ${DB_NAME:-javasqlweb_db}
+      POSTGRES_DB: ${DB_NAME:-javasqlweb_db}
+      POSTGRES_USER: ${DB_USERNAME:-jsw}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-my-secret-pw}
     volumes:
-      - jsw-db-data:/var/lib/mysql
-      - ./deploy/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - jsw-db-data:/var/lib/postgresql
+      - ./deploy/init.postgresql.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
-      test: ["CMD", "mariadb-admin", "ping", "-h", "127.0.0.1", "-uroot", "-p${DB_PASSWORD:-my-secret-pw}"]
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U ${DB_USERNAME:-jsw} -d ${DB_NAME:-javasqlweb_db}"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -24,10 +25,13 @@ services:
         condition: service_healthy
     environment:
       DB_HOST: jsw-db
-      DB_PORT: 3306
+      DB_PORT: 5432
       DB_NAME: ${DB_NAME:-javasqlweb_db}
-      DB_USERNAME: ${DB_USERNAME:-root}
+      DB_USERNAME: ${DB_USERNAME:-jsw}
       DB_PASSWORD: ${DB_PASSWORD:-my-secret-pw}
+      DB_DIALECT: ${DB_DIALECT:-postgresql}
+      APP_DB_DIALECT: ${APP_DB_DIALECT:-postgresql}
+      DB_URL: ${DB_URL:-jdbc:postgresql://jsw-db:5432/${DB_NAME:-javasqlweb_db}}
       PROJECT_VERSION: ${TAG}
       PROJECT_DOMAIN: ${PUBLIC_DOMAIN:-localhost}
       PROJECT_HOST: ${PUBLIC_HOST:-http://localhost}
