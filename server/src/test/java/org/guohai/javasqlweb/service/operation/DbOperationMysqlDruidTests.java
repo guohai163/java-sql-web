@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -31,13 +32,13 @@ class DbOperationMysqlDruidTests {
     void getTableListOrdersByTableNameAscending() throws Exception {
         DataSource dataSource = mock(DataSource.class);
         Connection connection = mock(Connection.class);
-        Statement statement = mock(Statement.class);
+        PreparedStatement statement = mock(PreparedStatement.class);
         ResultSet resultSet = mock(ResultSet.class);
         DbOperationMysqlDruid operation = new DbOperationMysqlDruid(dataSource);
 
         when(dataSource.getConnection()).thenReturn(connection);
-        when(connection.createStatement()).thenReturn(statement);
-        when(statement.executeQuery(anyString())).thenReturn(resultSet);
+        when(connection.prepareStatement(anyString())).thenReturn(statement);
+        when(statement.executeQuery()).thenReturn(resultSet);
         when(resultSet.next()).thenReturn(true, false);
         when(resultSet.getString("table_name")).thenReturn("A_table");
         when(resultSet.getLong("table_rows")).thenReturn(123L);
@@ -47,8 +48,29 @@ class DbOperationMysqlDruidTests {
         assertEquals(1, tables.size());
         assertEquals("A_table", tables.get(0).getTableName());
         assertEquals(123L, tables.get(0).getTableRows());
-        verify(statement).executeQuery(
-                "SELECT table_name ,table_rows FROM `information_schema`.`tables` WHERE TABLE_SCHEMA = 'analytics' ORDER BY table_name ASC;");
+        verify(statement).setString(1, "analytics");
+        verify(statement).executeQuery();
+    }
+
+    @Test
+    void getColumnsListReturnsEmptyWhenTableDoesNotExist() throws Exception {
+        DataSource dataSource = mock(DataSource.class);
+        Connection connection = mock(Connection.class);
+        PreparedStatement statement = mock(PreparedStatement.class);
+        ResultSet resultSet = mock(ResultSet.class);
+        DbOperationMysqlDruid operation = new DbOperationMysqlDruid(dataSource);
+
+        when(dataSource.getConnection()).thenReturn(connection);
+        when(connection.prepareStatement(anyString())).thenReturn(statement);
+        when(statement.executeQuery()).thenReturn(resultSet);
+        when(resultSet.next()).thenReturn(false);
+
+        List<?> columns = operation.getColumnsList("cos_power_order_db", "cos_power_order_d");
+
+        assertEquals(0, columns.size());
+        verify(statement).setString(1, "cos_power_order_db");
+        verify(statement).setString(2, "cos_power_order_d");
+        verify(statement).executeQuery();
     }
 
     @Test
@@ -64,7 +86,7 @@ class DbOperationMysqlDruidTests {
 
         when(dataSource.getConnection()).thenReturn(connection);
         when(connection.createStatement()).thenReturn(sessionStatement);
-        when(connection.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY)).thenReturn(statement);
+        when(connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY)).thenReturn(statement);
         when(sessionStatement.executeQuery(anyString())).thenReturn(sessionResultSet);
         when(sessionResultSet.next()).thenReturn(true);
         when(sessionResultSet.getString("value")).thenReturn("901");
@@ -90,9 +112,40 @@ class DbOperationMysqlDruidTests {
         assertEquals(1, rows.size());
         assertEquals(1, rows.get(0).get("value"));
         verify(statement).setQueryTimeout(30);
-        verify(statement).execute("use analytics");
+        verify(statement).setMaxRows(11);
+        verify(statement).setFetchSize(11);
+        verify(statement).execute("USE `analytics`");
         verify(statement).execute("SET @x = 1;");
-        verify(statement).executeQuery(" SELECT @x;");
+        verify(statement).executeQuery("SELECT @x;");
+        verify(resultSet, never()).last();
+    }
+
+    @Test
+    void queryDatabaseBySqlQuotesMysqlDatabaseIdentifierBeforeUse() throws Exception {
+        DataSource dataSource = mock(DataSource.class);
+        Connection connection = mock(Connection.class);
+        Statement statement = mock(Statement.class);
+        Statement sessionStatement = mock(Statement.class);
+        ResultSet sessionResultSet = mock(ResultSet.class);
+        ResultSet resultSet = mock(ResultSet.class);
+        ResultSetMetaData metaData = mock(ResultSetMetaData.class);
+        DbOperationMysqlDruid operation = new DbOperationMysqlDruid(dataSource);
+
+        when(dataSource.getConnection()).thenReturn(connection);
+        when(connection.createStatement()).thenReturn(sessionStatement);
+        when(connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY)).thenReturn(statement);
+        when(sessionStatement.executeQuery(anyString())).thenReturn(sessionResultSet);
+        when(sessionResultSet.next()).thenReturn(true);
+        when(sessionResultSet.getString("value")).thenReturn("901");
+        when(statement.executeQuery(anyString())).thenReturn(resultSet);
+        when(resultSet.getMetaData()).thenReturn(metaData);
+        when(metaData.getColumnCount()).thenReturn(1);
+        when(resultSet.next()).thenReturn(false);
+
+        operation.queryDatabaseBySqlWithSession("ana`lytics;DROP", "SELECT 1", 10, null);
+
+        verify(statement).execute("USE `ana``lytics;DROP`");
+        verify(statement).executeQuery("SELECT 1;");
     }
 
     @Test

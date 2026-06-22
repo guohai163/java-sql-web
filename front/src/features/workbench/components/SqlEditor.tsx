@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { autocompletion, startCompletion } from '@codemirror/autocomplete';
 import { defaultHighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { MSSQL, MySQL, PostgreSQL, sql } from '@codemirror/lang-sql';
+import { EditorSelection } from '@codemirror/state';
 import { EditorView, keymap, lineNumbers } from '@codemirror/view';
 
 export interface SelectionSnapshot {
@@ -18,6 +19,10 @@ interface SqlEditorProps {
   onChange?: (value: string, snapshot: SelectionSnapshot) => void;
   onSelectionChange?: (snapshot: SelectionSnapshot) => void;
   onMount?: (view: EditorView) => void;
+}
+
+export interface SqlEditorHandle {
+  resetViewport: () => void;
 }
 
 function normalizeSchemaTables(schemaTables: unknown): Record<string, string[]> {
@@ -77,15 +82,16 @@ const sqlEditorTheme = EditorView.theme({
   },
 });
 
-function SqlEditor({
+const SqlEditor = forwardRef<SqlEditorHandle, SqlEditorProps>(function SqlEditor({
   value,
   serverType,
   schemaTables,
   onChange,
   onSelectionChange,
   onMount,
-}: SqlEditorProps): React.JSX.Element {
+}: SqlEditorProps, ref): React.JSX.Element {
   const composingRef = useRef(false);
+  const editorViewRef = useRef<EditorView | null>(null);
   const pendingValueRef = useRef<string | null>(null);
   const onChangeRef = useRef(onChange);
   const onSelectionChangeRef = useRef(onSelectionChange);
@@ -106,6 +112,27 @@ function SqlEditor({
   useEffect(() => {
     onMountRef.current = onMount;
   }, [onMount]);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      resetViewport: () => {
+        const editorView = editorViewRef.current;
+        if (!editorView) {
+          return;
+        }
+        editorView.dispatch({
+          selection: EditorSelection.cursor(0),
+          effects: EditorView.scrollIntoView(0, { y: 'start' }),
+        });
+        if (editorView.scrollDOM) {
+          editorView.scrollDOM.scrollTop = 0;
+        }
+        editorView.focus();
+      },
+    }),
+    [],
+  );
 
   const extensions = useMemo(
     () => [
@@ -166,11 +193,15 @@ function SqlEditor({
       basicSetup={false}
       extensions={extensions}
       onCreateEditor={(view: EditorView) => {
+        editorViewRef.current = view;
+        if (view.scrollDOM) {
+          view.scrollDOM.scrollTop = 0;
+        }
         onMountRef.current?.(view);
       }}
       value={value}
     />
   );
-}
+});
 
 export default SqlEditor;

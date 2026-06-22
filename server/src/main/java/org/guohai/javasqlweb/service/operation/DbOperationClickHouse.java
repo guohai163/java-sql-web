@@ -4,6 +4,7 @@ import com.zaxxer.hikari.HikariDataSource;
 import com.zaxxer.hikari.HikariPoolMXBean;
 import org.guohai.javasqlweb.beans.*;
 import org.guohai.javasqlweb.util.HikariDataSourceUtils;
+import org.guohai.javasqlweb.util.SqlIdentifierUtils;
 
 import javax.sql.DataSource;
 import java.net.URLEncoder;
@@ -32,6 +33,8 @@ public class DbOperationClickHouse implements DbOperation{
     private final Map<String, CachedDataSource> queryDataSourceMap = new HashMap<>();
 
     private final QueryDataSourceFactory queryDataSourceFactory;
+
+    private int queryTimeoutSeconds;
 
     private static final class CachedDataSource {
         private final DataSource dataSource;
@@ -101,9 +104,10 @@ public class DbOperationClickHouse implements DbOperation{
     public List<TablesNameBean> getTableList(String dbName) throws SQLException {
         List<TablesNameBean> listTnb = new ArrayList<>();
         Connection conn = sqlDs.getConnection();
-        Statement st = conn.createStatement();
-        ResultSet rs = st.executeQuery(String.format(
-                "SELECT name,total_rows FROM system.tables where database='%s' ORDER BY name ASC; ", dbName));
+        PreparedStatement st = conn.prepareStatement(
+                "SELECT name, total_rows FROM system.tables WHERE database = ? ORDER BY name ASC");
+        st.setString(1, dbName);
+        ResultSet rs = st.executeQuery();
         while (rs.next()){
             listTnb.add(new TablesNameBean(rs.getString("name"),
                     rs.getLong("total_rows")));
@@ -149,16 +153,16 @@ public class DbOperationClickHouse implements DbOperation{
     public List<ColumnsNameBean> getColumnsList(String dbName, String tableName) throws SQLException {
         List<ColumnsNameBean> listCnb = new ArrayList<>();
         Connection conn = null;
-        Statement st = null;
+        PreparedStatement st = null;
         ResultSet rs = null;
         try {
             conn = sqlDs.getConnection();
-            st = conn.createStatement();
-            rs = st.executeQuery(String.format(
+            st = conn.prepareStatement(
                     "SELECT name AS column_name, type AS column_type, comment AS column_comment " +
-                            "FROM system.columns WHERE database='%s' AND table='%s' LIMIT 100;",
-                    dbName,
-                    tableName));
+                            "FROM system.columns WHERE database = ? AND table = ? LIMIT 100");
+            st.setString(1, dbName);
+            st.setString(2, tableName);
+            rs = st.executeQuery();
             while (rs.next()){
                 String columnType = rs.getString("column_type");
                 String columnComment = rs.getString("column_comment");
@@ -229,23 +233,19 @@ public class DbOperationClickHouse implements DbOperation{
         Connection conn = null;
         Statement st = null;
         ResultSet rs = null;
-        int safeLimit = limit == null ? Integer.MAX_VALUE : Math.max(limit, 0);
         try{
             queryDataSource = acquireQueryDataSource(dbName);
             conn = queryDataSource.getConnection();
             st = conn.createStatement();
-            //按【;】拆分SQL执行，默认最后一条为查询语句，为了方便使用SET @变量 = XXX
-            sql = sql.replace("\n"," ");
-            sql = sql.replace("\r"," ");
-
-            rs = st.executeQuery(String.format("%s;", sql));
+            QueryExecutionUtils.applyQueryControls(st, queryTimeoutSeconds, limit);
+            rs = st.executeQuery(QueryExecutionUtils.ensureTrailingSemicolon(sql));
             // 获得结果集结构信息,元数据
             java.sql.ResultSetMetaData md = rs.getMetaData();
             // 获得列数
             int columnCount = md.getColumnCount();
             boolean hasMore = false;
             while (rs.next()){
-                if(listData.size() >= safeLimit){
+                if(QueryExecutionUtils.shouldStopBeforeAdding(listData, limit)){
                     hasMore = true;
                     break;
                 }
@@ -261,9 +261,7 @@ public class DbOperationClickHouse implements DbOperation{
                 listData.add(rowData);
             }
 
-            result[0] = hasMore ? listData.size() + 1 : listData.size();
-            result[1] = listData.size();
-            result[2] = listData;
+            QueryExecutionUtils.fillResult(result, listData, hasMore);
         } finally {
             closeResource(rs,st,conn);
             releaseQueryDataSource(dbName, queryDataSource);
@@ -271,6 +269,11 @@ public class DbOperationClickHouse implements DbOperation{
 
 
         return result;
+    }
+
+    @Override
+    public void configureQueryTimeoutSeconds(int seconds) {
+        queryTimeoutSeconds = Math.max(0, seconds);
     }
 
     /**
@@ -501,7 +504,8 @@ public class DbOperationClickHouse implements DbOperation{
     }
 
     private String normalizeDatabaseName(String dbName) {
-        return dbName == null ? "" : dbName.trim();
+        String normalizedDbName = dbName == null ? "" : dbName.trim();
+        return normalizedDbName.isEmpty() ? "" : SqlIdentifierUtils.normalizeIdentifier(normalizedDbName);
     }
 
     private String encodeDatabaseName(String dbName) {

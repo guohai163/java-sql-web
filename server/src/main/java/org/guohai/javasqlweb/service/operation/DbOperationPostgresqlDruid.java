@@ -4,8 +4,11 @@ import com.zaxxer.hikari.HikariDataSource;
 import com.zaxxer.hikari.HikariPoolMXBean;
 import org.guohai.javasqlweb.beans.*;
 import org.guohai.javasqlweb.util.HikariDataSourceUtils;
+import org.guohai.javasqlweb.util.SqlIdentifierUtils;
 
 import javax.sql.DataSource;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.sql.*;
 import java.util.*;
 
@@ -32,6 +35,8 @@ public class DbOperationPostgresqlDruid implements DbOperation {
     private ConnectConfigBean connect;
 
     private final String applicationNamePrefix;
+
+    private int queryTimeoutSeconds;
 
     private static final class CachedDataSource {
         private final DataSource dataSource;
@@ -95,18 +100,20 @@ public class DbOperationPostgresqlDruid implements DbOperation {
         List<TablesNameBean> listTnb = new ArrayList<>();
         DataSource dataSource = acquireDataSource(dbName);
         Connection conn = null;
-        Statement st = null;
+        PreparedStatement st = null;
         ResultSet rs = null;
         try {
             conn = dataSource.getConnection();
-            st = conn.createStatement();
-            rs = st.executeQuery(String.format(
-                    "select relname as TABLE_NAME, reltuples as rowCounts from pg_class\n" +
-                            "where relkind = 'r' and relnamespace = (select oid from pg_namespace where nspname='public')\n" +
-                            "order by TABLE_NAME asc;", dbName));
+            st = conn.prepareStatement(
+                    "SELECT relname AS table_name, reltuples AS row_counts " +
+                            "FROM pg_class " +
+                            "WHERE relkind = 'r' AND relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = ?) " +
+                            "ORDER BY table_name ASC");
+            st.setString(1, PUBLIC_SCHEMA);
+            rs = st.executeQuery();
             while (rs.next()){
-                listTnb.add(new TablesNameBean(rs.getString("TABLE_NAME"),
-                        rs.getLong("rowCounts")));
+                listTnb.add(new TablesNameBean(rs.getString("table_name"),
+                        rs.getLong("row_counts")));
             }
         } finally {
             closeResource(rs,st,conn);
@@ -178,8 +185,8 @@ public class DbOperationPostgresqlDruid implements DbOperation {
                 return new ViewNameBean(
                         viewName,
                         String.format("CREATE OR REPLACE VIEW %s.%s AS%n%s",
-                                quoteIdentifier(PUBLIC_SCHEMA),
-                                quoteIdentifier(viewName),
+                                SqlIdentifierUtils.quotePostgresqlIdentifier(PUBLIC_SCHEMA),
+                                SqlIdentifierUtils.quotePostgresqlIdentifier(viewName),
                                 definition == null ? "" : definition)
                 );
             }
@@ -411,21 +418,19 @@ public class DbOperationPostgresqlDruid implements DbOperation {
             if (onSessionReady != null) {
                 onSessionReady.accept(sessionId);
             }
-            st = conn.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE,ResultSet.CONCUR_READ_ONLY);
-            rs = st.executeQuery(String.format("%s;", sql));
+            st = conn.createStatement(ResultSet.TYPE_FORWARD_ONLY,ResultSet.CONCUR_READ_ONLY);
+            QueryExecutionUtils.applyQueryControls(st, queryTimeoutSeconds, limit);
+            rs = st.executeQuery(QueryExecutionUtils.ensureTrailingSemicolon(sql));
             // 获得结果集结构信息,元数据
             java.sql.ResultSetMetaData md = rs.getMetaData();
             // 获得列数
             int columnCount = md.getColumnCount();
-            rs.last();
-            result[0] = rs.getRow();
-            rs.beforeFirst();
-            int dataCount = 1;
+            boolean hasMore = false;
             while (rs.next()){
-                if(dataCount>limit){
+                if(QueryExecutionUtils.shouldStopBeforeAdding(listData, limit)){
+                    hasMore = true;
                     break;
                 }
-                dataCount++;
                 Map<String, Object> rowData = new LinkedHashMap<String, Object>();
                 for(int i=1;i<=columnCount;i++){
                     rowData.put(md.getColumnLabel(i),md.getColumnType(i) == 93
@@ -435,8 +440,7 @@ public class DbOperationPostgresqlDruid implements DbOperation {
                 listData.add(rowData);
             }
 
-            result[1] = listData.size();
-            result[2] = listData;
+            QueryExecutionUtils.fillResult(result, listData, hasMore);
         }
         catch (SQLException e){
             throw e;
@@ -450,6 +454,11 @@ public class DbOperationPostgresqlDruid implements DbOperation {
         executionResult.setDbSessionId(sessionId);
         executionResult.setRows(result);
         return executionResult;
+    }
+
+    @Override
+    public void configureQueryTimeoutSeconds(int seconds) {
+        queryTimeoutSeconds = Math.max(0, seconds);
     }
 
     /**
@@ -613,10 +622,14 @@ public class DbOperationPostgresqlDruid implements DbOperation {
      * @return
      */
     private DataSource createDataSource(String dbName){
+        String poolName = applicationNamePrefix + "-" + dbName;
         return HikariDataSourceUtils.createDataSource(
-                applicationNamePrefix + "-" + dbName,
+                poolName,
                 String.format("jdbc:postgresql://%s:%s/%s?ApplicationName=%s",
-                        connect.getDbServerHost(), connect.getDbServerPort(), dbName, applicationNamePrefix + "-" + dbName),
+                        connect.getDbServerHost(),
+                        connect.getDbServerPort(),
+                        encodeDatabaseName(dbName),
+                        encodeUrlComponent(poolName)),
                 connect.getDbServerUsername(),
                 connect.getDbServerPassword(),
                 "select now()"
@@ -753,8 +766,13 @@ public class DbOperationPostgresqlDruid implements DbOperation {
         }
     }
 
-    private String quoteIdentifier(String identifier) {
-        return "\"" + identifier.replace("\"", "\"\"") + "\"";
+    private String encodeDatabaseName(String dbName) {
+        String normalizedDbName = SqlIdentifierUtils.normalizeIdentifier(dbName);
+        return encodeUrlComponent(normalizedDbName);
+    }
+
+    private String encodeUrlComponent(String value) {
+        return URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20");
     }
 
 }

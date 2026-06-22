@@ -12,9 +12,12 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.sql.Connection;
-import java.sql.Statement;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
+import java.sql.Statement;
+import java.sql.Types;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -22,9 +25,11 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.anyString;
 
 class DbOperationPostgresqlDruidTests {
 
@@ -33,7 +38,7 @@ class DbOperationPostgresqlDruidTests {
         DbOperationPostgresqlDruid operation = new DbOperationPostgresqlDruid(buildConnectConfig());
         com.zaxxer.hikari.HikariDataSource dataSource = mock(com.zaxxer.hikari.HikariDataSource.class);
         Connection connection = mock(Connection.class);
-        Statement statement = mock(Statement.class);
+        PreparedStatement statement = mock(PreparedStatement.class);
         ResultSet resultSet = mock(ResultSet.class);
         long now = System.currentTimeMillis();
         try {
@@ -41,22 +46,69 @@ class DbOperationPostgresqlDruidTests {
             accessPostgresMap(operation).put("analytics", newCachedDataSource(dataSource, now));
 
             when(dataSource.getConnection()).thenReturn(connection);
-            when(connection.createStatement()).thenReturn(statement);
-            when(statement.executeQuery(argThat(sql ->
-                    sql != null
-                            && sql.contains("select relname as TABLE_NAME")
-                            && sql.contains("order by TABLE_NAME asc;")
-            ))).thenReturn(resultSet);
+            when(connection.prepareStatement(anyString())).thenReturn(statement);
+            when(statement.executeQuery()).thenReturn(resultSet);
             when(resultSet.next()).thenReturn(true, false);
-            when(resultSet.getString("TABLE_NAME")).thenReturn("A_table");
-            when(resultSet.getLong("rowCounts")).thenReturn(88L);
+            when(resultSet.getString("table_name")).thenReturn("A_table");
+            when(resultSet.getLong("row_counts")).thenReturn(88L);
 
             java.util.List<TablesNameBean> tables = operation.getTableList("analytics");
 
             assertEquals(1, tables.size());
             assertEquals("A_table", tables.get(0).getTableName());
             assertEquals(88L, tables.get(0).getTableRows());
-            verify(statement).executeQuery(argThat(sql -> sql != null && sql.contains("order by TABLE_NAME asc;")));
+            verify(statement).setString(1, "public");
+            verify(statement).executeQuery();
+        } finally {
+            operation.close();
+        }
+    }
+
+    @Test
+    void queryDatabaseBySqlAppliesPostgresqlQueryControlsWithoutScrollableCursor() throws Exception {
+        DbOperationPostgresqlDruid operation = new DbOperationPostgresqlDruid(buildConnectConfig());
+        HikariDataSource dataSource = mock(HikariDataSource.class);
+        Connection connection = mock(Connection.class);
+        Statement sessionStatement = mock(Statement.class);
+        Statement queryStatement = mock(Statement.class);
+        ResultSet sessionResultSet = mock(ResultSet.class);
+        ResultSet resultSet = mock(ResultSet.class);
+        ResultSetMetaData metaData = mock(ResultSetMetaData.class);
+        long now = System.currentTimeMillis();
+        try {
+            accessPostgresMap(operation).put("analytics", newCachedDataSource(dataSource, now));
+            operation.configureQueryTimeoutSeconds(15);
+
+            when(dataSource.getConnection()).thenReturn(connection);
+            when(connection.createStatement()).thenReturn(sessionStatement);
+            when(connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY)).thenReturn(queryStatement);
+            when(sessionStatement.executeQuery(anyString())).thenReturn(sessionResultSet);
+            when(sessionResultSet.next()).thenReturn(true);
+            when(sessionResultSet.getString("value")).thenReturn("321");
+            when(queryStatement.executeQuery(anyString())).thenReturn(resultSet);
+            when(resultSet.getMetaData()).thenReturn(metaData);
+            when(metaData.getColumnCount()).thenReturn(1);
+            when(metaData.getColumnLabel(1)).thenReturn("value");
+            when(metaData.getColumnType(1)).thenReturn(Types.INTEGER);
+            when(resultSet.next()).thenReturn(true, true, false);
+            when(resultSet.getObject(1)).thenReturn(1, 2);
+
+            org.guohai.javasqlweb.beans.QueryExecutionResult executionResult =
+                    operation.queryDatabaseBySqlWithSession("analytics", "SELECT value FROM t", 1, null);
+
+            Object[] result = executionResult.getRows();
+            assertEquals(2, result[0]);
+            assertEquals(1, result[1]);
+            assertEquals("321", executionResult.getDbSessionId());
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> rows = (List<Map<String, Object>>) result[2];
+            assertEquals(1, rows.size());
+            verify(queryStatement).setQueryTimeout(15);
+            verify(queryStatement).setMaxRows(2);
+            verify(queryStatement).setFetchSize(2);
+            verify(queryStatement).executeQuery("SELECT value FROM t;");
+            verify(connection, never()).createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
+            verify(resultSet, never()).last();
         } finally {
             operation.close();
         }

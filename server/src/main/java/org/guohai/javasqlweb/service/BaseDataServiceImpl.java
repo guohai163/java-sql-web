@@ -342,6 +342,10 @@ public class BaseDataServiceImpl implements BaseDataService{
                 clearConnectionFailureState(serverCode);
                 return new Result<>(true, returnResult, result[2]);
             } catch (Exception e) {
+                if (isQueryTimeoutFailure(e)) {
+                    LOG.warn("SQL query timed out for server {}: {}", serverCode, extractExceptionMessage(e));
+                    return buildQueryTimeoutResult(e);
+                }
                 LOG.warn("SQL query failed for server {}", serverCode, e);
                 if (isConnectionFailure(e)) {
                     return buildConnectionFailureResult(serverCode, e);
@@ -656,6 +660,10 @@ public class BaseDataServiceImpl implements BaseDataService{
             clearConnectionFailureState(serverCode);
             return new Result<>(true, "", data);
         } catch (Exception e) {
+            if (isQueryTimeoutFailure(e)) {
+                LOG.warn("Server operation timed out for server {}: {}", serverCode, extractExceptionMessage(e));
+                return buildQueryTimeoutResult(e);
+            }
             LOG.warn("Server operation failed for server {}", serverCode, e);
             if (isConnectionFailure(e)) {
                 return buildConnectionFailureResult(serverCode, e);
@@ -796,6 +804,13 @@ public class BaseDataServiceImpl implements BaseDataService{
                         failureCount,
                         CONNECTION_FAILURE_THRESHOLD,
                         errorMessage),
+                null);
+    }
+
+    private <T> Result<T> buildQueryTimeoutResult(Exception exception) {
+        return new Result<>(false,
+                String.format("查询执行超时，请缩小查询范围、增加过滤条件或稍后重试。原始错误：%s",
+                        extractExceptionMessage(exception)),
                 null);
     }
 

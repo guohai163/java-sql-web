@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { buildConnListQuery, summarizeSyncResult } from '@/features/admin/Admin';
+import { buildConnListQuery, summarizeSyncResult } from '@/features/admin/lib/adminHelpers';
 
 describe('Admin helpers', () => {
   test('buildConnListQuery should include keyword and exact dbName', () => {

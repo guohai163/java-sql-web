@@ -24,6 +24,31 @@ export default defineConfig(({ mode }) => {
     ],
     build: {
       outDir: 'dist',
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (!id.includes('node_modules')) {
+              return undefined;
+            }
+            if (id.includes('/@codemirror/') || id.includes('/@uiw/react-codemirror/')) {
+              return 'codemirror';
+            }
+            if (id.includes('/recharts/') || id.includes('/victory-vendor/') || id.includes('/d3-')) {
+              return 'recharts';
+            }
+            if (
+              id.includes('/react/')
+              || id.includes('/react-dom/')
+              || id.includes('/react-router/')
+              || id.includes('/react-router-dom/')
+              || id.includes('/scheduler/')
+            ) {
+              return 'react';
+            }
+            return undefined;
+          },
+        },
+      },
     },
     resolve: {
       alias: {

@@ -28,13 +28,27 @@ import {
   TeamOutlined,
   UserOutlined,
 } from '@ant-design/icons';
-import AdminDashboard from '@/features/admin/components/AdminDashboard';
 import OidcSsfPanel from '@/features/admin/components/OidcSsfPanel';
+import {
+  buildConnListQuery,
+  buildServerRuntimeMap,
+  createEmptyQueryLogCursor,
+  createServerTestResult,
+  getAccountStatusMeta,
+  getAuthStatusMeta,
+  getPendingTaskMeta,
+  getServerRuntimeMeta,
+  getServerTestDetail,
+  pruneServerTestResults,
+  summarizeServerTestMessage,
+  summarizeSyncResult,
+} from '@/features/admin/lib/adminHelpers';
 import { getServerTypeLabel } from '@/features/workbench/lib/serverType';
 import { createClient } from '@/shared/api/apiClient';
 import { formatVersionLabel } from '@/shared/lib/version';
 import './Admin.css';
 
+const AdminDashboard = React.lazy(() => import('@/features/admin/components/AdminDashboard'));
 const { confirm } = Modal;
 const { Content, Footer, Header, Sider } = Layout;
 
@@ -48,160 +62,6 @@ function showDialog(content, title = '提示') {
     onOk() {},
     onCancel() {},
   });
-}
-
-function getServerTestDetail(response, fallback = '测试失败，请检查服务器配置。') {
-  const candidate = response?.jsonData?.data || response?.jsonData?.message || fallback;
-  if (typeof candidate !== 'string') {
-    return fallback;
-  }
-
-  const normalized = candidate.trim();
-  return normalized || fallback;
-}
-
-function summarizeServerTestMessage(detail, fallback) {
-  const normalized = (detail || fallback || '').replace(/\s+/g, ' ').trim();
-  if (!normalized) {
-    return fallback || '';
-  }
-  if (normalized.length <= 28) {
-    return normalized;
-  }
-  return `${normalized.slice(0, 28)}...`;
-}
-
-function createServerTestResult(status, messageText, detail) {
-  return {
-    status,
-    message: messageText,
-    detail,
-    testedAt:
-      status === 'testing'
-        ? ''
-        : new Date().toLocaleString('zh-CN', { hour12: false }),
-  };
-}
-
-function pruneServerTestResults(connList, serverTestResults) {
-  const validCodes = new Set((connList || []).map((item) => item.code));
-  return Object.entries(serverTestResults || {}).reduce((accumulator, [serverCode, result]) => {
-    if (validCodes.has(Number(serverCode)) || validCodes.has(serverCode)) {
-      accumulator[serverCode] = result;
-    }
-    return accumulator;
-  }, {});
-}
-
-function buildServerRuntimeMap(runtimeList) {
-  return (runtimeList || []).reduce((accumulator, item) => {
-    if (item?.serverCode != null) {
-      accumulator[item.serverCode] = item;
-    }
-    return accumulator;
-  }, {});
-}
-
-export function buildConnListQuery(keyword, serverType) {
-  const query = new URLSearchParams();
-  const normalizedKeyword = (keyword || '').trim();
-  const normalizedType = (serverType || '').trim();
-
-  if (normalizedKeyword) {
-    query.set('keyword', normalizedKeyword);
-    query.set('dbName', normalizedKeyword);
-  }
-  if (normalizedType && normalizedType !== 'all') {
-    query.set('serverType', normalizedType);
-  }
-
-  return query.toString();
-}
-
-export function summarizeSyncResult(result) {
-  const failures = Array.isArray(result?.failures) ? result.failures : [];
-  const summaryLines = [
-    `总实例数：${result?.totalServers ?? 0}`,
-    `成功：${result?.successCount ?? 0}`,
-    `失败：${result?.failCount ?? 0}`,
-    `同步时间：${result?.syncedAt || '-'}`,
-  ];
-
-  if (failures.length === 0) {
-    return summaryLines.join('\n');
-  }
-
-  const failureLines = failures.map((failure) => {
-    const serverName = failure?.serverName || '-';
-    const serverCode = failure?.serverCode == null ? '-' : failure.serverCode;
-    const detail = failure?.message || '同步失败';
-    return `${serverName}(${serverCode})：${detail}`;
-  });
-
-  return `${summaryLines.join('\n')}\n失败明细：\n${failureLines.join('\n')}`;
-}
-
-function getServerRuntimeMeta(status) {
-  switch (status) {
-    case 'ok':
-      return { color: 'success', text: '正常' };
-    case 'warning':
-      return { color: 'warning', text: '警告' };
-    case 'cooldown':
-      return { color: 'error', text: '冷却中' };
-    default:
-      return { color: 'default', text: '未使用' };
-  }
-}
-
-function getAccountStatusMeta(status) {
-  if (status === 'ACTIVE') {
-    return { color: 'success', text: '正常' };
-  }
-  if (status === 'PENDING_ACTIVATION') {
-    return { color: 'processing', text: '待激活' };
-  }
-  if (status === 'PENDING_PASSWORD_RESET') {
-    return { color: 'warning', text: '待重置密码' };
-  }
-  if (status === 'PENDING_OTP_RESET') {
-    return { color: 'warning', text: '待重绑OTP' };
-  }
-  return { color: 'default', text: status || '未知' };
-}
-
-function getPendingTaskMeta(taskType) {
-  if (taskType === 'ACTIVATE') {
-    return { color: 'processing', text: '激活' };
-  }
-  if (taskType === 'RESET_PASSWORD') {
-    return { color: 'warning', text: '重置密码' };
-  }
-  if (taskType === 'RESET_OTP') {
-    return { color: 'warning', text: '重绑OTP' };
-  }
-  return { color: 'default', text: '无' };
-}
-
-function getAuthStatusMeta(status) {
-  if (status === 'BIND') {
-    return { color: 'success', text: '已绑定' };
-  }
-  if (status === 'BINDING') {
-    return { color: 'processing', text: '绑定中' };
-  }
-  return { color: 'default', text: status || '未绑定' };
-}
-
-function createEmptyQueryLogCursor(pageSize = 25) {
-  return {
-    items: [],
-    pageSize,
-    firstCode: null,
-    lastCode: null,
-    hasOlder: false,
-    hasNewer: false,
-  };
 }
 
 interface AdminState {
@@ -1557,24 +1417,26 @@ function Admin() {
         </Header>
         <Content className="admin-content">
           {state.menuSelect === '1' ? (
-            <AdminDashboard
-              data={state.dashboardData}
-              filter={state.dashboardFilter}
-              loading={state.dashboardLoading}
-              updatedAt={state.dashboardUpdatedAt}
-              onRangeChange={(value) => {
-                void updateDashboardFilter({ range: value });
-              }}
-              onGrainChange={(value) => {
-                void updateDashboardFilter({ grain: value });
-              }}
-              onRefresh={() => {
-                void loadDashboard();
-              }}
-              onViewDynamicPoolDetail={(record) => {
-                void loadTargetSessionDetails(record);
-              }}
-            />
+            <React.Suspense fallback={<div className="admin-section-loading">Dashboard 加载中...</div>}>
+              <AdminDashboard
+                data={state.dashboardData}
+                filter={state.dashboardFilter}
+                loading={state.dashboardLoading}
+                updatedAt={state.dashboardUpdatedAt}
+                onRangeChange={(value) => {
+                  void updateDashboardFilter({ range: value });
+                }}
+                onGrainChange={(value) => {
+                  void updateDashboardFilter({ grain: value });
+                }}
+                onRefresh={() => {
+                  void loadDashboard();
+                }}
+                onViewDynamicPoolDetail={(record) => {
+                  void loadTargetSessionDetails(record);
+                }}
+              />
+            </React.Suspense>
           ) : null}
 
           {state.menuSelect === '2'

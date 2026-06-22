@@ -386,6 +386,18 @@
     box-shadow: none !important;
 }
 
+.workbench-editor-loading {
+    min-height: 300px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 14px;
+    background: #fbfdff;
+    color: #64748b;
+    font-size: 0.9rem;
+}
+
 .query_load {
     text-align: center;
     margin-top: 20px;

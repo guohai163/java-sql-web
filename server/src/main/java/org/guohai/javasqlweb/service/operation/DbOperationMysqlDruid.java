@@ -4,6 +4,8 @@ import com.zaxxer.hikari.HikariDataSource;
 import com.zaxxer.hikari.HikariPoolMXBean;
 import org.guohai.javasqlweb.beans.*;
 import org.guohai.javasqlweb.util.HikariDataSourceUtils;
+import org.guohai.javasqlweb.util.ReadOnlySqlGuard;
+import org.guohai.javasqlweb.util.SqlIdentifierUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -97,10 +99,11 @@ public class DbOperationMysqlDruid implements DbOperation {
     public List<TablesNameBean> getTableList(String dbName) throws SQLException {
         List<TablesNameBean> listTnb = new ArrayList<>();
         Connection conn = sqlDs.getConnection();
-        Statement st = conn.createStatement();
-        ResultSet rs = st.executeQuery(String.format(
-                "SELECT table_name ,table_rows " +
-                "FROM `information_schema`.`tables` WHERE TABLE_SCHEMA = '%s' ORDER BY table_name ASC;", dbName));
+        PreparedStatement st = conn.prepareStatement(
+                "SELECT table_name, table_rows " +
+                        "FROM information_schema.tables WHERE table_schema = ? ORDER BY table_name ASC");
+        st.setString(1, dbName);
+        ResultSet rs = st.executeQuery();
         while (rs.next()){
             listTnb.add(new TablesNameBean(rs.getString("table_name"),
                     rs.getLong("table_rows")));
@@ -120,11 +123,12 @@ public class DbOperationMysqlDruid implements DbOperation {
     public List<ViewNameBean> getViewsList(String dbName) throws SQLException {
         List<ViewNameBean> listView = new ArrayList<>();
         Connection conn = sqlDs.getConnection();
-        Statement st = conn.createStatement();
-        ResultSet rs = st.executeQuery(String.format(
-                "SELECT TABLE_NAME,VIEW_DEFINITION FROM information_schema.VIEWS WHERE TABLE_SCHEMA='%s'", dbName));
+        PreparedStatement st = conn.prepareStatement(
+                "SELECT table_name, view_definition FROM information_schema.views WHERE table_schema = ? ORDER BY table_name");
+        st.setString(1, dbName);
+        ResultSet rs = st.executeQuery();
         while (rs.next()){
-            listView.add(new ViewNameBean(rs.getString("TABLE_NAME"), rs.getString("VIEW_DEFINITION")));
+            listView.add(new ViewNameBean(rs.getString("table_name"), rs.getString("view_definition")));
         }
         closeResource(rs,st,conn);
         return listView;
@@ -144,25 +148,30 @@ public class DbOperationMysqlDruid implements DbOperation {
     }
 
     /**
-     * 获取所有列名
+     * 获取指定表的列元数据；目标表不存在时返回空列表。
      *
      * @param dbName
      * @param tableName
      * @return
-     * @throws SQLException 抛出异常
+     * @throws SQLException 连接或元数据查询失败时抛出异常
      */
     @Override
     public List<ColumnsNameBean> getColumnsList(String dbName, String tableName) throws SQLException {
         List<ColumnsNameBean> listCnb = new ArrayList<>();
         Connection conn = sqlDs.getConnection();
-        Statement st = conn.createStatement();
-        ResultSet rs = st.executeQuery(String.format("SHOW FULL COLUMNS FROM %s.%s", dbName, tableName));
+        PreparedStatement st = conn.prepareStatement(
+                "SELECT column_name, column_type, column_comment, is_nullable " +
+                        "FROM information_schema.columns " +
+                        "WHERE table_schema = ? AND table_name = ? ORDER BY ordinal_position");
+        st.setString(1, dbName);
+        st.setString(2, tableName);
+        ResultSet rs = st.executeQuery();
         while (rs.next()){
-            listCnb.add(new ColumnsNameBean(rs.getString("Field"),
-                    rs.getString("Type"),
+            listCnb.add(new ColumnsNameBean(rs.getString("column_name"),
+                    rs.getString("column_type"),
                     "",
-                    rs.getString("Comment"),
-                    "NO".equals(rs.getString("Null"))?"not null":"null"));
+                    rs.getString("column_comment"),
+                    "NO".equals(rs.getString("is_nullable"))?"not null":"null"));
         }
         closeResource(rs,st,conn);
         return listCnb;
@@ -179,10 +188,14 @@ public class DbOperationMysqlDruid implements DbOperation {
     public Map<String, String[]> getTablesColumnsMap(String dbName) throws SQLException {
         Map<String, String[]> tables = new HashMap<>(10);
         Connection conn = sqlDs.getConnection();
-        Statement st = conn.createStatement();
-        ResultSet rs = st.executeQuery(String.format("select TABLE_NAME,group_concat(COLUMN_NAME) as COLUMN_NAME from `information_schema`.`COLUMNS` where  TABLE_SCHEMA='%s' group by TABLE_NAME;", dbName));
+        PreparedStatement st = conn.prepareStatement(
+                "SELECT table_name, GROUP_CONCAT(column_name ORDER BY ordinal_position) AS column_name " +
+                        "FROM information_schema.columns WHERE table_schema = ? GROUP BY table_name");
+        st.setString(1, dbName);
+        ResultSet rs = st.executeQuery();
         while (rs.next()){
-            tables.put(rs.getString("TABLE_NAME"),rs.getString("COLUMN_NAME").split(","));
+            String columnNames = rs.getString("column_name");
+            tables.put(rs.getString("table_name"), columnNames == null || columnNames.isEmpty() ? new String[0] : columnNames.split(","));
         }
         closeResource(rs,st,conn);
         return tables;
@@ -201,13 +214,17 @@ public class DbOperationMysqlDruid implements DbOperation {
     public List<TableIndexesBean> getIndexesList(String dbName, String tableName) throws SQLException {
         List<TableIndexesBean> listTib = new ArrayList<>();
         Connection conn = sqlDs.getConnection();
-        Statement st = conn.createStatement();
-        ResultSet rs = st.executeQuery(String.format(
-                "SHOW INDEX FROM %s.%s", dbName, tableName));
+        PreparedStatement st = conn.prepareStatement(
+                "SELECT index_name, COALESCE(index_comment, '') AS index_comment, column_name " +
+                        "FROM information_schema.statistics " +
+                        "WHERE table_schema = ? AND table_name = ? ORDER BY index_name, seq_in_index");
+        st.setString(1, dbName);
+        st.setString(2, tableName);
+        ResultSet rs = st.executeQuery();
         while (rs.next()){
-            listTib.add(new TableIndexesBean(rs.getObject("Key_name").toString(),
-                    rs.getObject("Comment").toString(),
-                    rs.getObject("Column_name").toString()));
+            listTib.add(new TableIndexesBean(rs.getString("index_name"),
+                    rs.getString("index_comment"),
+                    rs.getString("column_name")));
         }
         closeResource(rs,st,conn);
         return listTib;
@@ -224,15 +241,17 @@ public class DbOperationMysqlDruid implements DbOperation {
     public List<StoredProceduresBean> getStoredProceduresList(String dbName) throws SQLException {
         List<StoredProceduresBean> listSp = new ArrayList<>();
         Connection conn = null;
-        Statement st = null;
+        PreparedStatement st = null;
         ResultSet rs = null;
         try {
             conn = sqlDs.getConnection();
-            st = conn.createStatement();
-            rs = st.executeQuery(String.format(
-                    "SELECT SPECIFIC_NAME FROM information_schema.Routines WHERE ROUTINE_SCHEMA='%s'", dbName));
+            st = conn.prepareStatement(
+                    "SELECT specific_name FROM information_schema.routines " +
+                            "WHERE routine_schema = ? AND routine_type = 'PROCEDURE' ORDER BY specific_name");
+            st.setString(1, dbName);
+            rs = st.executeQuery();
             while (rs.next()) {
-                listSp.add(new StoredProceduresBean(rs.getString("SPECIFIC_NAME")));
+                listSp.add(new StoredProceduresBean(rs.getString("specific_name")));
             }
         } finally {
             closeResource(rs, st, conn);
@@ -257,7 +276,10 @@ public class DbOperationMysqlDruid implements DbOperation {
         try {
             conn = sqlDs.getConnection();
             st = conn.createStatement();
-            rs = st.executeQuery(String.format("SHOW CREATE PROCEDURE %s.%s;", dbName, spName));
+            rs = st.executeQuery("SHOW CREATE PROCEDURE "
+                    + SqlIdentifierUtils.quoteMysqlIdentifier(dbName)
+                    + "."
+                    + SqlIdentifierUtils.quoteMysqlIdentifier(spName));
             while (rs.next()) {
                 spBean = new StoredProceduresBean(spName, rs.getString("Create Procedure"));
             }
@@ -295,35 +317,36 @@ public class DbOperationMysqlDruid implements DbOperation {
             if (onSessionReady != null) {
                 onSessionReady.accept(sessionId);
             }
-            st = conn.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE,ResultSet.CONCUR_READ_ONLY);
-            if (queryTimeoutSeconds > 0) {
-                st.setQueryTimeout(queryTimeoutSeconds);
+            st = conn.createStatement(ResultSet.TYPE_FORWARD_ONLY,ResultSet.CONCUR_READ_ONLY);
+            QueryExecutionUtils.applyQueryControls(st, queryTimeoutSeconds, limit);
+            // 数据库名无法参数化，必须先通过方言标识符转义再切换 catalog。
+            st.execute("USE " + SqlIdentifierUtils.quoteMysqlIdentifier(dbName));
+            List<String> splitSql = ReadOnlySqlGuard.splitStatements(sql);
+            String querySql = null;
+            for (String statement : splitSql) {
+                String trimmedStatement = statement == null ? "" : statement.trim();
+                if (trimmedStatement.isEmpty()) {
+                    continue;
+                }
+                if (querySql != null) {
+                    st.execute(QueryExecutionUtils.ensureTrailingSemicolon(querySql));
+                }
+                querySql = trimmedStatement;
             }
-            //选择一个数据库
-            st.execute("use ".concat(dbName));
-            //按【;】拆分SQL执行，默认最后一条为查询语句，为了方便使用SET @变量 = XXX
-            sql = sql.replace("\n"," ");
-            sql = sql.replace("\r"," ");
-            String[] splitSql = sql.split(";");
-            for (int i = 0; i < splitSql.length - 1; i++) {
-                st.execute(String.format("%s;", splitSql[i]));
+            if (querySql == null) {
+                throw new SQLException("SQL query is empty");
             }
-
-            //执行sql
-            rs = st.executeQuery(String.format("%s;", splitSql[splitSql.length - 1]));
+            rs = st.executeQuery(QueryExecutionUtils.ensureTrailingSemicolon(querySql));
             // 获得结果集结构信息,元数据
             java.sql.ResultSetMetaData md = rs.getMetaData();
             // 获得列数
             int columnCount = md.getColumnCount();
-            rs.last();
-            result[0] = rs.getRow();
-            rs.beforeFirst();
-            int dataCount = 1;
+            boolean hasMore = false;
             while (rs.next()){
-                if(dataCount>limit){
+                if(QueryExecutionUtils.shouldStopBeforeAdding(listData, limit)){
+                    hasMore = true;
                     break;
                 }
-                dataCount++;
                 Map<String, Object> rowData = new LinkedHashMap<>();
                 for(int i=1;i<=columnCount;i++){
                     String columnTypeName = md.getColumnTypeName(i);
@@ -342,8 +365,7 @@ public class DbOperationMysqlDruid implements DbOperation {
                 listData.add(rowData);
             }
 
-            result[1] = listData.size();
-            result[2] = listData;
+            QueryExecutionUtils.fillResult(result, listData, hasMore);
         } finally {
             closeResource(rs,st,conn);
         }

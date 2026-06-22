@@ -287,6 +287,31 @@ class BaseDataServiceImplTests {
     }
 
     @Test
+    void queryDataBySqlReturnsFriendlyTimeoutWithoutCooldown() throws Exception {
+        UserBean user = buildUser();
+        user.setUserName("tester");
+        DbOperation operation = mock(DbOperation.class);
+        ConnectConfigBean connectConfigBean = new ConnectConfigBean();
+        connectConfigBean.setCode(52);
+        connectConfigBean.setDbServerType("mysql");
+
+        when(baseConfigDao.hasServerPermission(user.getCode(), 52)).thenReturn(true);
+        when(baseConfigDao.getConnectConfig(52)).thenReturn(connectConfigBean);
+        when(operation.queryDatabaseBySqlWithSession(anyString(), anyString(), anyInt(), any()))
+                .thenThrow(new SQLTimeoutException("Statement cancelled due to timeout or client request"));
+        accessStaticMap("operationMap").put(52, operation);
+
+        for (int i = 0; i < 4; i++) {
+            Result<Object> result = baseDataService.quereyDataBySql(52, "demo", "SELECT SLEEP(60)", user, "127.0.0.1");
+            assertFalse(result.getStatus());
+            assertTrue(result.getMessage().contains("查询执行超时"));
+            assertFalse(result.getMessage().contains("冷却"));
+        }
+
+        verify(operation, times(4)).queryDatabaseBySqlWithSession(anyString(), anyString(), anyInt(), any());
+    }
+
+    @Test
     void getTargetPoolSessionsReturnsSortedSessionDetailsForServer() throws Exception {
         ConnectConfigBean server = buildConnectConfig(41, "mysql", "core");
         DbOperation operation = mock(DbOperation.class);

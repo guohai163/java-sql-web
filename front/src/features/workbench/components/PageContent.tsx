@@ -1,29 +1,32 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Pubsub from 'pubsub-js';
 import cookie from 'react-cookies';
-import { EditorSelection } from '@codemirror/state';
-import { EditorView } from '@codemirror/view';
-import { Button, Empty, List, Modal, Result, Spin, Switch, Tabs } from 'antd';
-import { LoadingOutlined } from '@ant-design/icons';
+import { Modal, Tabs } from 'antd';
 import { createClient } from '@/shared/api/apiClient';
-import dot from '@/features/workbench/assets/dot.gif';
-import DataDisplayFast from '@/features/workbench/components/DataDisplayFast';
-import SqlEditor from '@/features/workbench/components/SqlEditor';
-import Spreadsheet from '@/features/workbench/components/Spreadsheet';
-import WorkbenchDashboard from '@/features/workbench/components/WorkbenchDashboard';
+import WorkbenchPane from '@/features/workbench/components/WorkbenchPane';
+import type { SelectionSnapshot, SqlEditorHandle } from '@/features/workbench/components/SqlEditor';
 import {
-  getServerTypeLabel,
+  LARGE_RESULT_SIZE,
+  buildCsvContent,
+  buildQueryErrorFeedback,
+  clearPaneQueryFeedback,
+  createExportFileName,
+  createPane,
+  findSeedPane,
+  getPaneByKey,
+  quotePostgresqlIdentifier,
+  readHistorySql,
+  readRenderModePreference,
+  saveRenderModePreference,
+  updatePaneByKey,
+} from '@/features/workbench/lib/pageContentModel';
+import {
   isMysqlFamily,
   normalizeServerType,
 } from '@/features/workbench/lib/serverType';
 import '@/features/workbench/styles/PageContent.css';
 
 const { confirm } = Modal;
-const antIcon = <LoadingOutlined style={{ fontSize: 34 }} spin />;
-const RENDER_MODE_STORAGE_KEY = 'jsw_query_render_mode';
-const LARGE_RESULT_SIZE = 2000;
-const QUERY_ERROR_TITLE = 'SQL 执行失败';
-const QUERY_ERROR_DEFAULT_DETAIL = '查询执行失败，请稍后重试';
 
 function showDialog(content, title = '提示') {
   confirm({
@@ -32,149 +35,6 @@ function showDialog(content, title = '提示') {
     onOk() {},
     onCancel() {},
   });
-}
-
-function readRenderModePreference() {
-  return localStorage.getItem(RENDER_MODE_STORAGE_KEY) !== 'legacy';
-}
-
-function saveRenderModePreference(useModernMode) {
-  localStorage.setItem(RENDER_MODE_STORAGE_KEY, useModernMode ? 'modern' : 'legacy');
-}
-
-function createPane(overrides = {}) {
-  return {
-    title: 'MainTab',
-    closable: false,
-    key: 'Tab0',
-    server: '',
-    serverName: '',
-    serverType: '',
-    database: '',
-    sql: '',
-    queryResult: [],
-    dataAreaRefresh: [],
-    queryError: false,
-    queryErrorTitle: '',
-    queryErrorDetail: '',
-    dataDisplayStyle: readRenderModePreference(),
-    dashboardData: null,
-    dashboardLoading: false,
-    dashboardError: '',
-    dashboardUpdatedAt: '',
-    dashboardFetched: false,
-    contentTab: 'query',
-    schemaTables: {},
-    selectedSql: '',
-    ...overrides,
-  };
-}
-
-function getPaneByKey(panes, key) {
-  return panes.find((pane) => pane.key === key) || panes[0];
-}
-
-function updatePaneByKey(panes, key, updater) {
-  return panes.map((pane) =>
-    pane.key === key ? updater({ ...pane }) : pane,
-  );
-}
-
-function clearPaneQueryFeedback(pane) {
-  return {
-    ...pane,
-    queryError: false,
-    queryErrorTitle: '',
-    queryErrorDetail: '',
-  };
-}
-
-function findSeedPane(panes, selectServer, selectDatabase, activeKey) {
-  const activePane = getPaneByKey(panes, activeKey);
-  const normalizedServer = selectServer && selectServer !== '0' ? selectServer : '';
-  const normalizedDatabase = selectDatabase || '';
-
-  if (
-    activePane
-    && activePane.server === normalizedServer
-    && activePane.database === normalizedDatabase
-  ) {
-    return activePane;
-  }
-
-  const exactMatchPane = [...panes]
-    .reverse()
-    .find(
-      (pane) => pane.server === normalizedServer && pane.database === normalizedDatabase,
-    );
-  if (exactMatchPane) {
-    return exactMatchPane;
-  }
-
-  const serverMatchPane = [...panes]
-    .reverse()
-    .find((pane) => pane.server === normalizedServer);
-  if (serverMatchPane) {
-    return serverMatchPane;
-  }
-
-  return [...panes].reverse().find((pane) => pane.server || pane.database) || activePane;
-}
-
-function buildQueryErrorFeedback(message) {
-  return {
-    queryError: true,
-    queryErrorTitle: QUERY_ERROR_TITLE,
-    queryErrorDetail:
-      typeof message === 'string' && message.trim() !== ''
-        ? message.trim()
-        : QUERY_ERROR_DEFAULT_DETAIL,
-  };
-}
-
-function readHistorySql(serverCode) {
-  const cacheKey = `${serverCode}_history_sql`;
-  const historyData = localStorage.getItem(cacheKey);
-
-  return historyData === null ? [] : JSON.parse(historyData);
-}
-
-function escapeCsvValue(value) {
-  if (value === null || value === undefined) {
-    return '';
-  }
-
-  const normalizedValue = String(value).replace(/\r\n/g, '\n');
-  if (/[",\n]/.test(normalizedValue)) {
-    return `"${normalizedValue.replace(/"/g, '""')}"`;
-  }
-  return normalizedValue;
-}
-
-function buildCsvContent(rows) {
-  if (!rows || rows.length === 0) {
-    return '';
-  }
-
-  const headers = Object.keys(rows[0]);
-  const csvRows = [
-    headers.map(escapeCsvValue).join(','),
-    ...rows.map((row) =>
-      headers.map((header) => escapeCsvValue(row[header])).join(','),
-    ),
-  ];
-
-  return csvRows.join('\r\n');
-}
-
-function createExportFileName(pane) {
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const database = pane.database || 'query';
-  return `${database}-${timestamp}.csv`;
-}
-
-function quotePostgresqlIdentifier(identifier) {
-  return `"${String(identifier || '').replace(/"/g, '""')}"`;
 }
 
 interface PageContentState {
@@ -213,7 +73,7 @@ function PageContent() {
   const clientRef = useRef(createClient());
   const newTabIndexRef = useRef(2);
   const stateRef = useRef(state);
-  const editorRef = useRef<EditorView | null>(null);
+  const editorRef = useRef<SqlEditorHandle | null>(null);
   const editorInteractionRef = useRef({
     beforeSql: '',
     rearSql: '',
@@ -226,17 +86,7 @@ function PageContent() {
 
   const resetEditorViewport = () => {
     window.requestAnimationFrame(() => {
-      if (!editorRef.current) {
-        return;
-      }
-      editorRef.current.dispatch({
-        selection: EditorSelection.cursor(0),
-        effects: EditorView.scrollIntoView(0, { y: 'start' }),
-      });
-      if (editorRef.current.scrollDOM) {
-        editorRef.current.scrollDOM.scrollTop = 0;
-      }
-      editorRef.current.focus();
+      editorRef.current?.resetViewport();
     });
   };
 
@@ -829,6 +679,26 @@ function PageContent() {
     removeTab(targetKey);
   };
 
+  const handlePaneSqlChange = (paneKey: string, value: string, snapshot: SelectionSnapshot) => {
+    saveCursorValue(snapshot);
+    setState((previous) => ({
+      ...previous,
+      panes: updatePaneByKey(previous.panes, paneKey, (currentPane) => ({
+        ...currentPane,
+        sql: value,
+      })),
+    }));
+  };
+
+  const refreshDashboardPane = (pane) => {
+    void loadDashboardForPane({
+      server: pane.server,
+      database: pane.database,
+      paneKey: pane.key,
+      forceRefresh: true,
+    });
+  };
+
   return (
     <div className="right_area workbench-main-area">
       <Tabs
@@ -842,181 +712,24 @@ function PageContent() {
           label: pane.title,
           closable: pane.closable !== false,
           children: (
-            <>
-                <div id="menubar">
-                  <div id="serverinfo" className="workbench-serverinfo">
-                    <img src={dot} alt="SERVERIMG" className="icon ic_s_host " />
-                  服务器: {pane.serverName} ({getServerTypeLabel(pane.serverType)})
-                  <span className={pane.database === '' ? 'hide' : 'none'}>
-                    &gt;&gt;{' '}
-                    <img src={dot} className="icon ic_s_db " alt="DBIMG" />
-                    数据库: {pane.database}
-                  </span>
-                </div>
-              </div>
-              <div className="page_content workbench-page-content">
-                <div id="queryboxContainer" className="workbench-query-shell">
-                  <fieldset id="queryboxf" className="workbench-query-card">
-                    <div id="queryfieldscontainer" className="workbench-query-grid">
-                      <div id="sqlquerycontainer" className="workbench-editor-panel">
-                        <div className="workbench-panel-heading">
-                          <div>
-                            <h3>SQL 编辑器</h3>
-                            <p>支持对象补全、选中执行和快速切换库表</p>
-                          </div>
-                        </div>
-                        <SqlEditor
-                          onChange={(value, snapshot) => {
-                            saveCursorValue(snapshot);
-                            setState((previous) => ({
-                              ...previous,
-                              panes: updatePaneByKey(previous.panes, pane.key, (currentPane) => ({
-                                ...currentPane,
-                                sql: value,
-                              })),
-                            }));
-                          }}
-                          onMount={(editorView) => {
-                            editorRef.current = editorView;
-                            if (editorView.scrollDOM) {
-                              editorView.scrollDOM.scrollTop = 0;
-                            }
-                          }}
-                          onSelectionChange={(snapshot) => {
-                            saveCursorValue(snapshot);
-                          }}
-                          schemaTables={state.editorSchemaTables}
-                          serverType={state.editorServerType}
-                          value={pane.sql}
-                        />
-                        <div className="workbench-editor-tip">
-                          敲入关键字首字母后可使用 Ctrl+Space 快速补全，选中部分 SQL 时只执行选中语句。
-                        </div>
-                        <div className="workbench-editor-actions">
-                          <Button id="button_submit_query" onClick={executeSql} type="primary">
-                            执行 SQL
-                          </Button>
-                        </div>
-                      </div>
-                      <div id="tablefieldscontainer" className="workbench-history-panel">
-                        <div className="workbench-panel-heading">
-                          <div>
-                            <h3>历史记录</h3>
-                            <p>保留最近执行的 SQL，方便回看和复用</p>
-                          </div>
-                        </div>
-                        <List
-                          dataSource={state.historySql}
-                          renderItem={(item) => (
-                            <List.Item className="workbench-history-item" key={item}>
-                              <a className="workbench-history-link" onClick={() => historySqlToText(item)}>
-                                {item.length > 60 ? `${item.substring(0, 60)}...` : item}
-                              </a>
-                              <button
-                                className="workbench-history-delete"
-                                onClick={() => deleteHistorySql(item)}
-                              >
-                                删除
-                              </button>
-                            </List.Item>
-                          )}
-                        />
-                      </div>
-                      <div className="clearfloat"></div>
-                    </div>
-                  </fieldset>
-                </div>
-                <fieldset id="queryboxfooter" className="tblFooters workbench-query-toolbar">
-                  <div className="workbench-query-toolbar-meta">
-                    <span className="workbench-render-label">结果视图</span>
-                    <Switch
-                      checked={pane.dataDisplayStyle}
-                      checkedChildren="新版"
-                      unCheckedChildren="旧版"
-                      onChange={dataStyleSwitch}
-                    />
-                  </div>
-                  <div className="workbench-query-toolbar-actions">
-                    {pane.queryResult.length !== 0 ? (
-                      <Button onClick={() => exportQueryResult(pane)}>导出查询结果</Button>
-                    ) : null}
-                  </div>
-                </fieldset>
-                <div className="workbench-lower-panel">
-                  <Tabs
-                    activeKey={pane.contentTab}
-                    className="workbench-content-tabs"
-                    items={[
-                      {
-                        key: 'query',
-                        label: '查询结果',
-                        children: state.queryLoading ? (
-                          <div className="query_load workbench-loading">
-                            <Spin indicator={antIcon} />
-                            数据查询中...
-                          </div>
-                        ) : pane.queryError ? (
-                          <div className="query_load workbench-empty-state workbench-query-error-state">
-                            <Result
-                              status="error"
-                              subTitle={pane.queryErrorDetail}
-                              title={pane.queryErrorTitle}
-                            />
-                          </div>
-                        ) : pane.queryResult.length === 0 ? (
-                          <div className="query_load workbench-empty-state">
-                            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="还没有查询结果" />
-                          </div>
-                        ) : (
-                          <div className="responsivetable workbench-result-panel">
-                            <div className="workbench-panel-heading compact">
-                              <div>
-                                <h3>查询结果</h3>
-                                <p>{pane.queryResult.length} 行数据</p>
-                              </div>
-                            </div>
-                            <div className="container-wrap workbench-result-wrap" style={{ height: state.deskHeight }}>
-                              {pane.dataDisplayStyle ? (
-                                <Spreadsheet
-                                  data={pane.queryResult}
-                                  dataAreaRefresh={pane.dataAreaRefresh}
-                                  dataId={pane.key}
-                                />
-                              ) : (
-                                <DataDisplayFast
-                                  data={pane.queryResult}
-                                  dataAreaRefresh={pane.dataAreaRefresh}
-                                />
-                              )}
-                            </div>
-                          </div>
-                        ),
-                      },
-                      {
-                        key: 'dashboard',
-                        label: 'Dashboard',
-                        children: (
-                          <WorkbenchDashboard
-                            data={pane.dashboardData}
-                            error={pane.dashboardError}
-                            loading={pane.dashboardLoading}
-                            onRefresh={() =>
-                              void loadDashboardForPane({
-                                server: pane.server,
-                                database: pane.database,
-                                paneKey: pane.key,
-                                forceRefresh: true,
-                              })
-                            }
-                          />
-                        ),
-                      },
-                    ]}
-                    onChange={(contentTab) => handleContentTabChange(pane.key, contentTab)}
-                  />
-                </div>
-              </div>
-            </>
+            <WorkbenchPane
+              deskHeight={state.deskHeight}
+              editorRef={editorRef}
+              editorSchemaTables={state.editorSchemaTables}
+              editorServerType={state.editorServerType}
+              historySql={state.historySql}
+              pane={pane}
+              queryLoading={state.queryLoading}
+              onContentTabChange={handleContentTabChange}
+              onDashboardRefresh={refreshDashboardPane}
+              onDataStyleSwitch={dataStyleSwitch}
+              onDeleteHistorySql={deleteHistorySql}
+              onExecuteSql={executeSql}
+              onExportQueryResult={exportQueryResult}
+              onHistorySqlToText={historySqlToText}
+              onSelectionChange={saveCursorValue}
+              onSqlChange={handlePaneSqlChange}
+            />
           ),
         }))}
       />

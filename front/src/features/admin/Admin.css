@@ -709,6 +709,18 @@
     }
 }
 
+.admin-section-loading {
+    min-height: 240px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.92);
+    color: #64748b;
+    font-size: 0.9rem;
+}
+
 @media (max-width: 1180px) {
     .admin-dashboard-grid {
         grid-template-columns: 1fr;

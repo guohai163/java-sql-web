@@ -4,6 +4,7 @@ import com.zaxxer.hikari.HikariDataSource;
 import com.zaxxer.hikari.HikariPoolMXBean;
 import org.guohai.javasqlweb.beans.*;
 import org.guohai.javasqlweb.util.HikariDataSourceUtils;
+import org.guohai.javasqlweb.util.SqlIdentifierUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -18,7 +19,7 @@ import java.util.*;
 import static org.guohai.javasqlweb.util.Utils.closeResource;
 
 /**
- * 基于alibaba druid连接池的mysql实现类
+ * MSSQL 操作实现类。
  * @author guohai
  * @date 2021-1-5
  */
@@ -39,6 +40,8 @@ public class DbOperationMssqlDruid implements DbOperation {
     private DataSource sqlDs;
 
     private final String applicationName;
+
+    private int queryTimeoutSeconds;
 
 
     /**
@@ -86,16 +89,30 @@ public class DbOperationMssqlDruid implements DbOperation {
     @Override
     public List<TablesNameBean> getTableList(String dbName) throws SQLException {
         List<TablesNameBean> listTnb = new ArrayList<>();
-        Connection conn = sqlDs.getConnection();
-        Statement st = conn.createStatement();
-        ResultSet rs = st.executeQuery(String.format("use [%s];" +
-                "SELECT a.name, b.rows FROM sysobjects a JOIN sysindexes b ON a.id = b.id " +
-                "WHERE xtype = 'u' and indid in (0,1) ORDER BY a.name;", dbName));
-        while (rs.next()){
-            listTnb.add(new TablesNameBean(rs.getObject("name").toString(),
-                    rs.getLong("rows")));
+        Connection conn = null;
+        Statement st = null;
+        ResultSet rs = null;
+        String originalCatalog = null;
+        try {
+            conn = sqlDs.getConnection();
+            originalCatalog = switchCatalog(conn, dbName);
+            st = conn.createStatement();
+            rs = st.executeQuery(
+                    "SELECT a.name, SUM(b.rows) AS rows FROM sysobjects a JOIN sysindexes b ON a.id = b.id " +
+                            "WHERE xtype = 'u' and indid in (0,1) GROUP BY a.name ORDER BY a.name;");
+            while (rs.next()){
+                listTnb.add(new TablesNameBean(rs.getObject("name").toString(),
+                        rs.getLong("rows")));
+            }
+        } finally {
+            try {
+                if (conn != null) {
+                    restoreCatalog(conn, originalCatalog);
+                }
+            } finally {
+                closeResource(rs,st,conn);
+            }
         }
-        closeResource(rs,st,conn);
         return listTnb;
     }
 
@@ -109,14 +126,27 @@ public class DbOperationMssqlDruid implements DbOperation {
     @Override
     public List<ViewNameBean> getViewsList(String dbName) throws SQLException {
         List<ViewNameBean> listTnb = new ArrayList<>();
-        Connection conn = sqlDs.getConnection();
-        Statement st = conn.createStatement();
-        ResultSet rs = st.executeQuery(String.format("use [%s];" +
-                "SELECT name FROM sysobjects WHERE xtype = 'V' ORDER BY name;", dbName));
-        while (rs.next()){
-            listTnb.add(new ViewNameBean(rs.getObject("name").toString()));
+        Connection conn = null;
+        Statement st = null;
+        ResultSet rs = null;
+        String originalCatalog = null;
+        try {
+            conn = sqlDs.getConnection();
+            originalCatalog = switchCatalog(conn, dbName);
+            st = conn.createStatement();
+            rs = st.executeQuery("SELECT name FROM sysobjects WHERE xtype = 'V' ORDER BY name;");
+            while (rs.next()){
+                listTnb.add(new ViewNameBean(rs.getObject("name").toString()));
+            }
+        } finally {
+            try {
+                if (conn != null) {
+                    restoreCatalog(conn, originalCatalog);
+                }
+            } finally {
+                closeResource(rs,st,conn);
+            }
         }
-        closeResource(rs,st,conn);
         return listTnb;
     }
 
@@ -131,14 +161,31 @@ public class DbOperationMssqlDruid implements DbOperation {
     @Override
     public ViewNameBean getView(String dbName, String viewName) throws SQLException {
         ViewNameBean viewBean = null;
-        Connection conn = sqlDs.getConnection();
-        Statement st = conn.createStatement();
-        ResultSet rs = st.executeQuery(String.format("use [%s];" +
-                "select definition from sys.sql_modules WHERE object_id = object_id('%s')", dbName, viewName));
-        while (rs.next()){
-            viewBean = new ViewNameBean(viewName, rs.getString("definition"));
+        Connection conn = null;
+        PreparedStatement st = null;
+        ResultSet rs = null;
+        String originalCatalog = null;
+        try {
+            conn = sqlDs.getConnection();
+            originalCatalog = switchCatalog(conn, dbName);
+            st = conn.prepareStatement(
+                    "SELECT m.definition FROM sys.sql_modules m " +
+                            "JOIN sys.objects o ON o.object_id = m.object_id " +
+                            "WHERE o.name = ? AND o.type = 'V'");
+            st.setString(1, viewName);
+            rs = st.executeQuery();
+            while (rs.next()){
+                viewBean = new ViewNameBean(viewName, rs.getString("definition"));
+            }
+        } finally {
+            try {
+                if (conn != null) {
+                    restoreCatalog(conn, originalCatalog);
+                }
+            } finally {
+                closeResource(rs,st,conn);
+            }
         }
-        closeResource(rs,st,conn);
         return viewBean;
     }
 
@@ -153,23 +200,41 @@ public class DbOperationMssqlDruid implements DbOperation {
     @Override
     public List<ColumnsNameBean> getColumnsList(String dbName, String tableName) throws SQLException {
         List<ColumnsNameBean> listCnb = new ArrayList<>();
-        Connection conn = sqlDs.getConnection();
-        Statement st = conn.createStatement();
-        ResultSet rs = st.executeQuery(String.format("use [%s];" +
-                "SELECT b.name column_name,c.name column_type,b.length column_length,b.isnullable is_null_able,d.value column_comment \n" +
-                "FROM sysobjects a join syscolumns b on a.id=b.id and a.xtype='U'\n" +
-                "join systypes c on b.xtype=c.xusertype\n" +
-                "left join sys.extended_properties d on d.major_id=b.id and d.minor_id=b.colid\n" +
-                "where a.name='%s'", dbName, tableName));
-        while (rs.next()){
-            listCnb.add(new ColumnsNameBean(rs.getString("column_name"),
-                    rs.getString("column_type"),
-                    rs.getString("column_length"),
-                    rs.getString("column_comment") == null?"":rs.getString("column_comment"),
-                    rs.getInt("is_null_able") == 0?"not null":"null"
-                    ));
+        Connection conn = null;
+        PreparedStatement st = null;
+        ResultSet rs = null;
+        String originalCatalog = null;
+        try {
+            conn = sqlDs.getConnection();
+            originalCatalog = switchCatalog(conn, dbName);
+            st = conn.prepareStatement(
+                    "SELECT c.name AS column_name, t.name AS column_type, c.max_length AS column_length, " +
+                            "       c.is_nullable AS is_null_able, ep.value AS column_comment " +
+                            "FROM sys.objects o " +
+                            "JOIN sys.columns c ON o.object_id = c.object_id AND o.type = 'U' " +
+                            "JOIN sys.types t ON c.user_type_id = t.user_type_id " +
+                            "LEFT JOIN sys.extended_properties ep " +
+                            "  ON ep.major_id = c.object_id AND ep.minor_id = c.column_id AND ep.name = 'MS_Description' " +
+                            "WHERE o.name = ? ORDER BY c.column_id");
+            st.setString(1, tableName);
+            rs = st.executeQuery();
+            while (rs.next()){
+                listCnb.add(new ColumnsNameBean(rs.getString("column_name"),
+                        rs.getString("column_type"),
+                        rs.getString("column_length"),
+                        rs.getString("column_comment") == null?"":rs.getString("column_comment"),
+                        rs.getBoolean("is_null_able")?"null":"not null"
+                        ));
+            }
+        } finally {
+            try {
+                if (conn != null) {
+                    restoreCatalog(conn, originalCatalog);
+                }
+            } finally {
+                closeResource(rs,st,conn);
+            }
         }
-        closeResource(rs,st,conn);
         return listCnb;
     }
 
@@ -183,16 +248,30 @@ public class DbOperationMssqlDruid implements DbOperation {
     @Override
     public Map<String, String[]> getTablesColumnsMap(String dbName) throws SQLException {
         Map<String, String []> tables = new HashMap<>(10);
-        Connection conn = sqlDs.getConnection();
-        Statement st = conn.createStatement();
-        ResultSet rs = st.executeQuery(String.format("use [%s];\n" +
-                "    SELECT a.name as table_name,stuff((select ','+ b.name from syscolumns b where a.id=b.id for xml path('')), 1,1,'') as column_name\n" +
-                "    FROM sysobjects a --join syscolumns b on a.id=b.id and a.xtype='U'\n" +
-                "    where a.xtype='U' group by a.name,a.id;", dbName));
-        while (rs.next()){
-            tables.put(rs.getString("table_name"), rs.getString("column_name").split(","));
+        Connection conn = null;
+        Statement st = null;
+        ResultSet rs = null;
+        String originalCatalog = null;
+        try {
+            conn = sqlDs.getConnection();
+            originalCatalog = switchCatalog(conn, dbName);
+            st = conn.createStatement();
+            rs = st.executeQuery(
+                    "SELECT a.name AS table_name, " +
+                            "STUFF((SELECT ',' + b.name FROM syscolumns b WHERE a.id = b.id ORDER BY b.colid FOR XML PATH('')), 1, 1, '') AS column_name " +
+                            "FROM sysobjects a WHERE a.xtype = 'U' GROUP BY a.name, a.id;");
+            while (rs.next()){
+                tables.put(rs.getString("table_name"), rs.getString("column_name").split(","));
+            }
+        } finally {
+            try {
+                if (conn != null) {
+                    restoreCatalog(conn, originalCatalog);
+                }
+            } finally {
+                closeResource(rs,st,conn);
+            }
         }
-        closeResource(rs,st,conn);
         return tables;
     }
 
@@ -210,16 +289,39 @@ public class DbOperationMssqlDruid implements DbOperation {
     @Override
     public List<TableIndexesBean> getIndexesList(String dbName, String tableName) throws SQLException {
         List<TableIndexesBean> listTib = new ArrayList<>();
-        Connection conn = sqlDs.getConnection();
-        Statement st = conn.createStatement();
-        ResultSet rs = st.executeQuery(String.format("use [%s];" +
-                "exec sp_helpindex '%s'", dbName, tableName));
-        while (rs.next()){
-            listTib.add(new TableIndexesBean(rs.getObject("index_name").toString(),
-                    rs.getObject("index_description").toString(),
-                    rs.getObject("index_keys").toString()));
+        Connection conn = null;
+        PreparedStatement st = null;
+        ResultSet rs = null;
+        String originalCatalog = null;
+        try {
+            conn = sqlDs.getConnection();
+            originalCatalog = switchCatalog(conn, dbName);
+            st = conn.prepareStatement(
+                    "SELECT i.name AS index_name, i.type_desc AS index_description, " +
+                            "       STUFF((SELECT ',' + c2.name " +
+                            "              FROM sys.index_columns ic2 " +
+                            "              JOIN sys.columns c2 ON c2.object_id = ic2.object_id AND c2.column_id = ic2.column_id " +
+                            "              WHERE ic2.object_id = i.object_id AND ic2.index_id = i.index_id " +
+                            "              ORDER BY ic2.key_ordinal FOR XML PATH('')), 1, 1, '') AS index_keys " +
+                            "FROM sys.indexes i " +
+                            "JOIN sys.objects o ON o.object_id = i.object_id " +
+                            "WHERE o.name = ? AND i.index_id > 0 ORDER BY i.name");
+            st.setString(1, tableName);
+            rs = st.executeQuery();
+            while (rs.next()){
+                listTib.add(new TableIndexesBean(rs.getString("index_name"),
+                        rs.getString("index_description"),
+                        rs.getString("index_keys")));
+            }
+        } finally {
+            try {
+                if (conn != null) {
+                    restoreCatalog(conn, originalCatalog);
+                }
+            } finally {
+                closeResource(rs,st,conn);
+            }
         }
-        closeResource(rs,st,conn);
         return listTib;
     }
 
@@ -233,14 +335,27 @@ public class DbOperationMssqlDruid implements DbOperation {
     @Override
     public List<StoredProceduresBean> getStoredProceduresList(String dbName) throws SQLException {
         List<StoredProceduresBean> listSp = new ArrayList<>();
-        Connection conn = sqlDs.getConnection();
-        Statement st = conn.createStatement();
-        ResultSet rs = st.executeQuery(String.format("use [%s];" +
-                "SELECT name FROM sysobjects WHERE type='P' ORDER BY name", dbName));
-        while (rs.next()){
-            listSp.add(new StoredProceduresBean(rs.getString("name")));
+        Connection conn = null;
+        Statement st = null;
+        ResultSet rs = null;
+        String originalCatalog = null;
+        try {
+            conn = sqlDs.getConnection();
+            originalCatalog = switchCatalog(conn, dbName);
+            st = conn.createStatement();
+            rs = st.executeQuery("SELECT name FROM sysobjects WHERE type='P' ORDER BY name");
+            while (rs.next()){
+                listSp.add(new StoredProceduresBean(rs.getString("name")));
+            }
+        } finally {
+            try {
+                if (conn != null) {
+                    restoreCatalog(conn, originalCatalog);
+                }
+            } finally {
+                closeResource(rs,st,conn);
+            }
         }
-        closeResource(rs,st,conn);
         return listSp;
     }
 
@@ -255,14 +370,31 @@ public class DbOperationMssqlDruid implements DbOperation {
     @Override
     public StoredProceduresBean getStoredProcedure(String dbName, String spName) throws SQLException {
         StoredProceduresBean spBean = null;
-        Connection conn = sqlDs.getConnection();
-        Statement st = conn.createStatement();
-        ResultSet rs = st.executeQuery(String.format("use [%s];" +
-                "select definition from sys.sql_modules WHERE object_id = object_id('%s')", dbName, spName));
-        while (rs.next()){
-            spBean = new StoredProceduresBean(spName, rs.getString("definition"));
+        Connection conn = null;
+        PreparedStatement st = null;
+        ResultSet rs = null;
+        String originalCatalog = null;
+        try {
+            conn = sqlDs.getConnection();
+            originalCatalog = switchCatalog(conn, dbName);
+            st = conn.prepareStatement(
+                    "SELECT m.definition FROM sys.sql_modules m " +
+                            "JOIN sys.objects o ON o.object_id = m.object_id " +
+                            "WHERE o.name = ? AND o.type = 'P'");
+            st.setString(1, spName);
+            rs = st.executeQuery();
+            while (rs.next()){
+                spBean = new StoredProceduresBean(spName, rs.getString("definition"));
+            }
+        } finally {
+            try {
+                if (conn != null) {
+                    restoreCatalog(conn, originalCatalog);
+                }
+            } finally {
+                closeResource(rs,st,conn);
+            }
         }
-        closeResource(rs,st,conn);
         return spBean;
     }
 
@@ -284,30 +416,31 @@ public class DbOperationMssqlDruid implements DbOperation {
     public QueryExecutionResult queryDatabaseBySqlWithSession(String dbName, String sql, Integer limit, java.util.function.Consumer<String> onSessionReady) throws SQLException {
         Object[] result = new Object[3];
         List<Map<String, Object>> listData = new ArrayList<>();
-        Connection conn = sqlDs.getConnection();
-        Statement st = conn.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE,ResultSet.CONCUR_READ_ONLY);
-        st.setMaxRows(limit);
+        Connection conn = null;
+        Statement st = null;
         ResultSet rs = null;
-        String sessionId = queryCurrentSessionId(conn);
-        if (onSessionReady != null) {
-            onSessionReady.accept(sessionId);
-        }
+        String sessionId = null;
+        String originalCatalog = null;
         try{
-            rs = st.executeQuery(String.format("use [%s];" +
-                    "%s;", dbName, sql));
+            conn = sqlDs.getConnection();
+            sessionId = queryCurrentSessionId(conn);
+            if (onSessionReady != null) {
+                onSessionReady.accept(sessionId);
+            }
+            originalCatalog = switchCatalog(conn, dbName);
+            st = conn.createStatement(ResultSet.TYPE_FORWARD_ONLY,ResultSet.CONCUR_READ_ONLY);
+            QueryExecutionUtils.applyQueryControls(st, queryTimeoutSeconds, limit);
+            rs = st.executeQuery(QueryExecutionUtils.ensureTrailingSemicolon(sql));
             // 获得结果集结构信息,元数据
             java.sql.ResultSetMetaData md = rs.getMetaData();
             // 获得列数
             int columnCount = md.getColumnCount();
-            rs.last();
-            result[0] = rs.getRow();
-            rs.beforeFirst();
-            int dataCount = 1;
+            boolean hasMore = false;
             while (rs.next()){
-                if(dataCount>limit){
+                if(QueryExecutionUtils.shouldStopBeforeAdding(listData, limit)){
+                    hasMore = true;
                     break;
                 }
-                dataCount++;
                 Map<String, Object> rowData = new LinkedHashMap<String, Object>();
                 for(int i=1;i<=columnCount;i++){
                     rowData.put(md.getColumnName(i),rs.getString(i));
@@ -315,14 +448,19 @@ public class DbOperationMssqlDruid implements DbOperation {
                 listData.add(rowData);
             }
 
-            result[1] = listData.size();
-            result[2] = listData;
+            QueryExecutionUtils.fillResult(result, listData, hasMore);
         }
             catch (SQLException e){
             throw e;
         }
             finally {
-            closeResource(rs,st,conn);
+            try {
+                if (conn != null) {
+                    restoreCatalog(conn, originalCatalog);
+                }
+            } finally {
+                closeResource(rs,st,conn);
+            }
         }
         QueryExecutionResult executionResult = new QueryExecutionResult();
         executionResult.setDbSessionId(sessionId);
@@ -331,6 +469,10 @@ public class DbOperationMssqlDruid implements DbOperation {
     }
 
 
+    @Override
+    public void configureQueryTimeoutSeconds(int seconds) {
+        queryTimeoutSeconds = Math.max(0, seconds);
+    }
 
     /**
      * 服务器连接状态健康检查
@@ -457,6 +599,18 @@ public class DbOperationMssqlDruid implements DbOperation {
                 return resultSet.getString("value");
             }
             return null;
+        }
+    }
+
+    private String switchCatalog(Connection conn, String dbName) throws SQLException {
+        String originalCatalog = conn.getCatalog();
+        conn.setCatalog(SqlIdentifierUtils.normalizeIdentifier(dbName));
+        return originalCatalog;
+    }
+
+    private void restoreCatalog(Connection conn, String originalCatalog) throws SQLException {
+        if (conn != null && originalCatalog != null && !originalCatalog.equals(conn.getCatalog())) {
+            conn.setCatalog(originalCatalog);
         }
     }
 
