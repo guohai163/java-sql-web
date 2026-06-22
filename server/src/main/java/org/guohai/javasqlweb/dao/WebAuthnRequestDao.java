@@ -21,9 +21,15 @@ public interface WebAuthnRequestDao {
      * @param request 请求
      * @return 是否成功
      */
-    @Insert("INSERT INTO webauthn_request_tb (request_type,request_key,request_json,expire_time,created_time) " +
-            "VALUES (#{request.requestType},#{request.requestKey},#{request.requestJson},#{request.expireTime},#{request.createdTime}) " +
-            "ON DUPLICATE KEY UPDATE request_json=VALUES(request_json),expire_time=VALUES(expire_time),created_time=VALUES(created_time)")
+    @Insert.List({
+            @Insert(value = "INSERT INTO webauthn_request_tb (request_type,request_key,request_json,expire_time,created_time) " +
+                    "VALUES (#{request.requestType},#{request.requestKey},#{request.requestJson},#{request.expireTime},#{request.createdTime}) " +
+                    "ON DUPLICATE KEY UPDATE request_json=VALUES(request_json),expire_time=VALUES(expire_time),created_time=VALUES(created_time)", databaseId = "mysql"),
+            @Insert(value = "INSERT INTO webauthn_request_tb (request_type,request_key,request_json,expire_time,created_time) " +
+                    "VALUES (#{request.requestType},#{request.requestKey},#{request.requestJson},#{request.expireTime},#{request.createdTime}) " +
+                    "ON CONFLICT (request_type,request_key) DO UPDATE SET " +
+                    "request_json=EXCLUDED.request_json,expire_time=EXCLUDED.expire_time,created_time=EXCLUDED.created_time", databaseId = "postgresql")
+    })
     Boolean saveRequest(@Param("request") WebAuthnRequestBean request);
 
     /**

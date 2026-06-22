@@ -4,7 +4,7 @@ server:
     uri-encoding: UTF-8
 spring:
   datasource:
-    url: jdbc:mysql://${DB_HOST:${MARIADB_PORT_3306_TCP_ADDR:localhost}}:${DB_PORT:3306}/${DB_NAME:javasqlweb_db}?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Hongkong
+    url: ${DB_URL:jdbc:mysql://${DB_HOST:${MARIADB_PORT_3306_TCP_ADDR:localhost}}:${DB_PORT:3306}/${DB_NAME:javasqlweb_db}?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Hongkong}
     username: ${DB_USERNAME:${MARIADB_ENV_MYSQL_ROOT_NAME:root}}
     password: ${DB_PASSWORD:${MARIADB_ENV_MYSQL_ROOT_PASSWORD:Passw0rd}}
   jackson:
@@ -13,6 +13,9 @@ spring:
 mybatis:
   configuration:
     map-underscore-to-camel-case: true
+app:
+  db:
+    dialect: ${APP_DB_DIALECT:${DB_DIALECT:mysql}}
 project:
   version: ${PROJECT_VERSION:@project.version@}
   limit: ${PROJECT_LIMIT:20000}

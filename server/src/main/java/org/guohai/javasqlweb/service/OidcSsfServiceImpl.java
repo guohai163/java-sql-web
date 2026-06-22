@@ -11,6 +11,7 @@ import org.guohai.javasqlweb.dao.UserManageDao;
 import org.guohai.javasqlweb.util.PasswordUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,6 +47,7 @@ public class OidcSsfServiceImpl implements OidcSsfService {
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
+    private final String appDatabaseDialect;
 
     /** OIDC discovery 缓存 */
     private volatile Map<String, Object> oidcDiscovery;
@@ -72,12 +74,14 @@ public class OidcSsfServiceImpl implements OidcSsfService {
                               OidcLoginStateDao oidcLoginStateDao,
                               UserManageDao userManageDao,
                               JdbcTemplate jdbcTemplate,
-                              ObjectMapper objectMapper) {
+                              ObjectMapper objectMapper,
+                              @Value("${app.db.dialect:mysql}") String appDatabaseDialect) {
         this.oidcConfigDao = oidcConfigDao;
         this.oidcLoginStateDao = oidcLoginStateDao;
         this.userManageDao = userManageDao;
         this.jdbcTemplate = jdbcTemplate;
         this.objectMapper = objectMapper;
+        this.appDatabaseDialect = normalizeAppDatabaseDialect(appDatabaseDialect);
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(10))
                 .build();
@@ -891,12 +895,7 @@ public class OidcSsfServiceImpl implements OidcSsfService {
                 return oidcSubColumnPresent;
             }
             try {
-                Integer count = jdbcTemplate.queryForObject(
-                        "SELECT COUNT(*) FROM information_schema.columns " +
-                                "WHERE table_schema = DATABASE() AND table_name = 'user_tb' AND column_name = ?",
-                        Integer.class,
-                        OIDC_SUB_COLUMN
-                );
+                Integer count = jdbcTemplate.queryForObject(oidcSubColumnInspectionSql(), Integer.class, OIDC_SUB_COLUMN);
                 oidcSubColumnPresent = count != null && count > 0;
             } catch (Exception e) {
                 LOG.warn("Failed to inspect user_tb.oidc_sub, fallback to legacy-compatible OIDC login flow", e);
@@ -907,6 +906,27 @@ public class OidcSsfServiceImpl implements OidcSsfService {
             }
             return oidcSubColumnPresent;
         }
+    }
+
+    private String oidcSubColumnInspectionSql() {
+        if ("postgresql".equals(appDatabaseDialect)) {
+            return "SELECT COUNT(*) FROM information_schema.columns " +
+                    "WHERE table_catalog = current_database() " +
+                    "AND table_schema = current_schema() " +
+                    "AND table_name = 'user_tb' AND column_name = ?";
+        }
+        return "SELECT COUNT(*) FROM information_schema.columns " +
+                "WHERE table_schema = DATABASE() AND table_name = 'user_tb' AND column_name = ?";
+    }
+
+    private String normalizeAppDatabaseDialect(String dialect) {
+        if (dialect == null) {
+            return "mysql";
+        }
+        String normalized = dialect.trim().toLowerCase(Locale.ROOT);
+        return ("postgres".equals(normalized) || "pgsql".equals(normalized) || "postgresql".equals(normalized))
+                ? "postgresql"
+                : "mysql";
     }
 
     /**

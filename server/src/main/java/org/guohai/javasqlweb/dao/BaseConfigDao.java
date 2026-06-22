@@ -61,14 +61,14 @@ public interface BaseConfigDao {
      * @param queryLog
      * @return
      */
-    @Insert("INSERT INTO `db_query_log`\n" +
-            "(`query_ip`,\n" +
-            "`query_name`,\n" +
-            "`query_database`,\n" +
-            "`server_code`,\n" +
-            "`db_session_id`,\n" +
-            "`query_sqlscript`,\n" +
-            "`query_time`)\n" +
+    @Insert("INSERT INTO db_query_log\n" +
+            "(query_ip,\n" +
+            "query_name,\n" +
+            "query_database,\n" +
+            "server_code,\n" +
+            "db_session_id,\n" +
+            "query_sqlscript,\n" +
+            "query_time)\n" +
             "VALUES\n" +
             "(#{queryIp},\n" +
             "#{queryName},\n" +
@@ -80,13 +80,13 @@ public interface BaseConfigDao {
     @Options(useGeneratedKeys = true, keyProperty = "code", keyColumn = "code")
     Boolean saveQueryLog(QueryLogBean queryLog);
 
-    @Insert("INSERT INTO `db_query_log`\n" +
-            "(`query_ip`,\n" +
-            "`query_name`,\n" +
-            "`query_database`,\n" +
-            "`server_code`,\n" +
-            "`query_sqlscript`,\n" +
-            "`query_time`)\n" +
+    @Insert("INSERT INTO db_query_log\n" +
+            "(query_ip,\n" +
+            "query_name,\n" +
+            "query_database,\n" +
+            "server_code,\n" +
+            "query_sqlscript,\n" +
+            "query_time)\n" +
             "VALUES\n" +
             "(#{queryIp},\n" +
             "#{queryName},\n" +
@@ -104,7 +104,7 @@ public interface BaseConfigDao {
      * @param resultRowCount
      * @return
      */
-    @Update("UPDATE `db_query_log` SET query_consuming=#{time}, result_row_count=#{resultRowCount} WHERE code=#{code};")
+    @Update("UPDATE db_query_log SET query_consuming=#{time}, result_row_count=#{resultRowCount} WHERE code=#{code};")
     Boolean updateQueryLogMetrics(@Param("code") Integer code,
                                   @Param("time") Integer time,
                                   @Param("resultRowCount") Integer resultRowCount);
@@ -133,16 +133,28 @@ public interface BaseConfigDao {
     List<QueryLogBean> getQueryLogWindowNewer(@Param("cursorCode") Integer cursorCode,
                                               @Param("limit") Integer limit);
 
-    @Select("<script>" +
-            "SELECT query_log_code, " +
-            "GROUP_CONCAT(DISTINCT CONCAT(database_name, '.', table_name) ORDER BY table_name SEPARATOR ', ') AS target_tables " +
-            "FROM db_query_log_target_tb " +
-            "WHERE query_log_code IN " +
-            "<foreach collection='queryLogCodes' item='queryLogCode' open='(' separator=',' close=')'>" +
-            "#{queryLogCode}" +
-            "</foreach> " +
-            "GROUP BY query_log_code" +
-            "</script>")
+    @Select.List({
+            @Select(value = "<script>" +
+                    "SELECT query_log_code, " +
+                    "GROUP_CONCAT(DISTINCT CONCAT(database_name, '.', table_name) ORDER BY table_name SEPARATOR ', ') AS target_tables " +
+                    "FROM db_query_log_target_tb " +
+                    "WHERE query_log_code IN " +
+                    "<foreach collection='queryLogCodes' item='queryLogCode' open='(' separator=',' close=')'>" +
+                    "#{queryLogCode}" +
+                    "</foreach> " +
+                    "GROUP BY query_log_code" +
+                    "</script>", databaseId = "mysql"),
+            @Select(value = "<script>" +
+                    "SELECT query_log_code, " +
+                    "STRING_AGG(DISTINCT database_name || '.' || table_name, ', ' ORDER BY database_name || '.' || table_name) AS target_tables " +
+                    "FROM db_query_log_target_tb " +
+                    "WHERE query_log_code IN " +
+                    "<foreach collection='queryLogCodes' item='queryLogCode' open='(' separator=',' close=')'>" +
+                    "#{queryLogCode}" +
+                    "</foreach> " +
+                    "GROUP BY query_log_code" +
+                    "</script>", databaseId = "postgresql")
+    })
     List<Map<String, Object>> getQueryLogTargetSummaries(@Param("queryLogCodes") List<Integer> queryLogCodes);
 
     @Select("SELECT EXISTS(SELECT 1 FROM db_query_log WHERE code < #{code})")
@@ -170,17 +182,17 @@ public interface BaseConfigDao {
      * 获取所有的连接配置
      * @return
      */
-    @Select("SELECT `code`,`db_server_name`,`db_server_host`,`db_server_port`,`db_server_username`," +
-            "'' as `db_server_password`,`db_server_type`,`db_ssl_mode`,`create_time` " +
-            ",`db_group` "+
-            "FROM `db_connect_config_tb`;")
+    @Select("SELECT code,db_server_name,db_server_host,db_server_port,db_server_username," +
+            "'' as db_server_password,db_server_type,db_ssl_mode,create_time " +
+            ",db_group "+
+            "FROM db_connect_config_tb;")
     List<ConnectConfigBean> getConnData();
 
     /**
      * 获取用于后台同步任务的完整连接配置（含密码）
      * @return
      */
-    @Select("SELECT * FROM `db_connect_config_tb`;")
+    @Select("SELECT * FROM db_connect_config_tb;")
     List<ConnectConfigBean> getConnDataForSync();
 
     @Delete("DELETE FROM db_server_database_snapshot_tb WHERE server_code = #{serverCode}")
@@ -198,7 +210,10 @@ public interface BaseConfigDao {
     @Select("SELECT DISTINCT server_code FROM db_server_database_snapshot_tb WHERE database_name = #{dbName}")
     List<Integer> getServerCodesByDatabaseName(@Param("dbName") String dbName);
 
-    @Select("SELECT DATE_FORMAT(MAX(synced_at), '%Y-%m-%d %H:%i:%s') FROM db_server_database_snapshot_tb")
+    @Select.List({
+            @Select(value = "SELECT DATE_FORMAT(MAX(synced_at), '%Y-%m-%d %H:%i:%s') FROM db_server_database_snapshot_tb", databaseId = "mysql"),
+            @Select(value = "SELECT TO_CHAR(MAX(synced_at), 'YYYY-MM-DD HH24:MI:SS') FROM db_server_database_snapshot_tb", databaseId = "postgresql")
+    })
     String getLatestServerDatabaseSnapshotTime();
 
     /**
@@ -222,7 +237,7 @@ public interface BaseConfigDao {
      * @param code
      * @return
      */
-    @Delete("DELETE FROM `db_connect_config_tb`" +
+    @Delete("DELETE FROM db_connect_config_tb " +
             "WHERE code=#{code};")
     Boolean delServerByCode(@Param("code") Integer code);
 
@@ -231,15 +246,15 @@ public interface BaseConfigDao {
      * @param server
      * @return
      */
-    @Insert("INSERT INTO `db_connect_config_tb`\n" +
-            "(`db_server_name`,\n" +
-            "`db_server_host`,\n" +
-            "`db_server_port`,\n" +
-            "`db_server_username`,\n" +
-            "`db_server_password`,\n" +
-            "`db_server_type`,\n" +
-            "`db_ssl_mode`,\n" +
-            "`create_time`,`db_group`)\n" +
+    @Insert("INSERT INTO db_connect_config_tb\n" +
+            "(db_server_name,\n" +
+            "db_server_host,\n" +
+            "db_server_port,\n" +
+            "db_server_username,\n" +
+            "db_server_password,\n" +
+            "db_server_type,\n" +
+            "db_ssl_mode,\n" +
+            "create_time,db_group)\n" +
             "VALUES\n" +
             "(#{server.dbServerName},\n" +
             "#{server.dbServerHost},\n" +
@@ -257,19 +272,19 @@ public interface BaseConfigDao {
      * @return
      */
     @Update("<script>" +
-            "UPDATE `db_connect_config_tb`\n" +
+            "UPDATE db_connect_config_tb\n" +
             "SET\n" +
-            "`db_server_name` = #{server.dbServerName},\n" +
-            "`db_server_host` = #{server.dbServerHost},\n" +
-            "`db_server_port` = #{server.dbServerPort},\n" +
-            "`db_server_username` = #{server.dbServerUsername},\n" +
+            "db_server_name = #{server.dbServerName},\n" +
+            "db_server_host = #{server.dbServerHost},\n" +
+            "db_server_port = #{server.dbServerPort},\n" +
+            "db_server_username = #{server.dbServerUsername},\n" +
             "<if test='server.dbServerPassword != null and server.dbServerPassword != \"\"'>" +
-            "`db_server_password` = #{server.dbServerPassword}," +
+            "db_server_password = #{server.dbServerPassword}," +
             "</if>" +
-            "`db_server_type` = #{server.dbServerType}," +
-            "`db_ssl_mode` = #{server.dbSslMode}," +
-            "`db_group` = #{server.dbGroup}" +
-            "WHERE `code` = #{server.code};"+
+            "db_server_type = #{server.dbServerType}," +
+            "db_ssl_mode = #{server.dbSslMode}," +
+            "db_group = #{server.dbGroup} " +
+            "WHERE code = #{server.code};"+
             "</script>")
     Boolean updateConnServer(@Param("server")ConnectConfigBean server);
 

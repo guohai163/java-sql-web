@@ -145,7 +145,7 @@ public interface UserManageDao {
      * @param passwordHash 哈希后的密码
      * @return
      */
-    @Insert("INSERT INTO `user_tb` (`user_name`,`email`,`create_time`,`pass_word`,`token`,`account_status`,`auth_status`,`login_status`) VALUES" +
+    @Insert("INSERT INTO user_tb (user_name,email,create_time,pass_word,token,account_status,auth_status,login_status) VALUES" +
             "(#{name},#{email},NOW(),#{passwordHash},'',#{accountStatus},'UNBIND','LOGOUT');")
     Boolean addNewUser(@Param("name") String userName,
                        @Param("email") String email,
@@ -157,7 +157,7 @@ public interface UserManageDao {
      * @param userName
      * @return
      */
-    @Delete("DELETE FROM `user_tb` WHERE user_name=#{name};")
+    @Delete("DELETE FROM user_tb WHERE user_name=#{name};")
     Boolean delUser(@Param("name") String userName);
 
     /**

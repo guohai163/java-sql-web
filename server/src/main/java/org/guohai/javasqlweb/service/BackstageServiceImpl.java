@@ -15,6 +15,7 @@ import org.guohai.javasqlweb.util.DashboardRangeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.actuate.health.HealthEndpoint;
 import org.springframework.stereotype.Service;
 
@@ -67,6 +68,9 @@ public class BackstageServiceImpl implements BackstageService{
 
     @org.springframework.beans.factory.annotation.Value("${project.legacy-tls-enabled:false}")
     private boolean legacyTlsEnabled;
+
+    @Value("${app.db.dialect:mysql}")
+    private String appDatabaseDialect;
 
     private static final Logger LOG  = LoggerFactory.getLogger(BackstageServiceImpl.class);
     /**
@@ -539,10 +543,23 @@ public class BackstageServiceImpl implements BackstageService{
     }
 
     private String buildBucketExpr(String grain) {
-        if ("day".equalsIgnoreCase(grain)) {
-            return "DATE_FORMAT(query_time, '%Y-%m-%d')";
+        boolean dayGrain = "day".equalsIgnoreCase(grain);
+        if (isPostgresqlAppDatabase()) {
+            return dayGrain
+                    ? "TO_CHAR(query_time, 'YYYY-MM-DD')"
+                    : "TO_CHAR(query_time, 'YYYY-MM-DD HH24:00')";
         }
-        return "DATE_FORMAT(query_time, '%Y-%m-%d %H:00')";
+        return dayGrain
+                ? "DATE_FORMAT(query_time, '%Y-%m-%d')"
+                : "DATE_FORMAT(query_time, '%Y-%m-%d %H:00')";
+    }
+
+    private boolean isPostgresqlAppDatabase() {
+        if (appDatabaseDialect == null) {
+            return false;
+        }
+        String normalized = appDatabaseDialect.trim().toLowerCase();
+        return "postgresql".equals(normalized) || "postgres".equals(normalized) || "pgsql".equals(normalized);
     }
 
     private List<TargetPoolStatBean> resolveDynamicTargetPools() {

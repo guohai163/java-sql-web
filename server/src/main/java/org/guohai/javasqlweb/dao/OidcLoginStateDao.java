@@ -20,9 +20,15 @@ public interface OidcLoginStateDao {
      * @param stateRecord state 记录
      * @return 是否成功
      */
-    @Insert("INSERT INTO oidc_login_state_tb (usage_type,state_key,code_verifier,expire_time,created_time) " +
-            "VALUES (#{stateRecord.usageType},#{stateRecord.stateKey},#{stateRecord.codeVerifier},#{stateRecord.expireTime},#{stateRecord.createdTime}) " +
-            "ON DUPLICATE KEY UPDATE code_verifier=VALUES(code_verifier),expire_time=VALUES(expire_time),created_time=VALUES(created_time)")
+    @Insert.List({
+            @Insert(value = "INSERT INTO oidc_login_state_tb (usage_type,state_key,code_verifier,expire_time,created_time) " +
+                    "VALUES (#{stateRecord.usageType},#{stateRecord.stateKey},#{stateRecord.codeVerifier},#{stateRecord.expireTime},#{stateRecord.createdTime}) " +
+                    "ON DUPLICATE KEY UPDATE code_verifier=VALUES(code_verifier),expire_time=VALUES(expire_time),created_time=VALUES(created_time)", databaseId = "mysql"),
+            @Insert(value = "INSERT INTO oidc_login_state_tb (usage_type,state_key,code_verifier,expire_time,created_time) " +
+                    "VALUES (#{stateRecord.usageType},#{stateRecord.stateKey},#{stateRecord.codeVerifier},#{stateRecord.expireTime},#{stateRecord.createdTime}) " +
+                    "ON CONFLICT (usage_type,state_key) DO UPDATE SET " +
+                    "code_verifier=EXCLUDED.code_verifier,expire_time=EXCLUDED.expire_time,created_time=EXCLUDED.created_time", databaseId = "postgresql")
+    })
     Boolean saveState(@Param("stateRecord") OidcLoginStateBean stateRecord);
 
     /**

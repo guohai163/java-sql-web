@@ -9,11 +9,13 @@ import org.guohai.javasqlweb.service.operation.DbOperation;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.actuate.health.Health;
 import org.springframework.boot.actuate.health.HealthEndpoint;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import javax.sql.DataSource;
 import java.sql.SQLTransientConnectionException;
@@ -25,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -105,6 +108,41 @@ class BackstageServiceImplTests {
         assertEquals(5L, result.getData().getSummary().getQueryCount());
         assertEquals(50L, result.getData().getSummary().getTotalReturnedRows());
         verify(baseConfigDao, never()).getConnectConfig(anyInt());
+    }
+
+    @Test
+    void getDashboardUsesPostgresqlBucketExpressionWhenPlatformDbIsPostgresql() {
+        ReflectionTestUtils.setField(backstageService, "appDatabaseDialect", "postgresql");
+        DashboardSummary userSummary = new DashboardSummary();
+
+        when(baseConfigDao.getConnData()).thenReturn(Collections.emptyList());
+        when(baseDataService.getTargetPoolStats()).thenReturn(new Result<>(true, "", Collections.emptyList()));
+        when(dashboardDao.getUserSummary(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(userSummary);
+        when(dashboardDao.getTrend(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), anyString()))
+                .thenReturn(Collections.emptyList());
+        when(dashboardDao.getUserRanking(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyInt()))
+                .thenReturn(Collections.emptyList());
+        when(dashboardDao.getDatabaseHotspots(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyInt()))
+                .thenReturn(Collections.emptyList());
+        when(dashboardDao.getTableHotspots(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyInt()))
+                .thenReturn(Collections.emptyList());
+        when(dashboardDao.getRecentQueries(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyInt()))
+                .thenReturn(Collections.emptyList());
+        when(dashboardDao.countQueries(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any())).thenReturn(0L);
+        when(dashboardDao.sumResultRows(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any())).thenReturn(0L);
+        when(dashboardDao.avgQueryConsuming(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any())).thenReturn(0D);
+
+        Result<DashboardResponse> result = backstageService.getDashboard("24h", "hour", 10, 5, 10, 10);
+
+        ArgumentCaptor<String> bucketExprCaptor = ArgumentCaptor.forClass(String.class);
+        assertTrue(result.getStatus());
+        verify(dashboardDao).getTrend(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                bucketExprCaptor.capture()
+        );
+        assertEquals("TO_CHAR(query_time, 'YYYY-MM-DD HH24:00')", bucketExprCaptor.getValue());
     }
 
     @Test

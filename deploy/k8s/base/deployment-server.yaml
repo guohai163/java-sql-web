@@ -23,7 +23,7 @@ spec:
             - name: DB_HOST
               value: jsw-db
             - name: DB_PORT
-              value: "3306"
+              value: "${DB_PORT}"
             - name: DB_NAME
               valueFrom:
                 secretKeyRef:
@@ -39,6 +39,12 @@ spec:
                 secretKeyRef:
                   name: jsw-app-secret
                   key: DB_PASSWORD
+            - name: DB_DIALECT
+              value: "${DB_DIALECT}"
+            - name: APP_DB_DIALECT
+              value: "${DB_DIALECT}"
+            - name: DB_URL
+              value: "${DB_JDBC_URL}"
             - name: PROJECT_VERSION
               value: ${TAG}
             - name: PROJECT_DOMAIN
