@@ -1,0 +1,6 @@
+fastapi==0.116.1
+uvicorn==0.35.0
+httpx==0.28.1
+psycopg[binary]==3.2.9
+openai==1.93.0
+vanna==0.7.9

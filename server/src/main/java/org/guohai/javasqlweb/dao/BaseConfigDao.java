@@ -175,6 +175,32 @@ public interface BaseConfigDao {
     List<QueryLogBean> getQueryLogsByServerAndSessionIds(@Param("serverCode") Integer serverCode,
                                                          @Param("sessionIds") List<String> sessionIds);
 
+    @Select("<script>" +
+            "SELECT l.*, c.db_server_name AS server_name, " +
+            "       COALESCE(t.target_tables, '') AS target_tables " +
+            "FROM db_query_log l " +
+            "LEFT JOIN db_connect_config_tb c ON c.code = l.server_code " +
+            "LEFT JOIN ( " +
+            "    SELECT query_log_code, " +
+            "           STRING_AGG(DISTINCT database_name || '.' || table_name, ', ' ORDER BY database_name || '.' || table_name) AS target_tables " +
+            "    FROM db_query_log_target_tb " +
+            "    GROUP BY query_log_code " +
+            ") t ON t.query_log_code = l.code " +
+            "WHERE l.server_code = #{serverCode} " +
+            "AND l.query_database = #{dbName} " +
+            "ORDER BY l.code DESC " +
+            "LIMIT #{limit}" +
+            "</script>")
+    List<QueryLogBean> getRecentQueryLogsByServerAndDatabase(@Param("serverCode") Integer serverCode,
+                                                             @Param("dbName") String dbName,
+                                                             @Param("limit") Integer limit);
+
+    @Select.List({
+            @Select(value = "SELECT DATE_FORMAT(MAX(query_time), '%Y-%m-%d %H:%i:%s') FROM db_query_log WHERE server_code = #{serverCode} AND query_database = #{dbName}", databaseId = "mysql"),
+            @Select(value = "SELECT TO_CHAR(MAX(query_time), 'YYYY-MM-DD HH24:MI:SS') FROM db_query_log WHERE server_code = #{serverCode} AND query_database = #{dbName}", databaseId = "postgresql")
+    })
+    String getLatestQueryLogTime(@Param("serverCode") Integer serverCode, @Param("dbName") String dbName);
+
     @Select("SELECT 1")
     Integer selectOne();
 

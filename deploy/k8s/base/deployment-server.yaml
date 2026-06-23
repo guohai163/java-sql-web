@@ -69,6 +69,11 @@ spec:
                   key: PROJECT_SIGNKEY
             - name: PROJECT_LEGACY_TLS_ENABLED
               value: "${PROJECT_LEGACY_TLS_ENABLED}"
+            - name: VANNA_INTERNAL_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: jsw-app-secret
+                  key: VANNA_INTERNAL_TOKEN
             - name: JAVA_TOOL_OPTIONS
               value: "${JAVA_TOOL_OPTIONS}"
           startupProbe:

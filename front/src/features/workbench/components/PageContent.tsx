@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Pubsub from 'pubsub-js';
 import cookie from 'react-cookies';
+import copy from 'copy-to-clipboard';
 import { Modal, Tabs } from 'antd';
 import { createClient } from '@/shared/api/apiClient';
 import WorkbenchPane from '@/features/workbench/components/WorkbenchPane';
@@ -699,6 +700,97 @@ function PageContent() {
     });
   };
 
+  const handleVannaQuestionChange = (paneKey, value) => {
+    setState((previous) => ({
+      ...previous,
+      panes: updatePaneByKey(previous.panes, paneKey, (currentPane) => ({
+        ...currentPane,
+        vannaQuestion: value,
+      })),
+    }));
+  };
+
+  const handleVannaCopySql = (sql) => {
+    if (!sql) {
+      showDialog('当前没有可复制的 SQL');
+      return;
+    }
+    copy(sql);
+  };
+
+  const insertGeneratedSql = (paneKey, sql) => {
+    setState((previous) => ({
+      ...previous,
+      panes: updatePaneByKey(previous.panes, paneKey, (currentPane) => ({
+        ...currentPane,
+        sql,
+        contentTab: 'query',
+      })),
+    }));
+    resetEditorInteraction();
+    resetEditorViewport();
+  };
+
+  const handleVannaSubmit = async (paneKey) => {
+    const current = stateRef.current;
+    const pane = getPaneByKey(current.panes, paneKey);
+
+    if (!pane.server || !pane.database) {
+      showDialog('请先选择服务器和数据库');
+      return;
+    }
+    if (!pane.vannaQuestion || !pane.vannaQuestion.trim()) {
+      showDialog('请输入问题后再生成 SQL');
+      return;
+    }
+
+    setState((previous) => ({
+      ...previous,
+      panes: updatePaneByKey(previous.panes, paneKey, (currentPane) => ({
+        ...currentPane,
+        vannaLoading: true,
+        vannaError: '',
+      })),
+    }));
+
+    try {
+      const response = await clientRef.current.post('/api/vanna/sql/generate', {
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Token': current.token,
+        },
+        body: JSON.stringify({
+          serverCode: pane.server,
+          dbName: pane.database,
+          question: pane.vannaQuestion,
+        }),
+      });
+
+      if (response.status >= 400) {
+        throw new Error(response.jsonData?.message || 'AI 问数服务请求失败');
+      }
+
+      setState((previous) => ({
+        ...previous,
+        panes: updatePaneByKey(previous.panes, paneKey, (currentPane) => ({
+          ...currentPane,
+          vannaLoading: false,
+          vannaResult: response.jsonData,
+          vannaError: '',
+        })),
+      }));
+    } catch (error) {
+      setState((previous) => ({
+        ...previous,
+        panes: updatePaneByKey(previous.panes, paneKey, (currentPane) => ({
+          ...currentPane,
+          vannaLoading: false,
+          vannaError: error?.message || 'AI 问数服务请求失败',
+        })),
+      }));
+    }
+  };
+
   return (
     <div className="right_area workbench-main-area">
       <Tabs
@@ -727,8 +819,12 @@ function PageContent() {
               onExecuteSql={executeSql}
               onExportQueryResult={exportQueryResult}
               onHistorySqlToText={historySqlToText}
+              onInsertGeneratedSql={insertGeneratedSql}
               onSelectionChange={saveCursorValue}
               onSqlChange={handlePaneSqlChange}
+              onVannaCopySql={handleVannaCopySql}
+              onVannaQuestionChange={handleVannaQuestionChange}
+              onVannaSubmit={handleVannaSubmit}
             />
           ),
         }))}

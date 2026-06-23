@@ -94,11 +94,12 @@ public class DbOperationMysql implements DbOperation {
         List<TablesNameBean> listTnb = new ArrayList<>();
         Statement st = sqlConn.createStatement();
         ResultSet rs = st.executeQuery(String.format(
-                "SELECT table_name ,table_rows\n" +
+                "SELECT table_name ,table_rows, COALESCE(table_comment, '') AS table_comment\n" +
                         "FROM `information_schema`.`tables` WHERE TABLE_SCHEMA = '%s' ORDER BY table_rows DESC;", dbName));
         while (rs.next()){
             listTnb.add(new TablesNameBean(rs.getObject("table_name").toString(),
-                    rs.getLong("table_rows")));
+                    rs.getLong("table_rows"),
+                    rs.getString("table_comment")));
         }
         // 关闭rs和statement
         if (rs != null) {

@@ -2,6 +2,22 @@
 
 本文件记录当前 `master` 分支之后到当前 `develop` 工作区的主要变更，按版本和当前未发布改动整理。
 
+## v3.1.0 - 2026-06-23
+
+### Added
+- 新增独立 `jsw-vanna` 问数服务，提供基于 OpenAI 兼容接口的只读 SQL 生成能力，并将上下文缓存、向量数据与审计日志写入同一 PG 实例下的独立 `jsw_vanna_db`。
+- 新增 `jsw-server` 内部 Vanna 上下文接口，按当前用户权限返回库表备注、列备注、视图信息与脱敏后的历史查询样本。
+- 工作台新增 “AI 问数” 面板，支持非技术人员输入自然语言问题后生成 SQL，并一键复制或插入现有 SQL 编辑器。
+
+### Changed
+- 前端 Nginx 新增 `/api/vanna/` 代理，部署层新增 `jsw-vanna` 的 Docker Compose / Kubernetes 配置与环境变量模板。
+- GitHub Release 镜像流水线新增 `java-sql-web-vanna` 的 GHCR 构建与推送任务，Compose 改为直接复用发布镜像，不再本地 `build`。
+- 各数据库实现补齐表备注采集，历史 SQL 样本增加只读筛选与脱敏模板化，避免把敏感字面量直接送入问数上下文。
+
+### Tests
+- 新增 `InternalVannaControllerTests` 与 `VannaSqlExampleSanitizerTests`，覆盖内部鉴权与历史 SQL 脱敏逻辑。
+- 扩展 `PageContent.test.tsx`，覆盖 AI 问数生成结果插入 SQL 编辑器的前端主流程。
+
 ## v2.11.15 - 2026-06-01
 
 ### Fixed

@@ -105,15 +105,16 @@ public class DbOperationPostgresqlDruid implements DbOperation {
         try {
             conn = dataSource.getConnection();
             st = conn.prepareStatement(
-                    "SELECT relname AS table_name, reltuples AS row_counts " +
-                            "FROM pg_class " +
-                            "WHERE relkind = 'r' AND relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = ?) " +
+                    "SELECT c.relname AS table_name, c.reltuples AS row_counts, COALESCE(obj_description(c.oid, 'pg_class'), '') AS table_comment " +
+                            "FROM pg_class c " +
+                            "WHERE c.relkind = 'r' AND c.relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = ?) " +
                             "ORDER BY table_name ASC");
             st.setString(1, PUBLIC_SCHEMA);
             rs = st.executeQuery();
             while (rs.next()){
                 listTnb.add(new TablesNameBean(rs.getString("table_name"),
-                        rs.getLong("row_counts")));
+                        rs.getLong("row_counts"),
+                        rs.getString("table_comment")));
             }
         } finally {
             closeResource(rs,st,conn);

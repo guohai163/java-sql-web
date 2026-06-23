@@ -98,11 +98,15 @@ public class DbOperationMssqlDruid implements DbOperation {
             originalCatalog = switchCatalog(conn, dbName);
             st = conn.createStatement();
             rs = st.executeQuery(
-                    "SELECT a.name, SUM(b.rows) AS rows FROM sysobjects a JOIN sysindexes b ON a.id = b.id " +
-                            "WHERE xtype = 'u' and indid in (0,1) GROUP BY a.name ORDER BY a.name;");
+                    "SELECT a.name, SUM(b.rows) AS rows, COALESCE(CAST(ep.value AS nvarchar(4000)), '') AS table_comment " +
+                            "FROM sysobjects a " +
+                            "JOIN sysindexes b ON a.id = b.id " +
+                            "LEFT JOIN sys.extended_properties ep ON ep.major_id = a.id AND ep.minor_id = 0 AND ep.name = 'MS_Description' " +
+                            "WHERE xtype = 'u' and indid in (0,1) GROUP BY a.name, ep.value ORDER BY a.name;");
             while (rs.next()){
                 listTnb.add(new TablesNameBean(rs.getObject("name").toString(),
-                        rs.getLong("rows")));
+                        rs.getLong("rows"),
+                        rs.getString("table_comment")));
             }
         } finally {
             try {

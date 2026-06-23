@@ -177,5 +177,14 @@ public interface BaseDataService {
      */
     Result<List<SqlGuidBean>> getAllGuid();
 
+    /**
+     * 获取供 Vanna 服务使用的问数上下文。
+     * @param serverCode 服务器编号
+     * @param dbName 数据库名
+     * @param user 已认证用户
+     * @return Vanna 上下文
+     */
+    Result<VannaContextResponse> getVannaContext(Integer serverCode, String dbName, UserBean user);
+
 
 }

@@ -100,13 +100,14 @@ public class DbOperationMysqlDruid implements DbOperation {
         List<TablesNameBean> listTnb = new ArrayList<>();
         Connection conn = sqlDs.getConnection();
         PreparedStatement st = conn.prepareStatement(
-                "SELECT table_name, table_rows " +
+                "SELECT table_name, table_rows, COALESCE(table_comment, '') AS table_comment " +
                         "FROM information_schema.tables WHERE table_schema = ? ORDER BY table_name ASC");
         st.setString(1, dbName);
         ResultSet rs = st.executeQuery();
         while (rs.next()){
             listTnb.add(new TablesNameBean(rs.getString("table_name"),
-                    rs.getLong("table_rows")));
+                    rs.getLong("table_rows"),
+                    rs.getString("table_comment")));
         }
         closeResource(rs,st,conn);
         return listTnb;

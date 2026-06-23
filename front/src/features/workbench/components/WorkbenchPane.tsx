@@ -4,6 +4,7 @@ import { LoadingOutlined } from '@ant-design/icons';
 import dot from '@/features/workbench/assets/dot.gif';
 import DataDisplayFast from '@/features/workbench/components/DataDisplayFast';
 import Spreadsheet from '@/features/workbench/components/Spreadsheet';
+import VannaPanel from '@/features/workbench/components/VannaPanel';
 import WorkbenchDashboard from '@/features/workbench/components/WorkbenchDashboard';
 import type { SelectionSnapshot, SqlEditorHandle } from '@/features/workbench/components/SqlEditor';
 import { getServerTypeLabel } from '@/features/workbench/lib/serverType';
@@ -26,8 +27,12 @@ interface WorkbenchPaneProps {
   onExecuteSql: () => void;
   onExportQueryResult: (pane: any) => void;
   onHistorySqlToText: (sqlScript: string) => void;
+  onInsertGeneratedSql: (paneKey: string, sql: string) => void;
   onSelectionChange: (snapshot: SelectionSnapshot) => void;
   onSqlChange: (paneKey: string, value: string, snapshot: SelectionSnapshot) => void;
+  onVannaCopySql: (sql: string) => void;
+  onVannaQuestionChange: (paneKey: string, value: string) => void;
+  onVannaSubmit: (paneKey: string) => void;
 }
 
 function WorkbenchPane({
@@ -45,8 +50,12 @@ function WorkbenchPane({
   onExecuteSql,
   onExportQueryResult,
   onHistorySqlToText,
+  onInsertGeneratedSql,
   onSelectionChange,
   onSqlChange,
+  onVannaCopySql,
+  onVannaQuestionChange,
+  onVannaSubmit,
 }: WorkbenchPaneProps): React.JSX.Element {
   return (
     <>
@@ -193,6 +202,23 @@ function WorkbenchPane({
                     error={pane.dashboardError}
                     loading={pane.dashboardLoading}
                     onRefresh={() => onDashboardRefresh(pane)}
+                  />
+                ),
+              },
+              {
+                key: 'vanna',
+                label: 'AI 问数',
+                children: (
+                  <VannaPanel
+                    disabled={!pane.server || !pane.database}
+                    error={pane.vannaError}
+                    loading={pane.vannaLoading}
+                    question={pane.vannaQuestion || ''}
+                    response={pane.vannaResult}
+                    onChangeQuestion={(value) => onVannaQuestionChange(pane.key, value)}
+                    onCopySql={onVannaCopySql}
+                    onInsertSql={(sql) => onInsertGeneratedSql(pane.key, sql)}
+                    onSubmit={() => onVannaSubmit(pane.key)}
                   />
                 ),
               },

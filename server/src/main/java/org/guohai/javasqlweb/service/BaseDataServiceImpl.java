@@ -13,6 +13,7 @@ import org.guohai.javasqlweb.util.DbServerTypeUtils;
 import org.guohai.javasqlweb.util.MssqlQueryBatchParser;
 import org.guohai.javasqlweb.util.ReadOnlySqlGuard;
 import org.guohai.javasqlweb.util.SqlTargetExtractor;
+import org.guohai.javasqlweb.util.VannaSqlExampleSanitizer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,6 +30,7 @@ import java.sql.SQLTransientConnectionException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -86,6 +88,8 @@ public class BaseDataServiceImpl implements BaseDataService{
     private static final long CONNECTION_FAILURE_COOLDOWN_MILLIS = 5 * 60 * 1000L;
 
     private static final long WORKBENCH_DASHBOARD_CACHE_MILLIS = 10 * 60 * 1000L;
+    private static final int VANNA_HISTORY_SAMPLE_LIMIT = 200;
+    private static final int VANNA_HISTORY_DEDUPED_LIMIT = 30;
 
     private static class WorkbenchDashboardCacheEntry {
         private final List<WorkbenchDashboardSection> sections;
@@ -547,6 +551,80 @@ public class BaseDataServiceImpl implements BaseDataService{
         return new Result<>(true,"", baseConfigDao.getSqlGuidAll());
     }
 
+    @Override
+    public Result<VannaContextResponse> getVannaContext(Integer serverCode, String dbName, UserBean user) {
+        Result<ConnectConfigBean> permissionCheck = validateServerPermission(serverCode, user);
+        if (permissionCheck != null) {
+            return new Result<>(permissionCheck.getStatus(), permissionCheck.getMessage(), null);
+        }
+        if (dbName == null || dbName.trim().isEmpty()) {
+            return new Result<>(false, "请选择数据库", null);
+        }
+
+        Result<ConnectConfigBean> serverInfoResult = getServerInfo(serverCode, user);
+        if (!serverInfoResult.getStatus() || serverInfoResult.getData() == null) {
+            return new Result<>(false, serverInfoResult.getMessage(), null);
+        }
+
+        Result<List<TablesNameBean>> tableResult = getTableList(serverCode, dbName, user);
+        if (!tableResult.getStatus() || tableResult.getData() == null) {
+            return new Result<>(false, tableResult.getMessage(), null);
+        }
+
+        Result<List<ViewNameBean>> viewResult = getViewList(serverCode, dbName, user);
+        List<ViewNameBean> views = viewResult.getStatus() && viewResult.getData() != null
+                ? viewResult.getData()
+                : List.of();
+
+        List<VannaColumnContext> columns = new ArrayList<>();
+        for (TablesNameBean table : tableResult.getData()) {
+            Result<List<ColumnsNameBean>> columnResult = getColumnList(serverCode, dbName, table.getTableName(), user);
+            if (!columnResult.getStatus() || columnResult.getData() == null) {
+                continue;
+            }
+            for (ColumnsNameBean column : columnResult.getData()) {
+                columns.add(new VannaColumnContext(
+                        table.getTableName(),
+                        column.getColumnName(),
+                        column.getColumnType(),
+                        column.getColumnLength(),
+                        column.getColumnComment(),
+                        column.getColumnIsNull()
+                ));
+            }
+        }
+
+        List<VannaHistoryExample> historyExamples = buildVannaHistoryExamples(
+                serverCode,
+                dbName,
+                serverInfoResult.getData().getDbServerType()
+        );
+
+        String contextVersion = String.format(
+                Locale.ROOT,
+                "%s|%s|%s|%s|%d|%d|%d",
+                serverCode,
+                dbName,
+                safeValue(baseConfigDao.getLatestServerDatabaseSnapshotTime()),
+                safeValue(baseConfigDao.getLatestQueryLogTime(serverCode, dbName)),
+                tableResult.getData().size(),
+                columns.size(),
+                historyExamples.size()
+        );
+
+        VannaContextResponse response = new VannaContextResponse();
+        response.setServerType(serverInfoResult.getData().getDbServerType());
+        response.setDialect(DbServerTypeUtils.displayName(serverInfoResult.getData().getDbServerType()));
+        response.setServerName(serverInfoResult.getData().getDbServerName());
+        response.setDbName(dbName);
+        response.setContextVersion(contextVersion);
+        response.setTables(tableResult.getData());
+        response.setColumns(columns);
+        response.setViews(views);
+        response.setHistoryExamples(historyExamples);
+        return new Result<>(true, "success", response);
+    }
+
     /**
      * 使用单例模式创建一个数据操作实例对象
      * @param serverCode
@@ -596,6 +674,44 @@ public class BaseDataServiceImpl implements BaseDataService{
             return new Result<>(false, "无权限访问该数据库服务器", null);
         }
         return null;
+    }
+
+    private List<VannaHistoryExample> buildVannaHistoryExamples(Integer serverCode, String dbName, String dbType) {
+        List<QueryLogBean> recentLogs = baseConfigDao.getRecentQueryLogsByServerAndDatabase(
+                serverCode,
+                dbName,
+                VANNA_HISTORY_SAMPLE_LIMIT
+        );
+        Map<String, VannaHistoryExample> dedupedExamples = new LinkedHashMap<>();
+        for (QueryLogBean log : recentLogs) {
+            if (log == null || !VannaSqlExampleSanitizer.looksReadableSelect(log.getQuerySqlscript(), dbType)) {
+                continue;
+            }
+            String sanitizedSql = VannaSqlExampleSanitizer.sanitize(log.getQuerySqlscript());
+            if (sanitizedSql.isEmpty()) {
+                continue;
+            }
+            String dedupeKey = VannaSqlExampleSanitizer.dedupeKey(log.getQuerySqlscript());
+            if (dedupedExamples.containsKey(dedupeKey)) {
+                continue;
+            }
+            dedupedExamples.put(dedupeKey, new VannaHistoryExample(
+                    log.getCode(),
+                    log.getQueryName(),
+                    log.getQueryDatabase(),
+                    sanitizedSql,
+                    safeValue(log.getTargetTables()),
+                    log.getQueryTime() == null ? "" : log.getQueryTime().toString()
+            ));
+            if (dedupedExamples.size() >= VANNA_HISTORY_DEDUPED_LIMIT) {
+                break;
+            }
+        }
+        return new ArrayList<>(dedupedExamples.values());
+    }
+
+    private String safeValue(String value) {
+        return value == null ? "" : value;
     }
 
     private Integer resolveResultRowCount(Object[] result) {

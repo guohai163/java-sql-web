@@ -20,4 +20,13 @@ public class TablesNameBean {
      * 表大小
      */
     private Long tableRows;
+
+    /**
+     * 表备注
+     */
+    private String tableComment;
+
+    public TablesNameBean(String tableName, Long tableRows) {
+        this(tableName, tableRows, "");
+    }
 }

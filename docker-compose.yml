@@ -36,11 +36,33 @@ services:
       PROJECT_DOMAIN: ${PUBLIC_DOMAIN:-localhost}
       PROJECT_HOST: ${PUBLIC_HOST:-http://localhost}
       PROJECT_LEGACY_TLS_ENABLED: ${PROJECT_LEGACY_TLS_ENABLED:-false}
+      VANNA_INTERNAL_TOKEN: ${VANNA_INTERNAL_TOKEN:-change-me}
       JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:-}
     volumes:
       - ./deploy/java-security/legacy-tls.security:/opt/jsw/legacy-tls.security:ro
     expose:
       - "8002"
+
+  jsw-vanna:
+    image: ${JSW_VANNA_IMAGE:-ghcr.io/guohai163/java-sql-web-vanna}:${TAG}
+    container_name: jsw-vanna
+    restart: unless-stopped
+    depends_on:
+      jsw-db:
+        condition: service_healthy
+      jsw-server:
+        condition: service_started
+    environment:
+      VANNA_PORT: ${VANNA_PORT:-8003}
+      JSW_SERVER_BASE_URL: ${JSW_SERVER_BASE_URL:-http://jsw-server:8002}
+      VANNA_INTERNAL_TOKEN: ${VANNA_INTERNAL_TOKEN:-change-me}
+      VANNA_DB_URL: ${VANNA_DB_URL:-postgresql://${VANNA_DB_USER:-jsw_vanna}:${VANNA_DB_PASSWORD:-change-me}@jsw-db:5432/${VANNA_DB_NAME:-jsw_vanna_db}}
+      VANNA_CHAT_MODEL: ${VANNA_CHAT_MODEL:-gpt-4.1-mini}
+      VANNA_EMBEDDING_MODEL: ${VANNA_EMBEDDING_MODEL:-text-embedding-3-small}
+      VANNA_LLM_BASE_URL: ${VANNA_LLM_BASE_URL:-https://api.openai.com/v1}
+      VANNA_LLM_API_KEY: ${VANNA_LLM_API_KEY:-}
+    expose:
+      - "8003"
 
   jsw-front:
     image: ${JSW_FRONT_IMAGE:-ghcr.io/guohai163/java-sql-web-front}:${TAG}
@@ -48,6 +70,7 @@ services:
     restart: unless-stopped
     depends_on:
       - jsw-server
+      - jsw-vanna
     ports:
       - "${FRONT_PORT:-80}:80"
 

@@ -105,12 +105,13 @@ public class DbOperationClickHouse implements DbOperation{
         List<TablesNameBean> listTnb = new ArrayList<>();
         Connection conn = sqlDs.getConnection();
         PreparedStatement st = conn.prepareStatement(
-                "SELECT name, total_rows FROM system.tables WHERE database = ? ORDER BY name ASC");
+                "SELECT name, total_rows, COALESCE(comment, '') AS table_comment FROM system.tables WHERE database = ? ORDER BY name ASC");
         st.setString(1, dbName);
         ResultSet rs = st.executeQuery();
         while (rs.next()){
             listTnb.add(new TablesNameBean(rs.getString("name"),
-                    rs.getLong("total_rows")));
+                    rs.getLong("total_rows"),
+                    rs.getString("table_comment")));
         }
         closeResource(rs,st,conn);
         return listTnb;

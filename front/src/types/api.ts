@@ -225,6 +225,16 @@ export interface WorkbenchDashboardResponse {
   updatedAt: string;
 }
 
+export interface VannaGenerateSqlResponse {
+  needsClarification: boolean;
+  clarificationQuestion?: string | null;
+  sql?: string | null;
+  dialect: string;
+  summary: string;
+  matchedTables: string[];
+  warnings: string[];
+}
+
 // ── OIDC / SSF ────────────────────────────────────
 
 export interface OidcTokenInfo {

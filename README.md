@@ -33,8 +33,9 @@
 .
 ├── front/                 # React 前端 + Nginx 镜像
 ├── server/                # Spring Boot 服务端 + Maven 构建
+├── vanna/                 # 独立的 Vanna/FastAPI 问数服务
 ├── deploy/                # 部署相关文件，例如数据库初始化 SQL
-├── docker-compose.yml     # 运行数据库、服务端、前端三个容器
+├── docker-compose.yml     # 运行数据库、服务端、Vanna、前端四个容器
 └── .github/workflows/     # Git tag 触发的镜像发布流程
 ```
 
@@ -53,6 +54,7 @@ git push origin v0.9.0
 
 - `ghcr.io/guohai163/java-sql-web-front:<tag>`
 - `ghcr.io/guohai163/java-sql-web-server:<tag>`
+- `ghcr.io/guohai163/java-sql-web-vanna:<tag>`
 
 ### 2. 使用 docker compose 部署
 
@@ -68,6 +70,9 @@ cp .env.example .env
 - `DB_USERNAME` / `DB_PASSWORD`：PostgreSQL 应用用户与密码
 - `DB_DIALECT`：默认 `postgresql`，兼容旧元库时可设为 `mysql`
 - `PUBLIC_DOMAIN` / `PUBLIC_HOST`：对外访问域名与完整 URL
+- `VANNA_INTERNAL_TOKEN`：`jsw-server` 与 `jsw-vanna` 之间的内部共享密钥
+- `VANNA_LLM_API_KEY`：OpenAI 兼容接口密钥
+- `VANNA_DB_URL`：Vanna 独立数据库连接串
 
 建议配置示例：
 
@@ -89,7 +94,27 @@ docker compose up -d
 
 - `jsw-front`：唯一对外入口，提供静态页面并将后端请求代理到 `jsw-server`
 - `jsw-server`：Spring Boot API 服务
+- `jsw-vanna`：AI 问数服务，只生成只读 SQL，不执行 SQL
 - `jsw-db`：PostgreSQL 18 数据库，首次启动会执行 `deploy/init.postgresql.sql`
+
+如果当前 PG 实例已经在运行，并且不是“首次空数据卷启动”，还需要额外执行一次：
+
+```shell
+psql "$DB_URL" -f deploy/init.vanna.postgresql.sql
+```
+
+这一步会在同一 PG 实例中创建：
+
+- 独立数据库 `jsw_vanna_db`
+- 独立角色 `jsw_vanna`
+- `vector` 扩展
+- Vanna 的上下文缓存 / 向量 / 审计表
+
+补充说明：
+
+- 全新 `docker compose` 首次启动时，`deploy/init.postgresql.sql` 会创建 `jsw_vanna_db`
+- `jsw-vanna` 服务自身启动时会自动补齐 `vector` 扩展与其业务表
+- 已迁移完成的线上 PG 不会重新走首次初始化，因此需要手工执行 `deploy/init.vanna.postgresql.sql`
 
 应用自身元数据库通过 `APP_DB_DIALECT` / `DB_DIALECT` 选择 SQL 方言。默认新部署使用 PostgreSQL；若需要先发布兼容版本并继续连接旧 MariaDB/MySQL 元库，可显式设置：
 
@@ -161,6 +186,7 @@ bash scripts/deploy-k8s.sh
 
 - `jsw-db`：单实例 PostgreSQL 18（StatefulSet + PVC）
 - `jsw-server`：Spring Boot API（Deployment + ClusterIP Service）
+- `jsw-vanna`：AI 问数服务（Deployment + ClusterIP Service）
 - `jsw-front`：前端 Nginx（Deployment + ClusterIP Service）
 - `Ingress`：将外部流量转到 `jsw-front`
 
@@ -190,6 +216,10 @@ deploy/java-security/legacy-tls.security
 Docker Compose 模式下的完整迁移步骤、常见问题和回滚方案见：
 
 - [doc/docker-compose-mysql-to-postgresql-migration.md](./doc/docker-compose-mysql-to-postgresql-migration.md)
+
+Kubernetes 模式下从已有 MySQL 元库迁移到新的 PostgreSQL 元库，见：
+
+- [doc/k8s-mysql-to-postgresql-migration.md](./doc/k8s-mysql-to-postgresql-migration.md)
 
 推荐先发布同时兼容 MySQL/MariaDB 和 PostgreSQL 的服务端版本，但线上环境变量仍保持旧元库：
 

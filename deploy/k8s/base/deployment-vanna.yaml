@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jsw-vanna
+  namespace: ${NAMESPACE}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jsw-vanna
+  template:
+    metadata:
+      labels:
+        app: jsw-vanna
+    spec:
+      containers:
+        - name: jsw-vanna
+          image: ${JSW_VANNA_IMAGE}:${TAG}
+          ports:
+            - containerPort: 8003
+              name: http
+          env:
+            - name: VANNA_PORT
+              value: "${VANNA_PORT}"
+            - name: JSW_SERVER_BASE_URL
+              value: "${JSW_SERVER_BASE_URL}"
+            - name: VANNA_INTERNAL_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: jsw-app-secret
+                  key: VANNA_INTERNAL_TOKEN
+            - name: VANNA_DB_URL
+              valueFrom:
+                secretKeyRef:
+                  name: jsw-app-secret
+                  key: VANNA_DB_URL
+            - name: VANNA_CHAT_MODEL
+              valueFrom:
+                secretKeyRef:
+                  name: jsw-app-secret
+                  key: VANNA_CHAT_MODEL
+            - name: VANNA_EMBEDDING_MODEL
+              valueFrom:
+                secretKeyRef:
+                  name: jsw-app-secret
+                  key: VANNA_EMBEDDING_MODEL
+            - name: VANNA_LLM_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: jsw-app-secret
+                  key: VANNA_LLM_BASE_URL
+            - name: VANNA_LLM_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: jsw-app-secret
+                  key: VANNA_LLM_API_KEY
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8003
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8003
+            initialDelaySeconds: 20
+            periodSeconds: 15
+            timeoutSeconds: 5
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "1Gi"

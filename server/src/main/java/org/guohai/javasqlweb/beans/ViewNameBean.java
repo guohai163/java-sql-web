@@ -23,7 +23,16 @@ public class ViewNameBean {
      */
     private String viewData;
 
+    /**
+     * 视图备注
+     */
+    private String viewComment;
+
     public ViewNameBean(String name){
-        viewName = name;
+        this(name, null, "");
+    }
+
+    public ViewNameBean(String name, String viewData) {
+        this(name, viewData, "");
     }
 }
