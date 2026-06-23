@@ -1,4 +1,5 @@
 import json
+import asyncio
 import sys
 import types
 from pathlib import Path
@@ -28,6 +29,10 @@ try:
     import pydantic  # noqa: F401
 except ModuleNotFoundError:
     class _BaseModel:
+        def __init__(self, **kwargs):
+            for key, value in kwargs.items():
+                setattr(self, key, value)
+
         @classmethod
         def model_validate(cls, value):
             return value
@@ -48,10 +53,54 @@ except ModuleNotFoundError:
     )
 
 from app.service import VannaService  # noqa: E402
+from app.models import VannaContext, VannaTable, VannaColumn  # noqa: E402
 
 
 def _service() -> VannaService:
     return VannaService.__new__(VannaService)
+
+
+def _context() -> VannaContext:
+    return VannaContext(
+        serverType="postgresql",
+        dialect="pgsql",
+        serverName="demo",
+        dbName="demo",
+        contextVersion="1",
+        tables=[VannaTable(tableName="users")],
+        columns=[VannaColumn(tableName="users", columnName="id", columnType="bigint")],
+    )
+
+
+def _response(content: str):
+    return SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(content=content)
+            )
+        ]
+    )
+
+
+def _run_generate_sql(content: str):
+    async def run():
+        async def create(*args, **kwargs):
+            return _response(content)
+
+        service = _service()
+        service.ensure_context = lambda *args, **kwargs: None
+        service._retrieve_relevant_chunks = lambda *args, **kwargs: []
+        service._save_audit = lambda *args, **kwargs: None
+        service.client = SimpleNamespace(
+            chat=SimpleNamespace(
+                completions=SimpleNamespace(
+                    create=create
+                )
+            )
+        )
+        return await service.generate_sql("1", "demo", "list users", _context())
+
+    return asyncio.run(run())
 
 
 def test_parse_chat_payload_accepts_openai_sdk_response_shape():
@@ -174,3 +223,62 @@ def test_parse_chat_payload_returns_clarification_for_unparseable_text():
     assert payload["needsClarification"] is True
     assert payload["sql"] is None
     assert payload["warnings"] == ["模型返回内容不是有效 JSON，且未提取到只读 SQL"]
+
+
+def test_generate_sql_converts_empty_payload_to_clarification():
+    response = _run_generate_sql("{}")
+
+    assert response.needsClarification is True
+    assert response.sql is None
+    assert response.summary == "AI 返回内容缺少有效 SQL，未生成 SQL"
+    assert response.warnings == ["模型返回 JSON 中缺少有效 SQL"]
+
+
+def test_generate_sql_converts_null_sql_payload_to_clarification():
+    response = _run_generate_sql(
+        json.dumps(
+            {
+                "needsClarification": False,
+                "sql": None,
+                "summary": "已根据当前上下文生成 SQL 建议",
+                "matchedTables": [],
+                "warnings": [],
+            }
+        )
+    )
+
+    assert response.needsClarification is True
+    assert response.sql is None
+    assert response.warnings == ["模型返回 JSON 中缺少有效 SQL"]
+
+
+def test_generate_sql_converts_blank_sql_payload_to_clarification():
+    response = _run_generate_sql(json.dumps({"sql": "   "}))
+
+    assert response.needsClarification is True
+    assert response.sql is None
+    assert response.warnings == ["模型返回 JSON 中缺少有效 SQL"]
+
+
+def test_generate_sql_preserves_clarification_and_fills_missing_question():
+    response = _run_generate_sql(json.dumps({"needsClarification": True, "sql": None}))
+
+    assert response.needsClarification is True
+    assert response.sql is None
+    assert response.clarificationQuestion == "AI 未能生成有效 SQL，请补充查询目标或换一种问法。"
+
+
+def test_generate_sql_preserves_valid_read_only_sql():
+    response = _run_generate_sql(json.dumps({"sql": " select id from users "}))
+
+    assert response.needsClarification is False
+    assert response.sql == "select id from users"
+    assert response.warnings == []
+
+
+def test_generate_sql_rejects_non_read_only_sql():
+    response = _run_generate_sql(json.dumps({"sql": "delete from users"}))
+
+    assert response.needsClarification is True
+    assert response.sql is None
+    assert "只允许生成只读 SQL" in response.warnings

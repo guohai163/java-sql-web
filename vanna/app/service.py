@@ -12,6 +12,8 @@ from .models import GenerateSqlResponse, VannaContext
 from .prompting import SYSTEM_PROMPT, build_schema_text, build_user_prompt
 
 LOG = logging.getLogger(__name__)
+DEFAULT_CLARIFICATION_QUESTION = "AI 未能生成有效 SQL，请补充查询目标或换一种问法。"
+MISSING_SQL_WARNING = "模型返回 JSON 中缺少有效 SQL"
 
 
 class VannaService:
@@ -321,6 +323,54 @@ class VannaService:
             "warnings": [warning],
         }
 
+    def _normalize_chat_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """把模型 JSON 归一化为不会出现“成功但无 SQL”的响应负载。"""
+
+        matched_tables = self._string_list(payload.get("matchedTables"))
+        warnings = self._string_list(payload.get("warnings"))
+        summary = payload.get("summary")
+        summary = summary.strip() if isinstance(summary, str) else ""
+        clarification_question = payload.get("clarificationQuestion")
+        clarification_question = clarification_question.strip() if isinstance(clarification_question, str) else ""
+        sql = payload.get("sql")
+        sql = sql.strip() if isinstance(sql, str) else ""
+
+        if bool(payload.get("needsClarification")):
+            return {
+                "needsClarification": True,
+                "clarificationQuestion": clarification_question or DEFAULT_CLARIFICATION_QUESTION,
+                "sql": None,
+                "summary": summary or "AI 需要补充信息后才能生成 SQL",
+                "matchedTables": matched_tables,
+                "warnings": warnings,
+            }
+
+        if not sql:
+            return {
+                "needsClarification": True,
+                "clarificationQuestion": DEFAULT_CLARIFICATION_QUESTION,
+                "sql": None,
+                "summary": summary or "AI 返回内容缺少有效 SQL，未生成 SQL",
+                "matchedTables": matched_tables,
+                "warnings": warnings + [MISSING_SQL_WARNING],
+            }
+
+        return {
+            "needsClarification": False,
+            "clarificationQuestion": clarification_question or None,
+            "sql": sql,
+            "summary": summary or "已根据当前上下文生成 SQL 建议",
+            "matchedTables": matched_tables,
+            "warnings": warnings,
+        }
+
+    def _string_list(self, value: Any) -> list[str]:
+        """把模型可能返回的列表字段安全转换成字符串列表。"""
+
+        if not isinstance(value, list):
+            return []
+        return [str(item) for item in value]
+
     def _strip_json_fence(self, content: str) -> str:
         """去掉模型偶尔返回的 Markdown JSON 代码块包裹。"""
 
@@ -356,15 +406,16 @@ class VannaService:
             except Exception as exception:
                 LOG.warning("Failed to dump chat completion response: %s", exception)
         payload = self._parse_chat_payload(response)
-        # 先按标准返回结构建模，缺失字段使用保守默认值。
+        # 先归一化模型 JSON 语义，避免出现“成功但没有 SQL”的假阳性。
+        normalized_payload = self._normalize_chat_payload(payload)
         parsed = GenerateSqlResponse(
-            needsClarification=bool(payload.get("needsClarification")),
-            clarificationQuestion=payload.get("clarificationQuestion"),
-            sql=payload.get("sql"),
+            needsClarification=normalized_payload["needsClarification"],
+            clarificationQuestion=normalized_payload["clarificationQuestion"],
+            sql=normalized_payload["sql"],
             dialect=context.dialect,
-            summary=payload.get("summary") or "已根据当前上下文生成 SQL 建议",
-            matchedTables=[str(item) for item in payload.get("matchedTables", [])],
-            warnings=[str(item) for item in payload.get("warnings", [])],
+            summary=normalized_payload["summary"],
+            matchedTables=normalized_payload["matchedTables"],
+            warnings=normalized_payload["warnings"],
         )
         if parsed.sql:
             normalized = parsed.sql.strip().lower()
