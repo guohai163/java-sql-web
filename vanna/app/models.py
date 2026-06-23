@@ -1,12 +1,19 @@
 from typing import List, Optional
-
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class GenerateSqlRequest(BaseModel):
-    serverCode: str = Field(..., min_length=1)
+    serverCode: str | int = Field(...)
     dbName: str = Field(..., min_length=1)
     question: str = Field(..., min_length=1, max_length=4000)
+
+    @field_validator("serverCode")
+    @classmethod
+    def validate_server_code(cls, value: str | int) -> str:
+        normalized = str(value).strip()
+        if not normalized:
+            raise ValueError("serverCode cannot be blank")
+        return normalized
 
 
 class GenerateSqlResponse(BaseModel):

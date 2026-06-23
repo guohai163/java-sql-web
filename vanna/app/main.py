@@ -34,5 +34,6 @@ async def generate_sql(
         headers["User-Token"] = user_token
     if authorization:
         headers["Authorization"] = authorization
-    context = await jsw_client.get_context(body.serverCode, body.dbName, headers)
-    return await vanna_service.generate_sql(body.serverCode, body.dbName, body.question, context)
+    server_code = str(body.serverCode).strip()
+    context = await jsw_client.get_context(server_code, body.dbName, headers)
+    return await vanna_service.generate_sql(server_code, body.dbName, body.question, context)
