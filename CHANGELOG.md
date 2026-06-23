@@ -2,6 +2,14 @@
 
 本文件记录当前 `master` 分支之后到当前 `develop` 工作区的主要变更，按版本和当前未发布改动整理。
 
+## v3.1.7 - 2026-06-23
+
+### Fixed
+- 修复 `jsw-vanna` 在 OpenAI 兼容网关返回原始 JSON 字符串或序列化 chat completion 时访问 `response.choices` 导致的 500 错误；现在会兼容 SDK 对象、原始 JSON、序列化响应和 JSON 代码块格式。
+
+### Tests
+- 新增 Vanna 聊天响应解析单元测试，覆盖 SDK 响应、原始 JSON 字符串、序列化 chat completion 与 JSON 代码块格式。
+
 ## v3.1.6 - 2026-06-23
 
 ### Changed

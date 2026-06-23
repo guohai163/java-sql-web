@@ -114,6 +114,72 @@ class VannaService:
         ranked.sort(key=lambda item: item[0], reverse=True)
         return [chunk for _, chunk in ranked[: settings.embedding_top_k]]
 
+    def _extract_chat_content(self, response: Any) -> str:
+        if response is None:
+            return ""
+        if isinstance(response, (bytes, bytearray)):
+            return response.decode("utf-8")
+        if isinstance(response, str):
+            return response
+        if isinstance(response, dict):
+            return self._extract_chat_content_from_mapping(response)
+
+        choices = getattr(response, "choices", None)
+        if choices:
+            message = getattr(choices[0], "message", None)
+            content = getattr(message, "content", None)
+            return self._normalize_chat_content(content)
+
+        if hasattr(response, "model_dump"):
+            return self._extract_chat_content_from_mapping(response.model_dump())
+
+        return str(response)
+
+    def _extract_chat_content_from_mapping(self, response: dict[str, Any]) -> str:
+        choices = response.get("choices")
+        if choices:
+            message = choices[0].get("message", {}) if isinstance(choices[0], dict) else {}
+            return self._normalize_chat_content(message.get("content"))
+        return json.dumps(response)
+
+    def _normalize_chat_content(self, content: Any) -> str:
+        if content is None:
+            return ""
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            parts: list[str] = []
+            for item in content:
+                if isinstance(item, dict):
+                    text = item.get("text") or item.get("content")
+                    if text:
+                        parts.append(str(text))
+                else:
+                    parts.append(str(item))
+            return "".join(parts)
+        return str(content)
+
+    def _parse_chat_payload(self, response: Any) -> dict[str, Any]:
+        content = self._strip_json_fence(self._extract_chat_content(response).strip())
+        if not content:
+            return {}
+        payload = json.loads(content)
+        if isinstance(payload, dict) and payload.get("choices"):
+            return self._parse_chat_payload(payload)
+        if not isinstance(payload, dict):
+            raise ValueError("chat completion content must be a JSON object")
+        return payload
+
+    def _strip_json_fence(self, content: str) -> str:
+        if content.startswith("```") and content.endswith("```"):
+            lines = content.splitlines()
+            if lines:
+                lines = lines[1:]
+            if lines and lines[-1].strip() == "```":
+                lines = lines[:-1]
+            return "\n".join(lines).strip()
+        return content
+
     async def generate_sql(self, server_code: str, db_name: str, question: str, context: VannaContext) -> GenerateSqlResponse:
         started_at = time.time()
         self.ensure_context(server_code, db_name, context)
@@ -133,7 +199,7 @@ class VannaService:
                 LOG.info("Raw chat completion response model_dump=%s", response.model_dump())
             except Exception as exception:
                 LOG.warning("Failed to dump chat completion response: %s", exception)
-        payload = json.loads(response.choices[0].message.content or "{}")
+        payload = self._parse_chat_payload(response)
         parsed = GenerateSqlResponse(
             needsClarification=bool(payload.get("needsClarification")),
             clarificationQuestion=payload.get("clarificationQuestion"),
