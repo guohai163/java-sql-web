@@ -2,6 +2,12 @@
 
 本文件记录当前 `master` 分支之后到当前 `develop` 工作区的主要变更，按版本和当前未发布改动整理。
 
+## v3.1.1 - 2026-06-23
+
+### Changed
+- Vanna 默认聊天模型从 `gpt-4.1-mini` 调整为 `gpt-5.4-mini`，同步更新 Docker Compose、Kubernetes 和环境变量模板默认值。
+- Vanna embedding 默认方案切换为本地 CPU 运行的 `BAAI/bge-small-zh-v1.5`，减少对远程 embedding API 的依赖。
+
 ## v3.1.0 - 2026-06-23
 
 ### Added

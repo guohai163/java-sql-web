@@ -71,8 +71,9 @@ cp .env.example .env
 - `DB_DIALECT`：默认 `postgresql`，兼容旧元库时可设为 `mysql`
 - `PUBLIC_DOMAIN` / `PUBLIC_HOST`：对外访问域名与完整 URL
 - `VANNA_INTERNAL_TOKEN`：`jsw-server` 与 `jsw-vanna` 之间的内部共享密钥
-- `VANNA_LLM_API_KEY`：OpenAI 兼容接口密钥
 - `VANNA_DB_URL`：Vanna 独立数据库连接串
+- `VANNA_CHAT_MODEL` / `VANNA_LLM_API_KEY`：问数聊天模型配置（仍走 OpenAI 兼容接口）
+- `VANNA_EMBEDDING_MODEL`：本地 CPU 运行的 embedding 模型，默认 `BAAI/bge-small-zh-v1.5`
 
 建议配置示例：
 
@@ -96,6 +97,11 @@ docker compose up -d
 - `jsw-server`：Spring Boot API 服务
 - `jsw-vanna`：AI 问数服务，只生成只读 SQL，不执行 SQL
 - `jsw-db`：PostgreSQL 18 数据库，首次启动会执行 `deploy/init.postgresql.sql`
+
+默认配置下：
+
+- 聊天模型仍通过 OpenAI 兼容接口调用
+- embedding 模型改为本地 CPU 运行，不再依赖 `text-embedding-3-small`
 
 如果当前 PG 实例已经在运行，并且不是“首次空数据卷启动”，还需要额外执行一次：
 

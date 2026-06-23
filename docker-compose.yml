@@ -57,8 +57,8 @@ services:
       JSW_SERVER_BASE_URL: ${JSW_SERVER_BASE_URL:-http://jsw-server:8002}
       VANNA_INTERNAL_TOKEN: ${VANNA_INTERNAL_TOKEN:-change-me}
       VANNA_DB_URL: ${VANNA_DB_URL:-postgresql://${VANNA_DB_USER:-jsw_vanna}:${VANNA_DB_PASSWORD:-change-me}@jsw-db:5432/${VANNA_DB_NAME:-jsw_vanna_db}}
-      VANNA_CHAT_MODEL: ${VANNA_CHAT_MODEL:-gpt-4.1-mini}
-      VANNA_EMBEDDING_MODEL: ${VANNA_EMBEDDING_MODEL:-text-embedding-3-small}
+      VANNA_CHAT_MODEL: ${VANNA_CHAT_MODEL:-gpt-5.4-mini}
+      VANNA_EMBEDDING_MODEL: ${VANNA_EMBEDDING_MODEL:-BAAI/bge-small-zh-v1.5}
       VANNA_LLM_BASE_URL: ${VANNA_LLM_BASE_URL:-https://api.openai.com/v1}
       VANNA_LLM_API_KEY: ${VANNA_LLM_API_KEY:-}
     expose:

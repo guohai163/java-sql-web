@@ -1,22 +1,13 @@
 -- 为已存在的 PG 实例补齐 Vanna 独立数据库、角色与向量扩展。
-
-DO
-$$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'jsw_vanna') THEN
-    CREATE ROLE jsw_vanna LOGIN PASSWORD 'change-me';
-  END IF;
-END
-$$;
-
-DO
-$$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = 'jsw_vanna_db') THEN
-    CREATE DATABASE jsw_vanna_db OWNER jsw_vanna;
-  END IF;
-END
-$$;
+--
+-- 注意：
+-- 1. PostgreSQL 不允许在 DO / function / transaction 里执行 CREATE DATABASE。
+-- 2. 因此本脚本假定：
+--    - 角色 jsw_vanna 已存在，或由外部命令先创建
+--    - 数据库 jsw_vanna_db 已存在，或由外部命令先创建
+-- 3. 推荐执行顺序：
+--    - 先在 postgres 库里创建角色和数据库
+--    - 再用本脚本连接 jsw_vanna_db 创建扩展和表
 
 \connect jsw_vanna_db
 

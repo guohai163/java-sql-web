@@ -25,6 +25,15 @@ def build_schema_text(context: VannaContext) -> str:
     return "\n".join(lines)
 
 
+def build_retrieval_text(relevant_chunks: list[str]) -> str:
+    if not relevant_chunks:
+        return ""
+    lines = ["", "Most relevant retrieved context:"]
+    for chunk in relevant_chunks:
+        lines.append(f"- {chunk}")
+    return "\n".join(lines)
+
+
 SYSTEM_PROMPT = """You generate read-only SQL for business users.
 Rules:
 - Return only SELECT-style read-only SQL.
@@ -36,9 +45,10 @@ Rules:
 """
 
 
-def build_user_prompt(context: VannaContext, question: str) -> str:
+def build_user_prompt(context: VannaContext, question: str, relevant_chunks: list[str]) -> str:
     return (
-        f"{build_schema_text(context)}\n\n"
+        f"{build_schema_text(context)}"
+        f"{build_retrieval_text(relevant_chunks)}\n\n"
         f"User question:\n{question}\n\n"
         "Respond in JSON with fields: "
         "needsClarification(boolean), clarificationQuestion(string|null), sql(string|null), "

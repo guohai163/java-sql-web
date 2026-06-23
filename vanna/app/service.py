@@ -3,6 +3,7 @@ import time
 from typing import Any
 
 from openai import AsyncOpenAI
+from sentence_transformers import SentenceTransformer
 
 from .config import settings
 from .db import get_conn
@@ -17,9 +18,32 @@ class VannaService:
             base_url=settings.llm_base_url,
             timeout=settings.generation_timeout_seconds,
         )
+        self.embedder = SentenceTransformer(settings.embedding_model, device="cpu")
 
     def _cache_key(self, server_code: str, db_name: str) -> str:
         return f"{server_code}::{db_name}"
+
+    def _build_chunks(self, context: VannaContext) -> list[tuple[str, str, str]]:
+        chunks: list[tuple[str, str, str]] = []
+        for table in context.tables:
+            chunks.append(("table", table.tableName, f"{table.tableName}: {table.tableComment or ''}"))
+        for column in context.columns:
+            chunks.append(
+                (
+                    "column",
+                    f"{column.tableName}.{column.columnName}",
+                    f"{column.tableName}.{column.columnName} {column.columnType or ''} {column.columnComment or ''}",
+                )
+            )
+        for example in context.historyExamples:
+            chunks.append(
+                (
+                    "history",
+                    str(example.queryLogCode or example.sqlTemplate[:120]),
+                    example.sqlTemplate,
+                )
+            )
+        return chunks
 
     def _persist_context(self, cache_key: str, context: VannaContext) -> None:
         schema_text = build_schema_text(context)
@@ -50,25 +74,7 @@ class VannaService:
                     ),
                 )
                 cur.execute("DELETE FROM vanna_context_embedding WHERE cache_key = %s", (cache_key,))
-                chunks: list[tuple[str, str, str]] = []
-                for table in context.tables:
-                    chunks.append(("table", table.tableName, f"{table.tableName}: {table.tableComment or ''}"))
-                for column in context.columns:
-                    chunks.append(
-                        (
-                            "column",
-                            f"{column.tableName}.{column.columnName}",
-                            f"{column.tableName}.{column.columnName} {column.columnType or ''} {column.columnComment or ''}",
-                        )
-                    )
-                for example in context.historyExamples:
-                    chunks.append(
-                        (
-                            "history",
-                            str(example.queryLogCode or example.sqlTemplate[:120]),
-                            example.sqlTemplate,
-                        )
-                    )
+                chunks = self._build_chunks(context)
                 for chunk_type, chunk_key, chunk_text in chunks:
                     cur.execute(
                         """
@@ -92,16 +98,30 @@ class VannaService:
         if row is None or row[0] != context.contextVersion:
             self._persist_context(cache_key, context)
 
+    def _retrieve_relevant_chunks(self, context: VannaContext, question: str) -> list[str]:
+        chunks = [chunk_text for _, _, chunk_text in self._build_chunks(context)]
+        if not chunks:
+            return []
+        query_text = f"{settings.embedding_query_prefix}{question}".strip()
+        query_vector = self.embedder.encode([query_text], normalize_embeddings=True)[0]
+        chunk_vectors = self.embedder.encode(chunks, normalize_embeddings=True)
+        ranked: list[tuple[float, str]] = []
+        for vector, chunk in zip(chunk_vectors, chunks):
+            ranked.append((float((query_vector * vector).sum()), chunk))
+        ranked.sort(key=lambda item: item[0], reverse=True)
+        return [chunk for _, chunk in ranked[: settings.embedding_top_k]]
+
     async def generate_sql(self, server_code: str, db_name: str, question: str, context: VannaContext) -> GenerateSqlResponse:
         started_at = time.time()
         self.ensure_context(server_code, db_name, context)
+        relevant_chunks = self._retrieve_relevant_chunks(context, question)
         response = await self.client.chat.completions.create(
             model=settings.chat_model,
             temperature=0.1,
             response_format={"type": "json_object"},
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": build_user_prompt(context, question)},
+                {"role": "user", "content": build_user_prompt(context, question, relevant_chunks)},
             ],
         )
         payload = json.loads(response.choices[0].message.content or "{}")
