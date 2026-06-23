@@ -8,14 +8,20 @@ from .config import settings
 
 @contextmanager
 def get_conn() -> Iterator[psycopg.Connection]:
+    """创建一个短生命周期 PostgreSQL 连接，供缓存和审计写入使用。"""
+
     with psycopg.connect(settings.vanna_db_url) as conn:
         yield conn
 
 
 def init_db() -> None:
+    """初始化 Vanna 运行所需的数据表和 pgvector 扩展。"""
+
     with get_conn() as conn:
         with conn.cursor() as cur:
+            # pgvector 预留给上下文向量持久化使用；当前召回仍在内存中完成。
             cur.execute("CREATE EXTENSION IF NOT EXISTS vector")
+            # 缓存 JavaSqlWeb 返回的完整 schema 文本，避免上下文版本未变时重复整理。
             cur.execute(
                 """
                 CREATE TABLE IF NOT EXISTS vanna_context_cache (
@@ -30,6 +36,7 @@ def init_db() -> None:
                 )
                 """
             )
+            # 保存表、字段、历史 SQL 等可检索片段；embedding 字段保留给后续数据库侧向量召回。
             cur.execute(
                 """
                 CREATE TABLE IF NOT EXISTS vanna_context_embedding (
@@ -44,6 +51,7 @@ def init_db() -> None:
                 )
                 """
             )
+            # 记录每次生成结果、耗时和安全拦截状态，便于排查与审计。
             cur.execute(
                 """
                 CREATE TABLE IF NOT EXISTS vanna_audit_log (
