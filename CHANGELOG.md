@@ -2,6 +2,11 @@
 
 本文件记录当前 `master` 分支之后到当前 `develop` 工作区的主要变更，按版本和当前未发布改动整理。
 
+## v3.1.3 - 2026-06-23
+
+### Changed
+- 重新发布 `jsw-vanna` 镜像，确保 `POST /api/vanna/sql/generate` 中 `serverCode` 兼容数字与字符串的修复正确进入 GHCR 发布产物。
+
 ## v3.1.2 - 2026-06-23
 
 ### Fixed
