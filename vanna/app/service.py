@@ -390,16 +390,20 @@ class VannaService:
         self.ensure_context(server_code, db_name, context)
         relevant_chunks = self._retrieve_relevant_chunks(context, question)
         # response_format 要求模型尽量返回 JSON，后续仍会做兼容解析和安全校验。
-        response = await self.client.chat.completions.create(
-            model=settings.chat_model,
-            temperature=0.1,
-            response_format={"type": "json_object"},
-            messages=[
+        request_payload = {
+            "model": settings.chat_model,
+            "temperature": 0.1,
+            "response_format": {"type": "json_object"},
+            "messages": [
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": build_user_prompt(context, question, relevant_chunks)},
             ],
-        )
+        }
+        LOG.info("Chat completion request payload=%s", json.dumps(request_payload, ensure_ascii=False))
+        response = await self.client.chat.completions.create(**request_payload)
         LOG.info("Raw chat completion response type=%s value=%r", type(response).__name__, response)
+        response_content = self._extract_chat_content(response)
+        LOG.info("Chat completion response content=%r", response_content)
         if hasattr(response, "model_dump"):
             try:
                 LOG.info("Raw chat completion response model_dump=%s", response.model_dump())
