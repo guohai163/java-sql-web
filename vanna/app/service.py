@@ -1,4 +1,5 @@
 import json
+import logging
 import time
 from typing import Any
 
@@ -9,6 +10,8 @@ from .config import settings
 from .db import get_conn
 from .models import GenerateSqlResponse, VannaContext
 from .prompting import SYSTEM_PROMPT, build_schema_text, build_user_prompt
+
+LOG = logging.getLogger(__name__)
 
 
 class VannaService:
@@ -124,6 +127,12 @@ class VannaService:
                 {"role": "user", "content": build_user_prompt(context, question, relevant_chunks)},
             ],
         )
+        LOG.info("Raw chat completion response type=%s value=%r", type(response).__name__, response)
+        if hasattr(response, "model_dump"):
+            try:
+                LOG.info("Raw chat completion response model_dump=%s", response.model_dump())
+            except Exception as exception:
+                LOG.warning("Failed to dump chat completion response: %s", exception)
         payload = json.loads(response.choices[0].message.content or "{}")
         parsed = GenerateSqlResponse(
             needsClarification=bool(payload.get("needsClarification")),
