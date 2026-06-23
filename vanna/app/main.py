@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Header, HTTPException
 
 from .db import init_db
-from .jsw_client import JswServerClient
+from .jsw_client import JswContextAuthError, JswContextRequestError, JswServerClient
 from .models import GenerateSqlRequest, GenerateSqlResponse
 from .service import VannaService
 
@@ -35,5 +35,10 @@ async def generate_sql(
     if authorization:
         headers["Authorization"] = authorization
     server_code = str(body.serverCode).strip()
-    context = await jsw_client.get_context(server_code, body.dbName, headers)
+    try:
+        context = await jsw_client.get_context(server_code, body.dbName, headers)
+    except JswContextAuthError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+    except JswContextRequestError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
     return await vanna_service.generate_sql(server_code, body.dbName, body.question, context)

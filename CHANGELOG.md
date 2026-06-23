@@ -2,6 +2,12 @@
 
 本文件记录当前 `master` 分支之后到当前 `develop` 工作区的主要变更，按版本和当前未发布改动整理。
 
+## v3.1.4 - 2026-06-23
+
+### Fixed
+- 修复 Vanna 问数链路中内部上下文接口未正确走登录校验的问题，恢复 `/internal/vanna/context/...` 的登录态与 Bearer token 认证能力。
+- 修复 `jsw-vanna` 把 `not logged in` 业务错误抛成 `500 Internal Server Error` 的问题；现在鉴权失败会返回更明确的 401/上游错误响应。
+
 ## v3.1.3 - 2026-06-23
 
 ### Changed

@@ -5,6 +5,7 @@ import org.guohai.javasqlweb.beans.Result;
 import org.guohai.javasqlweb.beans.UserBean;
 import org.guohai.javasqlweb.beans.VannaContextResponse;
 import org.guohai.javasqlweb.config.AuthenticationInterceptor;
+import org.guohai.javasqlweb.config.LoginRequired;
 import org.guohai.javasqlweb.service.BaseDataService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * 供 Vanna 容器使用的内部上下文接口。
  */
+@LoginRequired
 @RestController
 @RequestMapping("/internal/vanna")
 public class InternalVannaController {
