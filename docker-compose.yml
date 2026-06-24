@@ -53,6 +53,7 @@ services:
       jsw-server:
         condition: service_started
     environment:
+      PROJECT_VERSION: ${TAG}
       VANNA_PORT: ${VANNA_PORT:-8003}
       JSW_SERVER_BASE_URL: ${JSW_SERVER_BASE_URL:-http://jsw-server:8002}
       VANNA_INTERNAL_TOKEN: ${VANNA_INTERNAL_TOKEN:-change-me}

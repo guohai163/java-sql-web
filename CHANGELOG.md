@@ -2,6 +2,13 @@
 
 本文件记录当前 `master` 分支之后到当前 `develop` 工作区的主要变更，按版本和当前未发布改动整理。
 
+## v3.2.0 - 2026-06-24
+
+### Changed
+- 增强 `jsw-vanna` 对 OpenAI 兼容模型返回的兼容解析能力，新增对 `responses` 风格 `output` 数组、`content` / `text` 直接字段等返回形态的提取支持。
+- `jsw-vanna` 统一启用应用级 INFO 日志并输出到容器标准输出，启动时会打印当前版本号、聊天模型、embedding 模型和 LLM 网关地址，便于直接通过 `docker logs` 排查线上问题。
+- Docker Compose 和 Kubernetes 部署均为 `jsw-vanna` 注入 `PROJECT_VERSION`，让容器启动日志与镜像版本保持一致。
+
 ## v3.1.10 - 2026-06-24
 
 ### Changed

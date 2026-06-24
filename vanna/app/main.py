@@ -1,10 +1,19 @@
+import logging
+
 from fastapi import FastAPI, Header, HTTPException
 
+from .config import settings
 from .db import init_db
 from .jsw_client import JswContextAuthError, JswContextRequestError, JswServerClient
 from .models import GenerateSqlRequest, GenerateSqlResponse
 from .service import VannaService
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+    force=True,
+)
+LOG = logging.getLogger(__name__)
 
 app = FastAPI(title="JavaSqlWeb Vanna Service", version="0.1.0")
 jsw_client = JswServerClient()
@@ -15,7 +24,15 @@ vanna_service = VannaService()
 async def startup() -> None:
     """应用启动时初始化 Vanna 本地缓存和审计表。"""
 
+    LOG.info(
+        "Starting JavaSqlWeb Vanna version=%s chat_model=%s embedding_model=%s llm_base_url=%s",
+        settings.version,
+        settings.chat_model,
+        settings.embedding_model,
+        settings.llm_base_url,
+    )
     init_db()
+    LOG.info("Vanna startup completed version=%s", settings.version)
 
 
 @app.get("/health")

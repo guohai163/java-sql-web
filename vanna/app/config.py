@@ -6,6 +6,8 @@ import os
 class Settings:
     """Vanna 服务运行配置，统一从环境变量读取并提供默认值。"""
 
+    # 当前服务版本号，用于启动日志和镜像排障。
+    version: str = os.getenv("PROJECT_VERSION", "dev")
     # FastAPI 服务监听端口。
     vanna_port: int = int(os.getenv("VANNA_PORT", "8003"))
     # JavaSqlWeb 主服务地址，用于拉取数据库结构与历史查询上下文。

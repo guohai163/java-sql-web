@@ -20,6 +20,8 @@ spec:
             - containerPort: 8003
               name: http
           env:
+            - name: PROJECT_VERSION
+              value: ${TAG}
             - name: VANNA_PORT
               value: "${VANNA_PORT}"
             - name: JSW_SERVER_BASE_URL

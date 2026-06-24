@@ -148,6 +148,12 @@ class VannaService:
         if isinstance(response, dict):
             return self._extract_chat_content_from_mapping(response)
 
+        output = getattr(response, "output", None)
+        if output:
+            text = self._extract_text_from_output_items(output)
+            if text:
+                return text
+
         choices = getattr(response, "choices", None)
         if choices:
             # 官方 SDK 对象通常是 response.choices[0].message.content。
@@ -164,11 +170,49 @@ class VannaService:
     def _extract_chat_content_from_mapping(self, response: dict[str, Any]) -> str:
         """从 dict 形态的 chat completion 响应中抽取内容。"""
 
+        output = response.get("output")
+        if output:
+            text = self._extract_text_from_output_items(output)
+            if text:
+                return text
         choices = response.get("choices")
         if choices:
             message = choices[0].get("message", {}) if isinstance(choices[0], dict) else {}
             return self._normalize_chat_content(message.get("content"))
+        if "content" in response:
+            return self._normalize_chat_content(response.get("content"))
+        if "text" in response:
+            return self._normalize_chat_content(response.get("text"))
         return json.dumps(response)
+
+    def _extract_text_from_output_items(self, output: Any) -> str:
+        """从 responses 风格 output 数组中提取文本内容。"""
+
+        if not isinstance(output, list):
+            return ""
+        parts: list[str] = []
+        for item in output:
+            if not isinstance(item, dict):
+                parts.append(str(item))
+                continue
+            content_items = item.get("content")
+            if isinstance(content_items, list):
+                for content_item in content_items:
+                    if isinstance(content_item, dict):
+                        text = (
+                            content_item.get("text")
+                            or content_item.get("output_text")
+                            or content_item.get("content")
+                        )
+                        if text:
+                            parts.append(str(text))
+                    else:
+                        parts.append(str(content_item))
+            else:
+                text = item.get("text") or item.get("output_text")
+                if text:
+                    parts.append(str(text))
+        return "".join(parts)
 
     def _normalize_chat_content(self, content: Any) -> str:
         """把 message.content 归一化为字符串，兼容多段 content 列表。"""
