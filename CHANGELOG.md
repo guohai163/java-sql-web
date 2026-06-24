@@ -2,6 +2,16 @@
 
 本文件记录当前 `master` 分支之后到当前 `develop` 工作区的主要变更，按版本和当前未发布改动整理。
 
+## v3.2.2 - 2026-06-24
+
+### Changed
+- 为 `jsw-vanna` 新增 embedding 模型来源配置，默认继续从 Hugging Face 拉取；当部署环境访问外网不稳定时，可切换到 ModelScope 下载并加载本地模型缓存。
+- 补充 `VANNA_EMBEDDING_MODEL_SOURCE`、`VANNA_EMBEDDING_MODELSCOPE_MODEL_ID`、`VANNA_EMBEDDING_MODEL_REVISION`、`VANNA_EMBEDDING_MODEL_CACHE_DIR` 等部署变量，并同步更新 Docker Compose、Kubernetes Secret/Deployment、环境变量模板和运维文档。
+- 为 `jsw-vanna` 增加 `startupProbe`，放宽模型加载阶段的启动探测窗口，避免 embedding 模型尚未准备好时被 `livenessProbe` 反复重启。
+
+### Tests
+- 新增 Vanna embedding 模型来源配置测试，覆盖默认 Hugging Face 初始化路径与 ModelScope 下载路径选择。
+
 ## v3.2.1 - 2026-06-24
 
 ### Added

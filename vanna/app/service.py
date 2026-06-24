@@ -1,6 +1,7 @@
 import json
 import logging
 import time
+from pathlib import Path
 from typing import Any
 
 from openai import AsyncOpenAI
@@ -27,7 +28,52 @@ class VannaService:
             base_url=settings.llm_base_url,
             timeout=settings.generation_timeout_seconds,
         )
-        self.embedder = SentenceTransformer(settings.embedding_model, device="cpu")
+        source = settings.embedding_model_source.strip().lower() or "huggingface"
+        if source == "huggingface":
+            kwargs: dict[str, Any] = {"device": "cpu"}
+            if settings.embedding_model_cache_dir.strip():
+                kwargs["cache_folder"] = settings.embedding_model_cache_dir.strip()
+            if settings.embedding_model_revision.strip():
+                kwargs["revision"] = settings.embedding_model_revision.strip()
+            self.embedder = SentenceTransformer(settings.embedding_model, **kwargs)
+        elif source == "modelscope":
+            self.embedder = SentenceTransformer(
+                self._download_model_from_modelscope(),
+                device="cpu",
+            )
+        else:
+            raise ValueError(
+                f"Unsupported VANNA_EMBEDDING_MODEL_SOURCE={settings.embedding_model_source!r}, "
+                "expected 'huggingface' or 'modelscope'"
+            )
+
+    def _download_model_from_modelscope(self) -> str:
+        """从 ModelScope 下载模型到本地缓存，再交给 SentenceTransformer 加载。"""
+
+        try:
+            from modelscope import snapshot_download
+        except ModuleNotFoundError as exc:
+            raise RuntimeError(
+                "VANNA_EMBEDDING_MODEL_SOURCE=modelscope requires the 'modelscope' package"
+            ) from exc
+
+        model_id = settings.embedding_modelscope_model_id.strip() or settings.embedding_model
+        revision = settings.embedding_model_revision.strip() or None
+        cache_dir = settings.embedding_model_cache_dir.strip() or None
+        LOG.info(
+            "Downloading embedding model from ModelScope model_id=%s revision=%s cache_dir=%s",
+            model_id,
+            revision or "default",
+            cache_dir or "default",
+        )
+        local_path = snapshot_download(
+            model_id=model_id,
+            revision=revision,
+            cache_dir=cache_dir,
+        )
+        resolved = str(Path(local_path).resolve())
+        LOG.info("ModelScope embedding model downloaded to %s", resolved)
+        return resolved
 
     def _cache_key(self, server_code: str, db_name: str) -> str:
         """按数据源和数据库生成唯一缓存键。"""

@@ -18,8 +18,16 @@ class Settings:
     vanna_db_url: str = os.getenv("VANNA_DB_URL", "postgresql://jsw_vanna:change-me@jsw-db:5432/jsw_vanna_db")
     # 生成 SQL 使用的聊天模型名称。
     chat_model: str = os.getenv("VANNA_CHAT_MODEL", "gpt-5.4-mini")
+    # embedding 模型来源，默认从 Hugging Face 拉取，也可切到 ModelScope。
+    embedding_model_source: str = os.getenv("VANNA_EMBEDDING_MODEL_SOURCE", "huggingface")
     # 本地向量召回模型，用于从 schema/history 中找出与问题最相关的片段。
     embedding_model: str = os.getenv("VANNA_EMBEDDING_MODEL", "BAAI/bge-small-zh-v1.5")
+    # ModelScope 模型仓库 ID；未显式配置时回退到 embedding_model。
+    embedding_modelscope_model_id: str = os.getenv("VANNA_EMBEDDING_MODELSCOPE_MODEL_ID", "")
+    # 可选的模型版本号/分支名，Hugging Face 与 ModelScope 都可透传。
+    embedding_model_revision: str = os.getenv("VANNA_EMBEDDING_MODEL_REVISION", "")
+    # 可选模型缓存目录，便于挂载持久卷或预热缓存。
+    embedding_model_cache_dir: str = os.getenv("VANNA_EMBEDDING_MODEL_CACHE_DIR", "")
     # bge 系列中文检索模型推荐的查询前缀。
     embedding_query_prefix: str = os.getenv("VANNA_EMBEDDING_QUERY_PREFIX", "为这个句子生成表示以用于检索相关文章：")
     # 送入大模型前保留的上下文片段数量。

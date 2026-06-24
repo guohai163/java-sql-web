@@ -41,11 +41,31 @@ spec:
                 secretKeyRef:
                   name: jsw-app-secret
                   key: VANNA_CHAT_MODEL
+            - name: VANNA_EMBEDDING_MODEL_SOURCE
+              valueFrom:
+                secretKeyRef:
+                  name: jsw-app-secret
+                  key: VANNA_EMBEDDING_MODEL_SOURCE
             - name: VANNA_EMBEDDING_MODEL
               valueFrom:
                 secretKeyRef:
                   name: jsw-app-secret
                   key: VANNA_EMBEDDING_MODEL
+            - name: VANNA_EMBEDDING_MODELSCOPE_MODEL_ID
+              valueFrom:
+                secretKeyRef:
+                  name: jsw-app-secret
+                  key: VANNA_EMBEDDING_MODELSCOPE_MODEL_ID
+            - name: VANNA_EMBEDDING_MODEL_REVISION
+              valueFrom:
+                secretKeyRef:
+                  name: jsw-app-secret
+                  key: VANNA_EMBEDDING_MODEL_REVISION
+            - name: VANNA_EMBEDDING_MODEL_CACHE_DIR
+              valueFrom:
+                secretKeyRef:
+                  name: jsw-app-secret
+                  key: VANNA_EMBEDDING_MODEL_CACHE_DIR
             - name: VANNA_LLM_BASE_URL
               valueFrom:
                 secretKeyRef:
@@ -56,20 +76,29 @@ spec:
                 secretKeyRef:
                   name: jsw-app-secret
                   key: VANNA_LLM_API_KEY
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8003
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 36
           readinessProbe:
             httpGet:
               path: /health
               port: 8003
-            initialDelaySeconds: 10
+            initialDelaySeconds: 5
             periodSeconds: 10
             timeoutSeconds: 5
+            failureThreshold: 3
+            successThreshold: 1
           livenessProbe:
             httpGet:
               path: /health
               port: 8003
-            initialDelaySeconds: 20
             periodSeconds: 15
             timeoutSeconds: 5
+            failureThreshold: 3
           resources:
             requests:
               cpu: "100m"
