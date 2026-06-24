@@ -32,11 +32,15 @@ def init_db() -> None:
                     db_name varchar(128) NOT NULL,
                     schema_text text NOT NULL,
                     matched_tables text[] NOT NULL DEFAULT '{}',
+                    embedding_model_key varchar(512) NOT NULL DEFAULT '',
                     updated_at timestamp NOT NULL DEFAULT now()
                 )
                 """
             )
-            # 保存表、字段、历史 SQL 等可检索片段；embedding 字段保留给后续数据库侧向量召回。
+            cur.execute(
+                "ALTER TABLE vanna_context_cache ADD COLUMN IF NOT EXISTS embedding_model_key varchar(512) NOT NULL DEFAULT ''"
+            )
+            # 保存表、字段、历史 SQL 等可检索片段；旧 embedding 字段保留给兼容升级。
             cur.execute(
                 """
                 CREATE TABLE IF NOT EXISTS vanna_context_embedding (
@@ -46,10 +50,16 @@ def init_db() -> None:
                     chunk_key varchar(256) NOT NULL,
                     chunk_text text NOT NULL,
                     embedding vector(1536) NULL,
+                    embedding_values real[] NULL,
+                    embedding_dims integer NOT NULL DEFAULT 0,
                     updated_at timestamp NOT NULL DEFAULT now(),
                     CONSTRAINT uk_vanna_context_embedding UNIQUE (cache_key, chunk_type, chunk_key)
                 )
                 """
+            )
+            cur.execute("ALTER TABLE vanna_context_embedding ADD COLUMN IF NOT EXISTS embedding_values real[] NULL")
+            cur.execute(
+                "ALTER TABLE vanna_context_embedding ADD COLUMN IF NOT EXISTS embedding_dims integer NOT NULL DEFAULT 0"
             )
             # 记录每次生成结果、耗时和安全拦截状态，便于排查与审计。
             cur.execute(
