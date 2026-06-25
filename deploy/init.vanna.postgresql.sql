@@ -90,6 +90,28 @@ COMMENT ON COLUMN vanna_audit_log.response_status IS '生成状态';
 COMMENT ON COLUMN vanna_audit_log.cost_millis IS '耗时毫秒';
 COMMENT ON COLUMN vanna_audit_log.created_at IS '创建时间';
 
+CREATE TABLE IF NOT EXISTS vanna_context_job_state (
+  cache_key varchar(256) PRIMARY KEY,
+  server_code varchar(64) NOT NULL,
+  db_name varchar(128) NOT NULL,
+  last_context_version varchar(256) NULL,
+  last_warmup_status varchar(32) NOT NULL DEFAULT 'PENDING',
+  last_warmup_started_at timestamp NULL,
+  last_warmup_finished_at timestamp NULL,
+  last_error_message text NULL,
+  next_retry_at timestamp NULL
+);
+COMMENT ON TABLE vanna_context_job_state IS 'Vanna 预热任务状态表';
+COMMENT ON COLUMN vanna_context_job_state.cache_key IS 'server/db 维度缓存键';
+COMMENT ON COLUMN vanna_context_job_state.server_code IS '目标服务器编号';
+COMMENT ON COLUMN vanna_context_job_state.db_name IS '目标数据库名';
+COMMENT ON COLUMN vanna_context_job_state.last_context_version IS '最近一次预热成功的上下文版本';
+COMMENT ON COLUMN vanna_context_job_state.last_warmup_status IS '最近一次预热状态';
+COMMENT ON COLUMN vanna_context_job_state.last_warmup_started_at IS '最近一次预热开始时间';
+COMMENT ON COLUMN vanna_context_job_state.last_warmup_finished_at IS '最近一次预热完成时间';
+COMMENT ON COLUMN vanna_context_job_state.last_error_message IS '最近一次失败原因';
+COMMENT ON COLUMN vanna_context_job_state.next_retry_at IS '下次允许重试时间';
+
 ALTER DATABASE jsw_vanna_db OWNER TO jsw_vanna;
 GRANT ALL PRIVILEGES ON DATABASE jsw_vanna_db TO jsw_vanna;
 GRANT USAGE, CREATE ON SCHEMA public TO jsw_vanna;

@@ -557,28 +557,58 @@ public class BaseDataServiceImpl implements BaseDataService{
         if (permissionCheck != null) {
             return new Result<>(permissionCheck.getStatus(), permissionCheck.getMessage(), null);
         }
+        return buildVannaContext(serverCode, dbName);
+    }
+
+    @Override
+    public Result<List<VannaServerWarmupItem>> getVannaWarmupServers() {
+        List<ConnectConfigBean> connectConfigs = DbServerTypeUtils.normalize(baseConfigDao.getAllConnectConfig());
+        List<VannaServerWarmupItem> items = new ArrayList<>();
+        for (ConnectConfigBean connectConfig : connectConfigs) {
+            items.add(new VannaServerWarmupItem(
+                    connectConfig.getCode(),
+                    connectConfig.getDbServerName(),
+                    connectConfig.getDbServerType()
+            ));
+        }
+        return new Result<>(true, "success", items);
+    }
+
+    @Override
+    public Result<List<DatabaseNameBean>> getVannaWarmupDatabases(Integer serverCode) {
+        return executeServerOperation(serverCode, DbOperation::getDbList);
+    }
+
+    @Override
+    public Result<VannaContextResponse> getVannaWarmupContext(Integer serverCode, String dbName) {
+        return buildVannaContext(serverCode, dbName);
+    }
+
+    private Result<VannaContextResponse> buildVannaContext(Integer serverCode, String dbName) {
         if (dbName == null || dbName.trim().isEmpty()) {
             return new Result<>(false, "请选择数据库", null);
         }
-
-        Result<ConnectConfigBean> serverInfoResult = getServerInfo(serverCode, user);
-        if (!serverInfoResult.getStatus() || serverInfoResult.getData() == null) {
-            return new Result<>(false, serverInfoResult.getMessage(), null);
+        ConnectConfigBean serverInfo = DbServerTypeUtils.normalize(baseConfigDao.getConnectConfig(serverCode));
+        if (serverInfo == null) {
+            return new Result<>(false, "没有找到对应的数据库", null);
         }
 
-        Result<List<TablesNameBean>> tableResult = getTableList(serverCode, dbName, user);
+        Result<List<TablesNameBean>> tableResult = executeServerOperation(serverCode, operation -> operation.getTableList(dbName));
         if (!tableResult.getStatus() || tableResult.getData() == null) {
             return new Result<>(false, tableResult.getMessage(), null);
         }
 
-        Result<List<ViewNameBean>> viewResult = getViewList(serverCode, dbName, user);
+        Result<List<ViewNameBean>> viewResult = executeServerOperation(serverCode, operation -> operation.getViewsList(dbName));
         List<ViewNameBean> views = viewResult.getStatus() && viewResult.getData() != null
                 ? viewResult.getData()
                 : List.of();
 
         List<VannaColumnContext> columns = new ArrayList<>();
         for (TablesNameBean table : tableResult.getData()) {
-            Result<List<ColumnsNameBean>> columnResult = getColumnList(serverCode, dbName, table.getTableName(), user);
+            Result<List<ColumnsNameBean>> columnResult = executeServerOperation(
+                    serverCode,
+                    operation -> operation.getColumnsList(dbName, table.getTableName())
+            );
             if (!columnResult.getStatus() || columnResult.getData() == null) {
                 continue;
             }
@@ -597,7 +627,7 @@ public class BaseDataServiceImpl implements BaseDataService{
         List<VannaHistoryExample> historyExamples = buildVannaHistoryExamples(
                 serverCode,
                 dbName,
-                serverInfoResult.getData().getDbServerType()
+                serverInfo.getDbServerType()
         );
 
         String contextVersion = String.format(
@@ -613,9 +643,9 @@ public class BaseDataServiceImpl implements BaseDataService{
         );
 
         VannaContextResponse response = new VannaContextResponse();
-        response.setServerType(serverInfoResult.getData().getDbServerType());
-        response.setDialect(DbServerTypeUtils.displayName(serverInfoResult.getData().getDbServerType()));
-        response.setServerName(serverInfoResult.getData().getDbServerName());
+        response.setServerType(serverInfo.getDbServerType());
+        response.setDialect(DbServerTypeUtils.displayName(serverInfo.getDbServerType()));
+        response.setServerName(serverInfo.getDbServerName());
         response.setDbName(dbName);
         response.setContextVersion(contextVersion);
         response.setTables(tableResult.getData());

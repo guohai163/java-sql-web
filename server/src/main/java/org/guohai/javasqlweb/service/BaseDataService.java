@@ -186,5 +186,26 @@ public interface BaseDataService {
      */
     Result<VannaContextResponse> getVannaContext(Integer serverCode, String dbName, UserBean user);
 
+    /**
+     * 获取供 Vanna 后台预热使用的所有服务器枚举。
+     * @return 服务器列表
+     */
+    Result<List<VannaServerWarmupItem>> getVannaWarmupServers();
+
+    /**
+     * 获取供 Vanna 后台预热使用的指定服务器数据库列表。
+     * @param serverCode 服务器编号
+     * @return 数据库列表
+     */
+    Result<List<DatabaseNameBean>> getVannaWarmupDatabases(Integer serverCode);
+
+    /**
+     * 获取供 Vanna 后台预热使用的全量上下文，不依赖具体用户登录态。
+     * @param serverCode 服务器编号
+     * @param dbName 数据库名
+     * @return Vanna 上下文
+     */
+    Result<VannaContextResponse> getVannaWarmupContext(Integer serverCode, String dbName);
+
 
 }

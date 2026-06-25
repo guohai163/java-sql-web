@@ -1,4 +1,6 @@
 import logging
+import asyncio
+from datetime import datetime, date
 
 from fastapi import FastAPI, Header, HTTPException
 
@@ -18,6 +20,35 @@ LOG = logging.getLogger(__name__)
 app = FastAPI(title="JavaSqlWeb Vanna Service", version="0.1.0")
 jsw_client = JswServerClient()
 vanna_service = VannaService()
+last_nightly_run_date: date | None = None
+
+
+async def _startup_warmup_task() -> None:
+    """启动后后台执行一次全量预热，不阻塞健康检查。"""
+
+    await asyncio.sleep(1)
+    try:
+        await vanna_service.warmup_all_contexts(jsw_client)
+    except Exception as exception:
+        LOG.exception("Startup warmup failed: %s", exception)
+
+
+async def _nightly_scheduler_task() -> None:
+    """常驻夜间调度器，每分钟检查一次是否需要触发增量重跑。"""
+
+    global last_nightly_run_date
+    while True:
+        await asyncio.sleep(60)
+        now = datetime.now()
+        if last_nightly_run_date == now.date():
+            continue
+        try:
+            triggered = await vanna_service.run_nightly_warmup_if_due(jsw_client, now)
+            if triggered:
+                last_nightly_run_date = now.date()
+                LOG.info("Nightly warmup finished for date=%s", last_nightly_run_date)
+        except Exception as exception:
+            LOG.exception("Nightly warmup failed: %s", exception)
 
 
 @app.on_event("startup")
@@ -33,6 +64,10 @@ async def startup() -> None:
     )
     init_db()
     LOG.info("Vanna startup completed version=%s", settings.version)
+    if settings.warmup_enabled and settings.warmup_on_startup:
+        asyncio.create_task(_startup_warmup_task())
+    if settings.warmup_enabled:
+        asyncio.create_task(_nightly_scheduler_task())
 
 
 @app.get("/health")

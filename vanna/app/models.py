@@ -88,3 +88,17 @@ class VannaContext(BaseModel):
     columns: List[VannaColumn]
     views: List[VannaView] = []
     historyExamples: List[VannaHistoryExample] = []
+
+
+class VannaServerWarmupItem(BaseModel):
+    """供后台预热任务枚举的服务器信息。"""
+
+    serverCode: int
+    serverName: str
+    serverType: str
+
+
+class DatabaseNameBean(BaseModel):
+    """JavaSqlWeb 返回的数据库名列表项。"""
+
+    dbName: str
