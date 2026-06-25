@@ -9,20 +9,18 @@ from .config import settings
 
 @contextmanager
 def get_conn() -> Iterator[psycopg.Connection]:
-    """创建一个短生命周期 PostgreSQL 连接，供缓存和审计写入使用。"""
+    """创建一个短生命周期 PostgreSQL 连接，供缓存、预热状态和审计写入使用。"""
 
     with psycopg.connect(settings.vanna_db_url) as conn:
         yield conn
 
 
 def init_db() -> None:
-    """初始化 Vanna 运行所需的数据表和 pgvector 扩展。"""
+    """初始化 Vanna 运行所需的数据表，并兼容补齐旧环境缺失字段。"""
 
     with get_conn() as conn:
         with conn.cursor() as cur:
-            # pgvector 预留给上下文向量持久化使用；当前召回仍在内存中完成。
             cur.execute("CREATE EXTENSION IF NOT EXISTS vector")
-            # 缓存 JavaSqlWeb 返回的完整 schema 文本，避免上下文版本未变时重复整理。
             cur.execute(
                 """
                 CREATE TABLE IF NOT EXISTS vanna_context_cache (
@@ -97,6 +95,13 @@ def init_db() -> None:
                 )
                 """
             )
+            cur.execute(
+                "ALTER TABLE vanna_context_cache ADD COLUMN IF NOT EXISTS embedding_model_key varchar(512) NOT NULL DEFAULT ''"
+            )
+            cur.execute("ALTER TABLE vanna_context_embedding ADD COLUMN IF NOT EXISTS embedding_values real[] NULL")
+            cur.execute(
+                "ALTER TABLE vanna_context_embedding ADD COLUMN IF NOT EXISTS embedding_dims integer NOT NULL DEFAULT 0"
+            )
         conn.commit()
 
 
@@ -150,50 +155,147 @@ def upsert_job_state(
         conn.commit()
 
 
-def fetch_cached_embeddings(cache_key: str) -> list[tuple[str, list[float]]]:
-    """读取某个库已经落盘的 chunk embedding。"""
+def load_cache_state(cache_key: str) -> tuple[str, str] | None:
+    """读取当前 cache 的上下文版本与 embedding 模型标识。"""
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT context_version, COALESCE(embedding_model_key, '') FROM vanna_context_cache WHERE cache_key = %s",
+                (cache_key,),
+            )
+            row = cur.fetchone()
+    if row is None:
+        return None
+    return str(row[0]), str(row[1] or "")
+
+
+def persist_context_cache(
+    cache_key: str,
+    context_version: str,
+    dialect: str,
+    server_name: str,
+    db_name: str,
+    schema_text: str,
+    matched_tables: list[str],
+    embedding_model_key: str,
+) -> None:
+    """持久化完整 schema 文本与当前向量模型标识。"""
 
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT chunk_text, embedding::text
-                FROM vanna_context_embedding
-                WHERE cache_key = %s AND embedding IS NOT NULL
-                ORDER BY id ASC
+                INSERT INTO vanna_context_cache (
+                    cache_key, context_version, dialect, server_name, db_name,
+                    schema_text, matched_tables, embedding_model_key, updated_at
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, now())
+                ON CONFLICT (cache_key) DO UPDATE SET
+                    context_version = excluded.context_version,
+                    dialect = excluded.dialect,
+                    server_name = excluded.server_name,
+                    db_name = excluded.db_name,
+                    schema_text = excluded.schema_text,
+                    matched_tables = excluded.matched_tables,
+                    embedding_model_key = excluded.embedding_model_key,
+                    updated_at = now()
                 """,
-                (cache_key,),
+                (
+                    cache_key,
+                    context_version,
+                    dialect,
+                    server_name,
+                    db_name,
+                    schema_text,
+                    matched_tables,
+                    embedding_model_key,
+                ),
             )
-            rows = cur.fetchall()
-    result: list[tuple[str, list[float]]] = []
-    for chunk_text, embedding_text in rows:
-        values = embedding_text.strip("[]")
-        vector = [float(item) for item in values.split(",")] if values else []
-        result.append((chunk_text, vector))
-    return result
+        conn.commit()
 
 
-def save_chunk_embeddings(cache_key: str, chunks: list[tuple[str, str, str]], vectors: list[list[float]]) -> None:
-    """把预计算好的 chunk embeddings 批量写入数据库。"""
+def replace_chunk_embeddings(
+    cache_key: str,
+    chunks: list[tuple[str, str, str]],
+    vectors: list[list[float]],
+) -> None:
+    """原子替换某个库的全部 chunk 向量缓存。"""
 
     with get_conn() as conn:
         with conn.cursor() as cur:
+            cur.execute("DELETE FROM vanna_context_embedding WHERE cache_key = %s", (cache_key,))
             for (chunk_type, chunk_key, chunk_text), vector in zip(chunks, vectors):
                 cur.execute(
                     """
-                    INSERT INTO vanna_context_embedding (cache_key, chunk_type, chunk_key, chunk_text, embedding, updated_at)
-                    VALUES (%s, %s, %s, %s, %s::vector, now())
-                    ON CONFLICT (cache_key, chunk_type, chunk_key) DO UPDATE SET
-                        chunk_text = excluded.chunk_text,
-                        embedding = excluded.embedding,
-                        updated_at = now()
+                    INSERT INTO vanna_context_embedding (
+                        cache_key, chunk_type, chunk_key, chunk_text,
+                        embedding_values, embedding_dims, updated_at
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, now())
                     """,
                     (
                         cache_key,
                         chunk_type,
                         chunk_key,
                         chunk_text,
-                        "[" + ",".join(f"{value:.8f}" for value in vector) + "]",
+                        vector,
+                        len(vector),
                     ),
                 )
         conn.commit()
+
+
+def has_complete_embeddings(cache_key: str, expected_count: int) -> bool:
+    """检查当前 cache 下是否存在完整、可复用的 chunk 向量。"""
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                    COUNT(*),
+                    COALESCE(
+                        SUM(
+                            CASE
+                                WHEN embedding_values IS NULL
+                                    OR embedding_dims <= 0
+                                    OR COALESCE(cardinality(embedding_values), 0) = 0
+                                    OR COALESCE(cardinality(embedding_values), 0) <> embedding_dims
+                                THEN 1
+                                ELSE 0
+                            END
+                        ),
+                        0
+                    )
+                FROM vanna_context_embedding
+                WHERE cache_key = %s
+                """,
+                (cache_key,),
+            )
+            row = cur.fetchone()
+    total = int((row or (0, 0))[0] or 0)
+    invalid = int((row or (0, 0))[1] or 0)
+    return total == expected_count and invalid == 0
+
+
+def load_chunk_embeddings(cache_key: str) -> list[tuple[str, list[float], int]]:
+    """读取某个库全部已持久化 chunk 文本和向量。"""
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT chunk_text, embedding_values, embedding_dims
+                FROM vanna_context_embedding
+                WHERE cache_key = %s
+                ORDER BY id ASC
+                """,
+                (cache_key,),
+            )
+            rows = cur.fetchall() or []
+    result: list[tuple[str, list[float], int]] = []
+    for chunk_text, embedding_values, embedding_dims in rows:
+        vector = [float(value) for value in list(embedding_values or [])]
+        result.append((str(chunk_text), vector, int(embedding_dims or 0)))
+    return result
