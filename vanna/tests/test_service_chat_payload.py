@@ -53,7 +53,7 @@ except ModuleNotFoundError:
     )
 
 from app.service import VannaService  # noqa: E402
-from app.models import VannaContext, VannaTable, VannaColumn  # noqa: E402
+from app.models import DatabaseNameBean, VannaContext, VannaServerWarmupItem, VannaTable, VannaColumn  # noqa: E402
 
 
 def _service() -> VannaService:
@@ -282,3 +282,82 @@ def test_generate_sql_rejects_non_read_only_sql():
     assert response.needsClarification is True
     assert response.sql is None
     assert "只允许生成只读 SQL" in response.warnings
+
+
+def test_extract_chat_content_accepts_output_shape():
+    service = _service()
+    content = service._extract_chat_content(
+        {
+            "output": [
+                {
+                    "content": [
+                        {
+                            "text": "{\"sql\": \"select 1\"}"
+                        }
+                    ]
+                }
+            ]
+        }
+    )
+
+    assert content == "{\"sql\": \"select 1\"}"
+
+
+def test_generate_sql_returns_warmup_hint_when_cached_embeddings_missing():
+    async def run():
+        service = _service()
+        service.ensure_context = lambda *args, **kwargs: None
+        service._retrieve_relevant_chunks = lambda *args, **kwargs: []
+        service._save_audit = lambda *args, **kwargs: None
+        return await service.generate_sql("1", "demo", "list users", _context())
+
+    response = asyncio.run(run())
+
+    assert response.needsClarification is True
+    assert response.sql is None
+    assert response.clarificationQuestion == "系统正在预热该库，请稍后重试。"
+
+
+def test_run_nightly_warmup_if_due_only_triggers_at_target_hour():
+    async def run():
+        service = _service()
+        called = {"value": False}
+
+        async def warmup_all_contexts(_):
+            called["value"] = True
+
+        service.warmup_all_contexts = warmup_all_contexts
+
+        from datetime import datetime
+
+        triggered = await service.run_nightly_warmup_if_due(SimpleNamespace(), datetime(2026, 6, 25, 1, 0, 0))
+        assert triggered is True
+        assert called["value"] is True
+
+        called["value"] = False
+        triggered = await service.run_nightly_warmup_if_due(SimpleNamespace(), datetime(2026, 6, 25, 2, 0, 0))
+        assert triggered is False
+        assert called["value"] is False
+
+    asyncio.run(run())
+
+
+def test_warmup_all_contexts_walks_servers_and_databases():
+    async def run():
+        service = _service()
+        warmed = []
+
+        async def warmup_single_database(_, server, database):
+            warmed.append((server.serverCode, database.dbName))
+
+        service._warmup_single_database = warmup_single_database
+
+        jsw_client = SimpleNamespace(
+            get_warmup_servers=lambda: asyncio.sleep(0, result=[VannaServerWarmupItem(serverCode=1, serverName="s1", serverType="postgresql")]),
+            get_warmup_databases=lambda server_code: asyncio.sleep(0, result=[DatabaseNameBean(dbName="db1"), DatabaseNameBean(dbName="db2")]),
+        )
+
+        await service.warmup_all_contexts(jsw_client)
+        assert warmed == [(1, "db1"), (1, "db2")]
+
+    asyncio.run(run())

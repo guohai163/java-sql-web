@@ -1,4 +1,5 @@
 from contextlib import contextmanager
+from datetime import datetime, timedelta
 from typing import Iterator
 
 import psycopg
@@ -71,4 +72,118 @@ def init_db() -> None:
                 )
                 """
             )
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS vanna_context_job_state (
+                    cache_key varchar(256) PRIMARY KEY,
+                    server_code varchar(64) NOT NULL,
+                    db_name varchar(128) NOT NULL,
+                    last_context_version varchar(256) NULL,
+                    last_warmup_status varchar(32) NOT NULL DEFAULT 'PENDING',
+                    last_warmup_started_at timestamp NULL,
+                    last_warmup_finished_at timestamp NULL,
+                    last_error_message text NULL,
+                    next_retry_at timestamp NULL
+                )
+                """
+            )
+        conn.commit()
+
+
+def upsert_job_state(
+    cache_key: str,
+    server_code: str,
+    db_name: str,
+    context_version: str | None,
+    status: str,
+    error_message: str | None = None,
+    next_retry_minutes: int | None = None,
+) -> None:
+    """记录某个库的预热状态，便于重启后继续调度与失败重试。"""
+
+    next_retry_at = (
+        datetime.now() + timedelta(minutes=next_retry_minutes)
+        if next_retry_minutes and next_retry_minutes > 0
+        else None
+    )
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO vanna_context_job_state (
+                    cache_key, server_code, db_name, last_context_version, last_warmup_status,
+                    last_warmup_started_at, last_warmup_finished_at, last_error_message, next_retry_at
+                )
+                VALUES (%s, %s, %s, %s, %s, now(), CASE WHEN %s = 'SUCCESS' THEN now() ELSE NULL END, %s, %s)
+                ON CONFLICT (cache_key) DO UPDATE SET
+                    last_context_version = excluded.last_context_version,
+                    last_warmup_status = excluded.last_warmup_status,
+                    last_warmup_started_at = excluded.last_warmup_started_at,
+                    last_warmup_finished_at = CASE
+                        WHEN excluded.last_warmup_status = 'SUCCESS' THEN now()
+                        ELSE vanna_context_job_state.last_warmup_finished_at
+                    END,
+                    last_error_message = excluded.last_error_message,
+                    next_retry_at = excluded.next_retry_at
+                """,
+                (
+                    cache_key,
+                    server_code,
+                    db_name,
+                    context_version,
+                    status,
+                    status,
+                    error_message,
+                    next_retry_at,
+                ),
+            )
+        conn.commit()
+
+
+def fetch_cached_embeddings(cache_key: str) -> list[tuple[str, list[float]]]:
+    """读取某个库已经落盘的 chunk embedding。"""
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT chunk_text, embedding::text
+                FROM vanna_context_embedding
+                WHERE cache_key = %s AND embedding IS NOT NULL
+                ORDER BY id ASC
+                """,
+                (cache_key,),
+            )
+            rows = cur.fetchall()
+    result: list[tuple[str, list[float]]] = []
+    for chunk_text, embedding_text in rows:
+        values = embedding_text.strip("[]")
+        vector = [float(item) for item in values.split(",")] if values else []
+        result.append((chunk_text, vector))
+    return result
+
+
+def save_chunk_embeddings(cache_key: str, chunks: list[tuple[str, str, str]], vectors: list[list[float]]) -> None:
+    """把预计算好的 chunk embeddings 批量写入数据库。"""
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            for (chunk_type, chunk_key, chunk_text), vector in zip(chunks, vectors):
+                cur.execute(
+                    """
+                    INSERT INTO vanna_context_embedding (cache_key, chunk_type, chunk_key, chunk_text, embedding, updated_at)
+                    VALUES (%s, %s, %s, %s, %s::vector, now())
+                    ON CONFLICT (cache_key, chunk_type, chunk_key) DO UPDATE SET
+                        chunk_text = excluded.chunk_text,
+                        embedding = excluded.embedding,
+                        updated_at = now()
+                    """,
+                    (
+                        cache_key,
+                        chunk_type,
+                        chunk_key,
+                        chunk_text,
+                        "[" + ",".join(f"{value:.8f}" for value in vector) + "]",
+                    ),
+                )
         conn.commit()

@@ -40,6 +40,16 @@ class Settings:
     context_timeout_seconds: float = float(os.getenv("VANNA_CONTEXT_TIMEOUT_SECONDS", "15"))
     # 调用大模型生成 SQL 的超时时间。
     generation_timeout_seconds: float = float(os.getenv("VANNA_GENERATION_TIMEOUT_SECONDS", "60"))
+    # 是否开启后台预热能力。
+    warmup_enabled: bool = os.getenv("VANNA_WARMUP_ENABLED", "true").strip().lower() == "true"
+    # 服务启动后是否立即在后台开始预热。
+    warmup_on_startup: bool = os.getenv("VANNA_WARMUP_ON_STARTUP", "true").strip().lower() == "true"
+    # 预热最大并发度，当前默认按 1 串行执行，避免压垮单实例。
+    warmup_max_concurrency: int = int(os.getenv("VANNA_WARMUP_MAX_CONCURRENCY", "1"))
+    # 夜间重跑开始小时，默认凌晨 1 点。
+    warmup_nightly_hour: int = int(os.getenv("VANNA_WARMUP_NIGHTLY_HOUR", "1"))
+    # 预热失败后下次允许重试的分钟数。
+    warmup_retry_minutes: int = int(os.getenv("VANNA_WARMUP_RETRY_MINUTES", "30"))
 
 
 settings = Settings()

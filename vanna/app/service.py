@@ -1,6 +1,8 @@
 import json
 import logging
+import math
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -8,8 +10,8 @@ from openai import AsyncOpenAI
 from sentence_transformers import SentenceTransformer
 
 from .config import settings
-from .db import get_conn
-from .models import GenerateSqlResponse, VannaContext
+from .db import fetch_cached_embeddings, get_conn, save_chunk_embeddings, upsert_job_state
+from .models import DatabaseNameBean, GenerateSqlResponse, VannaContext, VannaServerWarmupItem
 from .prompting import SYSTEM_PROMPT, build_schema_text, build_user_prompt
 
 LOG = logging.getLogger(__name__)
@@ -155,6 +157,15 @@ class VannaService:
                     )
             conn.commit()
 
+    def _encode_chunk_vectors(self, chunks: list[tuple[str, str, str]]) -> list[list[float]]:
+        """对 chunk 文本做 embedding，供启动预热和夜间重建复用。"""
+
+        if not chunks:
+            return []
+        texts = [chunk_text for _, _, chunk_text in chunks]
+        vectors = self.embedder.encode(texts, normalize_embeddings=True)
+        return [vector.tolist() if hasattr(vector, "tolist") else list(vector) for vector in vectors]
+
     def ensure_context(self, server_code: str, db_name: str, context: VannaContext) -> None:
         """确保本地缓存与 JavaSqlWeb 返回的上下文版本一致。"""
 
@@ -165,22 +176,115 @@ class VannaService:
                 row = cur.fetchone()
         if row is None or row[0] != context.contextVersion:
             self._persist_context(cache_key, context)
+            chunks = self._build_chunks(context)
+            vectors = self._encode_chunk_vectors(chunks)
+            save_chunk_embeddings(cache_key, chunks, vectors)
+            upsert_job_state(
+                cache_key=cache_key,
+                server_code=server_code,
+                db_name=db_name,
+                context_version=context.contextVersion,
+                status="SUCCESS",
+            )
 
-    def _retrieve_relevant_chunks(self, context: VannaContext, question: str) -> list[str]:
+    def _retrieve_relevant_chunks(self, cache_key: str, question: str) -> list[str]:
         """用本地向量模型从 schema、字段和历史 SQL 中召回高相关片段。"""
 
-        chunks = [chunk_text for _, _, chunk_text in self._build_chunks(context)]
-        if not chunks:
+        cached_embeddings = fetch_cached_embeddings(cache_key)
+        if not cached_embeddings:
             return []
         query_text = f"{settings.embedding_query_prefix}{question}".strip()
         query_vector = self.embedder.encode([query_text], normalize_embeddings=True)[0]
-        chunk_vectors = self.embedder.encode(chunks, normalize_embeddings=True)
         ranked: list[tuple[float, str]] = []
-        for vector, chunk in zip(chunk_vectors, chunks):
-            # 向量已归一化，点积即可表示余弦相似度。
-            ranked.append((float((query_vector * vector).sum()), chunk))
+        for chunk, vector in cached_embeddings:
+            if not vector:
+                continue
+            # 向量已归一化，点积即可表示余弦相似度；兼容 list / numpy array 两种形态。
+            if hasattr(query_vector, "dot"):
+                score = float(query_vector.dot(vector))
+            else:
+                score = float(sum(float(left) * float(right) for left, right in zip(query_vector, vector)))
+            if math.isnan(score):
+                continue
+            ranked.append((score, chunk))
         ranked.sort(key=lambda item: item[0], reverse=True)
         return [chunk for _, chunk in ranked[: settings.embedding_top_k]]
+
+    async def warmup_all_contexts(self, jsw_client) -> None:
+        """全量枚举 server/db 并顺序预热，避免用户首次命中时同步承担全量 embedding 开销。"""
+
+        if not settings.warmup_enabled:
+            LOG.info("Warmup skipped because VANNA_WARMUP_ENABLED is false")
+            return
+        servers = await jsw_client.get_warmup_servers()
+        LOG.info("Warmup started for %d servers", len(servers))
+        for server in servers:
+            try:
+                databases = await jsw_client.get_warmup_databases(server.serverCode)
+            except Exception as exception:
+                LOG.warning("Warmup failed to enumerate databases for server=%s error=%s", server.serverCode, exception)
+                continue
+            for database in databases:
+                await self._warmup_single_database(jsw_client, server, database)
+        LOG.info("Warmup finished")
+
+    async def _warmup_single_database(
+        self,
+        jsw_client,
+        server: VannaServerWarmupItem,
+        database: DatabaseNameBean,
+    ) -> None:
+        """预热单个库并记录成功/失败状态。"""
+
+        cache_key = self._cache_key(str(server.serverCode), database.dbName)
+        try:
+            context = await jsw_client.get_warmup_context(server.serverCode, database.dbName)
+            self.ensure_context(str(server.serverCode), database.dbName, context)
+        except Exception as exception:
+            upsert_job_state(
+                cache_key=cache_key,
+                server_code=str(server.serverCode),
+                db_name=database.dbName,
+                context_version=None,
+                status="FAILED",
+                error_message=str(exception),
+                next_retry_minutes=settings.warmup_retry_minutes,
+            )
+            LOG.warning(
+                "Warmup failed for server=%s db=%s error=%s",
+                server.serverCode,
+                database.dbName,
+                exception,
+            )
+
+    async def run_nightly_warmup_if_due(self, jsw_client, current_time: datetime) -> bool:
+        """到达夜间窗口时触发一次全量增量预热。"""
+
+        if not settings.warmup_enabled:
+            return False
+        if current_time.hour != settings.warmup_nightly_hour or current_time.minute != 0:
+            return False
+        await self.warmup_all_contexts(jsw_client)
+        return True
+
+    async def ensure_context_warm_async(self, jsw_client, server_code: str, db_name: str) -> None:
+        """在用户首个请求未命中缓存时，异步触发一次低优先级补偿预热。"""
+
+        try:
+            context = await jsw_client.get_warmup_context(int(server_code), db_name)
+            self.ensure_context(server_code, db_name, context)
+        except Exception as exception:
+            cache_key = self._cache_key(server_code, db_name)
+            upsert_job_state(
+                cache_key=cache_key,
+                server_code=server_code,
+                db_name=db_name,
+                context_version=None,
+                status="FAILED",
+                error_message=str(exception),
+                next_retry_minutes=settings.warmup_retry_minutes,
+            )
+            LOG.warning("Deferred warmup failed for server=%s db=%s error=%s", server_code, db_name, exception)
 
     def _extract_chat_content(self, response: Any) -> str:
         """兼容不同 OpenAI SDK/代理返回形态，抽取最终 message.content。"""
@@ -477,8 +581,20 @@ class VannaService:
         """根据用户问题和受权限控制的上下文生成只读 SQL。"""
 
         started_at = time.time()
+        cache_key = self._cache_key(server_code, db_name)
         self.ensure_context(server_code, db_name, context)
-        relevant_chunks = self._retrieve_relevant_chunks(context, question)
+        relevant_chunks = self._retrieve_relevant_chunks(cache_key, question)
+        if not relevant_chunks:
+            LOG.info("No cached embeddings found for cache_key=%s, returning warmup hint", cache_key)
+            return GenerateSqlResponse(
+                needsClarification=True,
+                clarificationQuestion="系统正在预热该库，请稍后重试。",
+                sql=None,
+                dialect=context.dialect,
+                summary="当前库的向量缓存尚未完成，未生成 SQL",
+                matchedTables=[],
+                warnings=["该库尚未完成预热，已跳过同步全量 chunk embedding"],
+            )
         # response_format 要求模型尽量返回 JSON，后续仍会做兼容解析和安全校验。
         request_payload = {
             "model": settings.chat_model,

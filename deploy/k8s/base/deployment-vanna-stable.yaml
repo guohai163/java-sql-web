@@ -66,31 +66,6 @@ spec:
                 secretKeyRef:
                   name: jsw-app-secret
                   key: VANNA_EMBEDDING_MODEL_CACHE_DIR
-            - name: VANNA_WARMUP_ENABLED
-              valueFrom:
-                secretKeyRef:
-                  name: jsw-app-secret
-                  key: VANNA_WARMUP_ENABLED
-            - name: VANNA_WARMUP_ON_STARTUP
-              valueFrom:
-                secretKeyRef:
-                  name: jsw-app-secret
-                  key: VANNA_WARMUP_ON_STARTUP
-            - name: VANNA_WARMUP_MAX_CONCURRENCY
-              valueFrom:
-                secretKeyRef:
-                  name: jsw-app-secret
-                  key: VANNA_WARMUP_MAX_CONCURRENCY
-            - name: VANNA_WARMUP_NIGHTLY_HOUR
-              valueFrom:
-                secretKeyRef:
-                  name: jsw-app-secret
-                  key: VANNA_WARMUP_NIGHTLY_HOUR
-            - name: VANNA_WARMUP_RETRY_MINUTES
-              valueFrom:
-                secretKeyRef:
-                  name: jsw-app-secret
-                  key: VANNA_WARMUP_RETRY_MINUTES
             - name: VANNA_LLM_BASE_URL
               valueFrom:
                 secretKeyRef:
@@ -107,27 +82,28 @@ spec:
               port: 8003
             periodSeconds: 10
             timeoutSeconds: 5
-            failureThreshold: 36
+            failureThreshold: 60
           readinessProbe:
             httpGet:
               path: /health
               port: 8003
-            initialDelaySeconds: 5
-            periodSeconds: 10
-            timeoutSeconds: 5
-            failureThreshold: 3
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            timeoutSeconds: 10
+            failureThreshold: 6
             successThreshold: 1
           livenessProbe:
             httpGet:
               path: /health
               port: 8003
-            periodSeconds: 15
-            timeoutSeconds: 5
-            failureThreshold: 3
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 10
           resources:
             requests:
-              cpu: "100m"
-              memory: "256Mi"
-            limits:
-              cpu: "500m"
+              cpu: "1"
               memory: "1Gi"
+            limits:
+              cpu: "2"
+              memory: "2Gi"
