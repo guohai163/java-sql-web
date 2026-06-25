@@ -1,6 +1,5 @@
 import json
 import logging
-import math
 import time
 from datetime import datetime
 from pathlib import Path
@@ -10,7 +9,14 @@ from openai import AsyncOpenAI
 from sentence_transformers import SentenceTransformer
 
 from .config import settings
-from .db import fetch_cached_embeddings, get_conn, save_chunk_embeddings, upsert_job_state
+from .db import (
+    has_complete_embeddings,
+    load_cache_state,
+    load_chunk_embeddings,
+    persist_context_cache,
+    replace_chunk_embeddings,
+    upsert_job_state,
+)
 from .models import DatabaseNameBean, GenerateSqlResponse, VannaContext, VannaServerWarmupItem
 from .prompting import SYSTEM_PROMPT, build_schema_text, build_user_prompt
 
@@ -20,11 +26,9 @@ MISSING_SQL_WARNING = "模型返回 JSON 中缺少有效 SQL"
 
 
 class VannaService:
-    """负责上下文缓存、相关片段召回、LLM 生成和审计落库的应用服务。"""
+    """负责上下文缓存、后台预热、向量召回、LLM 生成和审计落库的应用服务。"""
 
     def __init__(self) -> None:
-        """初始化 OpenAI 兼容客户端和本地中文向量模型。"""
-
         self.client = AsyncOpenAI(
             api_key=settings.llm_api_key,
             base_url=settings.llm_base_url,
@@ -39,10 +43,7 @@ class VannaService:
                 kwargs["revision"] = settings.embedding_model_revision.strip()
             self.embedder = SentenceTransformer(settings.embedding_model, **kwargs)
         elif source == "modelscope":
-            self.embedder = SentenceTransformer(
-                self._download_model_from_modelscope(),
-                device="cpu",
-            )
+            self.embedder = SentenceTransformer(self._download_model_from_modelscope(), device="cpu")
         else:
             raise ValueError(
                 f"Unsupported VANNA_EMBEDDING_MODEL_SOURCE={settings.embedding_model_source!r}, "
@@ -50,7 +51,7 @@ class VannaService:
             )
 
     def _download_model_from_modelscope(self) -> str:
-        """从 ModelScope 下载模型到本地缓存，再交给 SentenceTransformer 加载。"""
+        """从 ModelScope 下载 embedding 模型到本地缓存目录。"""
 
         try:
             from modelscope import snapshot_download
@@ -68,29 +69,27 @@ class VannaService:
             revision or "default",
             cache_dir or "default",
         )
-        local_path = snapshot_download(
-            model_id=model_id,
-            revision=revision,
-            cache_dir=cache_dir,
-        )
+        local_path = snapshot_download(model_id=model_id, revision=revision, cache_dir=cache_dir)
         resolved = str(Path(local_path).resolve())
         LOG.info("ModelScope embedding model downloaded to %s", resolved)
         return resolved
 
     def _cache_key(self, server_code: str, db_name: str) -> str:
-        """按数据源和数据库生成唯一缓存键。"""
-
         return f"{server_code}::{db_name}"
 
-    def _build_chunks(self, context: VannaContext) -> list[tuple[str, str, str]]:
-        """把完整上下文拆成可检索片段，供向量召回和缓存明细使用。"""
+    def _embedding_model_key(self) -> str:
+        return (
+            f"source={settings.embedding_model_source.strip().lower() or 'huggingface'}"
+            f"|model={settings.embedding_model.strip()}"
+            f"|revision={settings.embedding_model_revision.strip() or 'default'}"
+            "|normalize_embeddings=true"
+        )
 
+    def _build_chunks(self, context: VannaContext) -> list[tuple[str, str, str]]:
         chunks: list[tuple[str, str, str]] = []
         for table in context.tables:
-            # 表名和表注释通常能快速定位业务主题。
             chunks.append(("table", table.tableName, f"{table.tableName}: {table.tableComment or ''}"))
         for column in context.columns:
-            # 字段粒度片段用于提升问题中指标、状态、时间字段的命中率。
             chunks.append(
                 (
                     "column",
@@ -99,7 +98,6 @@ class VannaService:
                 )
             )
         for example in context.historyExamples:
-            # 历史 SQL 片段帮助模型学习当前项目里常见的 join 和过滤写法。
             chunks.append(
                 (
                     "history",
@@ -109,76 +107,68 @@ class VannaService:
             )
         return chunks
 
+    def _normalize_embedding_vector(self, vector: Any) -> list[float]:
+        if hasattr(vector, "tolist"):
+            vector = vector.tolist()
+        if not isinstance(vector, (list, tuple)):
+            raise TypeError(f"Unsupported embedding vector type: {type(vector)!r}")
+        return [float(value) for value in vector]
+
+    def _encode_texts(self, texts: list[str]) -> list[list[float]]:
+        if not texts:
+            return []
+        encoded = self.embedder.encode(texts, normalize_embeddings=True)
+        return [self._normalize_embedding_vector(vector) for vector in encoded]
+
+    def _dot_product(self, left: list[float], right: list[float]) -> float:
+        return sum(left_value * right_value for left_value, right_value in zip(left, right))
+
     def _persist_context(self, cache_key: str, context: VannaContext) -> None:
-        """持久化最新上下文文本和检索片段。"""
+        """一次性持久化 schema cache 与完整 chunk embeddings。"""
 
         schema_text = build_schema_text(context)
         matched_tables = [table.tableName for table in context.tables]
-        with get_conn() as conn:
-            with conn.cursor() as cur:
-                # cache 表保存完整 schema 文本，contextVersion 不变时无需重复刷新。
-                cur.execute(
-                    """
-                    INSERT INTO vanna_context_cache (cache_key, context_version, dialect, server_name, db_name, schema_text, matched_tables, updated_at)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, now())
-                    ON CONFLICT (cache_key) DO UPDATE SET
-                        context_version = excluded.context_version,
-                        dialect = excluded.dialect,
-                        server_name = excluded.server_name,
-                        db_name = excluded.db_name,
-                        schema_text = excluded.schema_text,
-                        matched_tables = excluded.matched_tables,
-                        updated_at = now()
-                    """,
-                    (
-                        cache_key,
-                        context.contextVersion,
-                        context.dialect,
-                        context.serverName,
-                        context.dbName,
-                        schema_text,
-                        matched_tables,
-                    ),
-                )
-                # 上下文版本变化后重建片段，避免旧字段/旧历史 SQL 干扰生成。
-                cur.execute("DELETE FROM vanna_context_embedding WHERE cache_key = %s", (cache_key,))
-                chunks = self._build_chunks(context)
-                for chunk_type, chunk_key, chunk_text in chunks:
-                    cur.execute(
-                        """
-                        INSERT INTO vanna_context_embedding (cache_key, chunk_type, chunk_key, chunk_text, embedding, updated_at)
-                        VALUES (%s, %s, %s, %s, NULL, now())
-                        ON CONFLICT (cache_key, chunk_type, chunk_key) DO UPDATE SET
-                            chunk_text = excluded.chunk_text,
-                            embedding = excluded.embedding,
-                            updated_at = now()
-                        """,
-                        (cache_key, chunk_type, chunk_key, chunk_text),
-                    )
-            conn.commit()
+        chunks = self._build_chunks(context)
+        chunk_texts = [chunk_text for _, _, chunk_text in chunks]
+        chunk_embeddings = self._encode_texts(chunk_texts)
+        embedding_model_key = self._embedding_model_key()
 
-    def _encode_chunk_vectors(self, chunks: list[tuple[str, str, str]]) -> list[list[float]]:
-        """对 chunk 文本做 embedding，供启动预热和夜间重建复用。"""
-
-        if not chunks:
-            return []
-        texts = [chunk_text for _, _, chunk_text in chunks]
-        vectors = self.embedder.encode(texts, normalize_embeddings=True)
-        return [vector.tolist() if hasattr(vector, "tolist") else list(vector) for vector in vectors]
+        persist_context_cache(
+            cache_key=cache_key,
+            context_version=context.contextVersion,
+            dialect=context.dialect,
+            server_name=context.serverName,
+            db_name=context.dbName,
+            schema_text=schema_text,
+            matched_tables=matched_tables,
+            embedding_model_key=embedding_model_key,
+        )
+        replace_chunk_embeddings(cache_key, chunks, chunk_embeddings)
 
     def ensure_context(self, server_code: str, db_name: str, context: VannaContext) -> None:
-        """确保本地缓存与 JavaSqlWeb 返回的上下文版本一致。"""
+        """确保本地 cache 与当前 contextVersion / embedding model key 一致。"""
 
         cache_key = self._cache_key(server_code, db_name)
-        with get_conn() as conn:
-            with conn.cursor() as cur:
-                cur.execute("SELECT context_version FROM vanna_context_cache WHERE cache_key = %s", (cache_key,))
-                row = cur.fetchone()
-        if row is None or row[0] != context.contextVersion:
+        chunks = self._build_chunks(context)
+        cache_state = load_cache_state(cache_key)
+        if cache_state is None:
             self._persist_context(cache_key, context)
-            chunks = self._build_chunks(context)
-            vectors = self._encode_chunk_vectors(chunks)
-            save_chunk_embeddings(cache_key, chunks, vectors)
+            upsert_job_state(
+                cache_key=cache_key,
+                server_code=server_code,
+                db_name=db_name,
+                context_version=context.contextVersion,
+                status="SUCCESS",
+            )
+            return
+
+        cached_version, cached_embedding_model_key = cache_state
+        if (
+            cached_version != context.contextVersion
+            or cached_embedding_model_key != self._embedding_model_key()
+            or not has_complete_embeddings(cache_key, len(chunks))
+        ):
+            self._persist_context(cache_key, context)
             upsert_job_state(
                 cache_key=cache_key,
                 server_code=server_code,
@@ -188,30 +178,41 @@ class VannaService:
             )
 
     def _retrieve_relevant_chunks(self, cache_key: str, question: str) -> list[str]:
-        """用本地向量模型从 schema、字段和历史 SQL 中召回高相关片段。"""
+        """在线请求只计算 query embedding，然后复用已持久化 chunk 向量。"""
 
-        cached_embeddings = fetch_cached_embeddings(cache_key)
-        if not cached_embeddings:
+        persisted_vectors = load_chunk_embeddings(cache_key)
+        if not persisted_vectors:
             return []
+
         query_text = f"{settings.embedding_query_prefix}{question}".strip()
-        query_vector = self.embedder.encode([query_text], normalize_embeddings=True)[0]
+        query_vector = self._encode_texts([query_text])[0]
+        query_dims = len(query_vector)
         ranked: list[tuple[float, str]] = []
-        for chunk, vector in cached_embeddings:
-            if not vector:
+        for chunk_text, vector, dims in persisted_vectors:
+            if dims <= 0 or not vector:
                 continue
-            # 向量已归一化，点积即可表示余弦相似度；兼容 list / numpy array 两种形态。
-            if hasattr(query_vector, "dot"):
-                score = float(query_vector.dot(vector))
-            else:
-                score = float(sum(float(left) * float(right) for left, right in zip(query_vector, vector)))
-            if math.isnan(score):
+            if dims != len(vector):
+                LOG.warning(
+                    "Skip persisted chunk due to inconsistent dims cache dims=%s vector_len=%s chunk=%r",
+                    dims,
+                    len(vector),
+                    chunk_text[:120],
+                )
                 continue
-            ranked.append((score, chunk))
+            if dims != query_dims:
+                LOG.warning(
+                    "Skip persisted chunk due to dims mismatch query_dims=%s chunk_dims=%s chunk=%r",
+                    query_dims,
+                    dims,
+                    chunk_text[:120],
+                )
+                continue
+            ranked.append((self._dot_product(query_vector, vector), chunk_text))
         ranked.sort(key=lambda item: item[0], reverse=True)
         return [chunk for _, chunk in ranked[: settings.embedding_top_k]]
 
     async def warmup_all_contexts(self, jsw_client) -> None:
-        """全量枚举 server/db 并顺序预热，避免用户首次命中时同步承担全量 embedding 开销。"""
+        """全量枚举 server/db 并顺序预热，避免首次用户使用触发全量 chunk embedding。"""
 
         if not settings.warmup_enabled:
             LOG.info("Warmup skipped because VANNA_WARMUP_ENABLED is false")
@@ -228,14 +229,7 @@ class VannaService:
                 await self._warmup_single_database(jsw_client, server, database)
         LOG.info("Warmup finished")
 
-    async def _warmup_single_database(
-        self,
-        jsw_client,
-        server: VannaServerWarmupItem,
-        database: DatabaseNameBean,
-    ) -> None:
-        """预热单个库并记录成功/失败状态。"""
-
+    async def _warmup_single_database(self, jsw_client, server: VannaServerWarmupItem, database: DatabaseNameBean) -> None:
         cache_key = self._cache_key(str(server.serverCode), database.dbName)
         try:
             context = await jsw_client.get_warmup_context(server.serverCode, database.dbName)
@@ -250,16 +244,9 @@ class VannaService:
                 error_message=str(exception),
                 next_retry_minutes=settings.warmup_retry_minutes,
             )
-            LOG.warning(
-                "Warmup failed for server=%s db=%s error=%s",
-                server.serverCode,
-                database.dbName,
-                exception,
-            )
+            LOG.warning("Warmup failed for server=%s db=%s error=%s", server.serverCode, database.dbName, exception)
 
     async def run_nightly_warmup_if_due(self, jsw_client, current_time: datetime) -> bool:
-        """到达夜间窗口时触发一次全量增量预热。"""
-
         if not settings.warmup_enabled:
             return False
         if current_time.hour != settings.warmup_nightly_hour or current_time.minute != 0:
@@ -268,7 +255,7 @@ class VannaService:
         return True
 
     async def ensure_context_warm_async(self, jsw_client, server_code: str, db_name: str) -> None:
-        """在用户首个请求未命中缓存时，异步触发一次低优先级补偿预热。"""
+        """首次请求未命中缓存时，后台异步补偿预热。"""
 
         try:
             context = await jsw_client.get_warmup_context(int(server_code), db_name)
@@ -287,8 +274,6 @@ class VannaService:
             LOG.warning("Deferred warmup failed for server=%s db=%s error=%s", server_code, db_name, exception)
 
     def _extract_chat_content(self, response: Any) -> str:
-        """兼容不同 OpenAI SDK/代理返回形态，抽取最终 message.content。"""
-
         if response is None:
             return ""
         if isinstance(response, (bytes, bytearray)):
@@ -306,20 +291,15 @@ class VannaService:
 
         choices = getattr(response, "choices", None)
         if choices:
-            # 官方 SDK 对象通常是 response.choices[0].message.content。
             message = getattr(choices[0], "message", None)
             content = getattr(message, "content", None)
             return self._normalize_chat_content(content)
 
         if hasattr(response, "model_dump"):
-            # 某些响应对象不能直接取 choices，但可以转为 dict 后继续解析。
             return self._extract_chat_content_from_mapping(response.model_dump())
-
         return str(response)
 
     def _extract_chat_content_from_mapping(self, response: dict[str, Any]) -> str:
-        """从 dict 形态的 chat completion 响应中抽取内容。"""
-
         output = response.get("output")
         if output:
             text = self._extract_text_from_output_items(output)
@@ -336,8 +316,6 @@ class VannaService:
         return json.dumps(response)
 
     def _extract_text_from_output_items(self, output: Any) -> str:
-        """从 responses 风格 output 数组中提取文本内容。"""
-
         if not isinstance(output, list):
             return ""
         parts: list[str] = []
@@ -349,11 +327,7 @@ class VannaService:
             if isinstance(content_items, list):
                 for content_item in content_items:
                     if isinstance(content_item, dict):
-                        text = (
-                            content_item.get("text")
-                            or content_item.get("output_text")
-                            or content_item.get("content")
-                        )
+                        text = content_item.get("text") or content_item.get("output_text") or content_item.get("content")
                         if text:
                             parts.append(str(text))
                     else:
@@ -365,8 +339,6 @@ class VannaService:
         return "".join(parts)
 
     def _normalize_chat_content(self, content: Any) -> str:
-        """把 message.content 归一化为字符串，兼容多段 content 列表。"""
-
         if content is None:
             return ""
         if isinstance(content, str):
@@ -384,8 +356,6 @@ class VannaService:
         return str(content)
 
     def _parse_chat_payload(self, response: Any) -> dict[str, Any]:
-        """解析模型返回内容，兼容 JSON、包裹 JSON、纯 SQL 和不可解析文本。"""
-
         content = self._strip_json_fence(self._extract_chat_content(response).strip())
         if not content:
             return self._clarification_payload("模型返回为空，请稍后重试或换一种问法。", "模型返回为空")
@@ -417,16 +387,12 @@ class VannaService:
         return payload
 
     def _loads_payload_json(self, content: str) -> Any | None:
-        """尝试解析 JSON，失败时返回 None 让上层继续走其它兼容路径。"""
-
         try:
             return json.loads(content)
         except json.JSONDecodeError:
             return None
 
     def _extract_first_json_object(self, content: str) -> str | None:
-        """从包含说明文字的响应里提取第一个完整 JSON object。"""
-
         start = content.find("{")
         if start < 0:
             return None
@@ -454,8 +420,6 @@ class VannaService:
         return None
 
     def _extract_read_only_sql(self, content: str) -> str | None:
-        """当兼容网关返回纯 SQL 时，提取只读语句作为生成结果。"""
-
         candidate = (self._extract_first_fenced_block(content) or self._strip_sql_fence(content)).strip()
         if not candidate:
             return None
@@ -472,8 +436,6 @@ class VannaService:
         return None
 
     def _extract_first_fenced_block(self, content: str) -> str | None:
-        """提取响应中任意位置的第一个 Markdown 代码块内容。"""
-
         start = content.find("```")
         if start < 0:
             return None
@@ -486,16 +448,12 @@ class VannaService:
         return content[body_start + 1 : end].strip()
 
     def _strip_trailing_fence(self, content: str) -> str:
-        """去掉从说明文本中截取 SQL 时可能带上的尾部代码块标记。"""
-
         fence_index = content.find("```")
         if fence_index >= 0:
             return content[:fence_index].strip()
         return content
 
     def _strip_sql_fence(self, content: str) -> str:
-        """去掉模型偶尔返回的 Markdown SQL 代码块包裹。"""
-
         if content.startswith("```") and content.endswith("```"):
             lines = content.splitlines()
             if lines:
@@ -506,8 +464,6 @@ class VannaService:
         return content
 
     def _clarification_payload(self, question: str, warning: str) -> dict[str, Any]:
-        """生成不会导致接口 500 的保守失败响应。"""
-
         return {
             "needsClarification": True,
             "clarificationQuestion": question,
@@ -518,8 +474,6 @@ class VannaService:
         }
 
     def _normalize_chat_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
-        """把模型 JSON 归一化为不会出现“成功但无 SQL”的响应负载。"""
-
         matched_tables = self._string_list(payload.get("matchedTables"))
         warnings = self._string_list(payload.get("warnings"))
         summary = payload.get("summary")
@@ -559,15 +513,11 @@ class VannaService:
         }
 
     def _string_list(self, value: Any) -> list[str]:
-        """把模型可能返回的列表字段安全转换成字符串列表。"""
-
         if not isinstance(value, list):
             return []
         return [str(item) for item in value]
 
     def _strip_json_fence(self, content: str) -> str:
-        """去掉模型偶尔返回的 Markdown JSON 代码块包裹。"""
-
         if content.startswith("```") and content.endswith("```"):
             lines = content.splitlines()
             if lines:
@@ -578,7 +528,7 @@ class VannaService:
         return content
 
     async def generate_sql(self, server_code: str, db_name: str, question: str, context: VannaContext) -> GenerateSqlResponse:
-        """根据用户问题和受权限控制的上下文生成只读 SQL。"""
+        """在线请求只做 query embedding；若当前库尚未预热，则立即返回温和提示。"""
 
         started_at = time.time()
         cache_key = self._cache_key(server_code, db_name)
@@ -595,7 +545,7 @@ class VannaService:
                 matchedTables=[],
                 warnings=["该库尚未完成预热，已跳过同步全量 chunk embedding"],
             )
-        # response_format 要求模型尽量返回 JSON，后续仍会做兼容解析和安全校验。
+
         request_payload = {
             "model": settings.chat_model,
             "temperature": 0.1,
@@ -616,7 +566,6 @@ class VannaService:
             except Exception as exception:
                 LOG.warning("Failed to dump chat completion response: %s", exception)
         payload = self._parse_chat_payload(response)
-        # 先归一化模型 JSON 语义，避免出现“成功但没有 SQL”的假阳性。
         normalized_payload = self._normalize_chat_payload(payload)
         parsed = GenerateSqlResponse(
             needsClarification=normalized_payload["needsClarification"],
@@ -629,7 +578,6 @@ class VannaService:
         )
         if parsed.sql:
             normalized = parsed.sql.strip().lower()
-            # 双重保护：即使 prompt 要求只读，也在服务端拒绝非 SELECT/WITH 语句。
             if not (normalized.startswith("select") or normalized.startswith("with")):
                 parsed = GenerateSqlResponse(
                     needsClarification=True,
@@ -645,7 +593,7 @@ class VannaService:
         return parsed
 
     def _save_audit(self, server_code: str, db_name: str, question: str, response: GenerateSqlResponse, cost_millis: int) -> None:
-        """保存本次生成的审计记录，包含 SQL、告警、状态和耗时。"""
+        from .db import get_conn
 
         with get_conn() as conn:
             with conn.cursor() as cur:

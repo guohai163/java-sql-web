@@ -89,7 +89,7 @@ def _run_generate_sql(content: str):
 
         service = _service()
         service.ensure_context = lambda *args, **kwargs: None
-        service._retrieve_relevant_chunks = lambda *args, **kwargs: []
+        service._retrieve_relevant_chunks = lambda *args, **kwargs: ["users: user table"]
         service._save_audit = lambda *args, **kwargs: None
         service.client = SimpleNamespace(
             chat=SimpleNamespace(
@@ -361,3 +361,15 @@ def test_warmup_all_contexts_walks_servers_and_databases():
         assert warmed == [(1, "db1"), (1, "db2")]
 
     asyncio.run(run())
+
+
+def test_retrieve_relevant_chunks_returns_empty_when_cache_missing():
+    service = _service()
+    from app import service as service_module
+
+    original_loader = service_module.load_chunk_embeddings
+    try:
+        service_module.load_chunk_embeddings = lambda cache_key: []
+        assert service._retrieve_relevant_chunks("1::demo", "find users") == []
+    finally:
+        service_module.load_chunk_embeddings = original_loader

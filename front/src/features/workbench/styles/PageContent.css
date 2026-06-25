@@ -243,6 +243,21 @@
     padding: 14px;
 }
 
+.workbench-tab-with-icon {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.38em;
+    line-height: 1;
+}
+
+.workbench-tab-icon {
+    width: 1em;
+    height: 1em;
+    object-fit: contain;
+    vertical-align: middle;
+    flex: 0 0 auto;
+}
+
 .workbench-dashboard-panel {
     display: flex;
     flex-direction: column;

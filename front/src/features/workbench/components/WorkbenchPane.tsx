@@ -2,6 +2,7 @@ import React from 'react';
 import { Button, Empty, List, Result, Spin, Switch, Tabs } from 'antd';
 import { LoadingOutlined } from '@ant-design/icons';
 import dot from '@/features/workbench/assets/dot.gif';
+import aiIcon from '/ai.png';
 import DataDisplayFast from '@/features/workbench/components/DataDisplayFast';
 import Spreadsheet from '@/features/workbench/components/Spreadsheet';
 import VannaPanel from '@/features/workbench/components/VannaPanel';
@@ -207,7 +208,12 @@ function WorkbenchPane({
               },
               {
                 key: 'vanna',
-                label: 'AI 问数',
+                label: (
+                  <span className="workbench-tab-with-icon">
+                    <img className="workbench-tab-icon" src={aiIcon} alt="" aria-hidden="true" />
+                    <span>AI 问数</span>
+                  </span>
+                ),
                 children: (
                   <VannaPanel
                     disabled={!pane.server || !pane.database}

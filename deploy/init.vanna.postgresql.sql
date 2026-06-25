@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS vanna_context_cache (
   db_name varchar(128) NOT NULL,
   schema_text text NOT NULL,
   matched_tables text[] NOT NULL DEFAULT '{}',
+  embedding_model_key varchar(512) NOT NULL DEFAULT '',
   updated_at timestamp NOT NULL DEFAULT now()
 );
 COMMENT ON TABLE vanna_context_cache IS 'Vanna 问数上下文缓存表';
@@ -31,6 +32,7 @@ COMMENT ON COLUMN vanna_context_cache.server_name IS '服务器名称';
 COMMENT ON COLUMN vanna_context_cache.db_name IS '数据库名称';
 COMMENT ON COLUMN vanna_context_cache.schema_text IS '拼装后的 schema 文本';
 COMMENT ON COLUMN vanna_context_cache.matched_tables IS '上下文中的表名数组';
+COMMENT ON COLUMN vanna_context_cache.embedding_model_key IS '当前持久化 chunk 向量对应的 embedding 模型标识';
 COMMENT ON COLUMN vanna_context_cache.updated_at IS '更新时间';
 
 CREATE TABLE IF NOT EXISTS vanna_context_embedding (
@@ -40,6 +42,8 @@ CREATE TABLE IF NOT EXISTS vanna_context_embedding (
   chunk_key varchar(256) NOT NULL,
   chunk_text text NOT NULL,
   embedding vector(1536) NULL,
+  embedding_values real[] NULL,
+  embedding_dims integer NOT NULL DEFAULT 0,
   updated_at timestamp NOT NULL DEFAULT now(),
   CONSTRAINT uk_vanna_context_embedding UNIQUE (cache_key, chunk_type, chunk_key)
 );
@@ -51,6 +55,8 @@ COMMENT ON COLUMN vanna_context_embedding.chunk_type IS '分块类型';
 COMMENT ON COLUMN vanna_context_embedding.chunk_key IS '分块唯一键';
 COMMENT ON COLUMN vanna_context_embedding.chunk_text IS '分块文本';
 COMMENT ON COLUMN vanna_context_embedding.embedding IS '向量';
+COMMENT ON COLUMN vanna_context_embedding.embedding_values IS '当前实际使用的持久化向量数组';
+COMMENT ON COLUMN vanna_context_embedding.embedding_dims IS 'embedding_values 的维度';
 COMMENT ON COLUMN vanna_context_embedding.updated_at IS '更新时间';
 
 CREATE TABLE IF NOT EXISTS vanna_audit_log (
