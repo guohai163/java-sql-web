@@ -78,25 +78,18 @@ class VannaService:
         return f"{server_code}::{db_name}"
 
     def _embedding_model_key(self) -> str:
-<<<<<<< HEAD
-        """生成当前 chunk 向量缓存对应的模型标识。"""
+        """生成当前 chunk 向量缓存对应的 embedding 模型标识。"""
 
-=======
->>>>>>> 9e858d2 (chore: release v3.2.6)
         return (
             f"source={settings.embedding_model_source.strip().lower() or 'huggingface'}"
             f"|model={settings.embedding_model.strip()}"
             f"|revision={settings.embedding_model_revision.strip() or 'default'}"
             "|normalize_embeddings=true"
         )
-<<<<<<< HEAD
 
     def _build_chunks(self, context: VannaContext) -> list[tuple[str, str, str]]:
-        """把完整上下文拆成可检索片段，供向量召回和缓存明细使用。"""
-=======
->>>>>>> 9e858d2 (chore: release v3.2.6)
+        """把完整上下文拆成可检索片段。"""
 
-    def _build_chunks(self, context: VannaContext) -> list[tuple[str, str, str]]:
         chunks: list[tuple[str, str, str]] = []
         for table in context.tables:
             chunks.append(("table", table.tableName, f"{table.tableName}: {table.tableComment or ''}"))
@@ -119,11 +112,8 @@ class VannaService:
         return chunks
 
     def _normalize_embedding_vector(self, vector: Any) -> list[float]:
-<<<<<<< HEAD
         """把 embedding 输出统一转换成 float 列表，兼容 numpy/list 等返回形态。"""
 
-=======
->>>>>>> 9e858d2 (chore: release v3.2.6)
         if hasattr(vector, "tolist"):
             vector = vector.tolist()
         if not isinstance(vector, (list, tuple)):
@@ -131,89 +121,17 @@ class VannaService:
         return [float(value) for value in vector]
 
     def _encode_texts(self, texts: list[str]) -> list[list[float]]:
-<<<<<<< HEAD
         """对文本列表做归一化向量编码，并统一成可持久化的 float 数组。"""
 
-=======
->>>>>>> 9e858d2 (chore: release v3.2.6)
         if not texts:
             return []
         encoded = self.embedder.encode(texts, normalize_embeddings=True)
         return [self._normalize_embedding_vector(vector) for vector in encoded]
 
     def _dot_product(self, left: list[float], right: list[float]) -> float:
-<<<<<<< HEAD
         """对两个已归一化的向量做点积，用于近似余弦相似度。"""
 
         return sum(left_value * right_value for left_value, right_value in zip(left, right))
-
-    def _load_cache_state(self, cache_key: str) -> tuple[str, str] | None:
-        """读取当前 cache 的上下文版本与向量模型标识。"""
-
-        with get_conn() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "SELECT context_version, COALESCE(embedding_model_key, '') FROM vanna_context_cache WHERE cache_key = %s",
-                    (cache_key,),
-                )
-                row = cur.fetchone()
-        if row is None:
-            return None
-        return str(row[0]), str(row[1] or "")
-
-    def _has_complete_embeddings(self, cache_key: str, expected_count: int) -> bool:
-        """检查当前 cache 下是否存在完整、可复用的 chunk 向量。"""
-
-        with get_conn() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    SELECT
-                        COUNT(*),
-                        COALESCE(
-                            SUM(
-                                CASE
-                                    WHEN embedding_values IS NULL
-                                        OR embedding_dims <= 0
-                                        OR COALESCE(cardinality(embedding_values), 0) = 0
-                                        OR COALESCE(cardinality(embedding_values), 0) <> embedding_dims
-                                    THEN 1
-                                    ELSE 0
-                                END
-                            ),
-                            0
-                        )
-                    FROM vanna_context_embedding
-                    WHERE cache_key = %s
-                    """,
-                    (cache_key,),
-                )
-                row = cur.fetchone()
-        total = int((row or (0, 0))[0] or 0)
-        invalid = int((row or (0, 0))[1] or 0)
-        return total == expected_count and invalid == 0
-
-    def _load_persisted_chunk_vectors(self, cache_key: str) -> list[tuple[str, list[float], int]]:
-        """从数据库加载已持久化的 chunk 文本与向量。"""
-
-        with get_conn() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    SELECT chunk_text, embedding_values, embedding_dims
-                    FROM vanna_context_embedding
-                    WHERE cache_key = %s
-                    ORDER BY id ASC
-                    """,
-                    (cache_key,),
-                )
-                rows = cur.fetchall() or []
-
-        persisted: list[tuple[str, list[float], int]] = []
-        for chunk_text, embedding_values, embedding_dims in rows:
-            vector = self._normalize_embedding_vector(embedding_values) if embedding_values is not None else []
-            persisted.append((str(chunk_text), vector, int(embedding_dims or 0)))
-        return persisted
 
     def _rank_chunks_from_vectors(
         self,
@@ -268,10 +186,6 @@ class VannaService:
         ranked.sort(key=lambda item: item[0], reverse=True)
         return [chunk for _, chunk in ranked[: settings.embedding_top_k]]
 
-=======
-        return sum(left_value * right_value for left_value, right_value in zip(left, right))
-
->>>>>>> 9e858d2 (chore: release v3.2.6)
     def _persist_context(self, cache_key: str, context: VannaContext) -> None:
         """一次性持久化 schema cache 与完整 chunk embeddings。"""
 
@@ -281,60 +195,6 @@ class VannaService:
         chunk_texts = [chunk_text for _, _, chunk_text in chunks]
         chunk_embeddings = self._encode_texts(chunk_texts)
         embedding_model_key = self._embedding_model_key()
-<<<<<<< HEAD
-
-        with get_conn() as conn:
-            with conn.cursor() as cur:
-                # cache 表保存完整 schema 文本，contextVersion 不变时无需重复刷新。
-                cur.execute(
-                    """
-                    INSERT INTO vanna_context_cache (
-                        cache_key, context_version, dialect, server_name, db_name,
-                        schema_text, matched_tables, embedding_model_key, updated_at
-                    )
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, now())
-                    ON CONFLICT (cache_key) DO UPDATE SET
-                        context_version = excluded.context_version,
-                        dialect = excluded.dialect,
-                        server_name = excluded.server_name,
-                        db_name = excluded.db_name,
-                        schema_text = excluded.schema_text,
-                        matched_tables = excluded.matched_tables,
-                        embedding_model_key = excluded.embedding_model_key,
-                        updated_at = now()
-                    """,
-                    (
-                        cache_key,
-                        context.contextVersion,
-                        context.dialect,
-                        context.serverName,
-                        context.dbName,
-                        schema_text,
-                        matched_tables,
-                        embedding_model_key,
-                    ),
-                )
-                # 上下文版本变化后重建片段，避免旧字段/旧历史 SQL 干扰生成。
-                cur.execute("DELETE FROM vanna_context_embedding WHERE cache_key = %s", (cache_key,))
-                for (chunk_type, chunk_key, chunk_text), chunk_vector in zip(chunks, chunk_embeddings):
-                    cur.execute(
-                        """
-                        INSERT INTO vanna_context_embedding (
-                            cache_key, chunk_type, chunk_key, chunk_text,
-                            embedding_values, embedding_dims, updated_at
-                        )
-                        VALUES (%s, %s, %s, %s, %s, %s, now())
-                        ON CONFLICT (cache_key, chunk_type, chunk_key) DO UPDATE SET
-                            chunk_text = excluded.chunk_text,
-                            embedding_values = excluded.embedding_values,
-                            embedding_dims = excluded.embedding_dims,
-                            updated_at = now()
-                        """,
-                        (cache_key, chunk_type, chunk_key, chunk_text, chunk_vector, len(chunk_vector)),
-                    )
-            conn.commit()
-=======
->>>>>>> 9e858d2 (chore: release v3.2.6)
 
         persist_context_cache(
             cache_key=cache_key,
@@ -353,11 +213,6 @@ class VannaService:
 
         cache_key = self._cache_key(server_code, db_name)
         chunks = self._build_chunks(context)
-<<<<<<< HEAD
-        cache_state = self._load_cache_state(cache_key)
-        if cache_state is None:
-            self._persist_context(cache_key, context)
-=======
         cache_state = load_cache_state(cache_key)
         if cache_state is None:
             self._persist_context(cache_key, context)
@@ -368,18 +223,13 @@ class VannaService:
                 context_version=context.contextVersion,
                 status="SUCCESS",
             )
->>>>>>> 9e858d2 (chore: release v3.2.6)
             return
 
         cached_version, cached_embedding_model_key = cache_state
         if (
             cached_version != context.contextVersion
             or cached_embedding_model_key != self._embedding_model_key()
-<<<<<<< HEAD
-            or not self._has_complete_embeddings(cache_key, len(chunks))
-=======
             or not has_complete_embeddings(cache_key, len(chunks))
->>>>>>> 9e858d2 (chore: release v3.2.6)
         ):
             self._persist_context(cache_key, context)
             upsert_job_state(
@@ -390,61 +240,28 @@ class VannaService:
                 status="SUCCESS",
             )
 
-<<<<<<< HEAD
     def _retrieve_relevant_chunks(self, server_code: str, db_name: str, context: VannaContext, question: str) -> list[str]:
-        """用本地向量模型从 schema、字段和历史 SQL 中召回高相关片段。"""
+        """优先走已持久化向量检索，必要时重建并在最后回退到内存编码。"""
+
+        query_text = f"{settings.embedding_query_prefix}{question}".strip()
         query_vector = self._encode_texts([query_text])[0]
         cache_key = self._cache_key(server_code, db_name)
 
-        persisted_vectors = self._load_persisted_chunk_vectors(cache_key)
+        persisted_vectors = load_chunk_embeddings(cache_key)
         ranked_chunks = self._rank_chunks_from_vectors(query_vector, persisted_vectors)
         if ranked_chunks:
             return ranked_chunks
 
         LOG.info("No usable persisted chunk embeddings for cache_key=%s, rebuilding now", cache_key)
         self._persist_context(cache_key, context)
-        persisted_vectors = self._load_persisted_chunk_vectors(cache_key)
+        persisted_vectors = load_chunk_embeddings(cache_key)
         ranked_chunks = self._rank_chunks_from_vectors(query_vector, persisted_vectors)
         if ranked_chunks:
             return ranked_chunks
 
         LOG.warning("Falling back to in-memory chunk embedding retrieval for cache_key=%s", cache_key)
+        chunks = [chunk_text for _, _, chunk_text in self._build_chunks(context)]
         return self._rank_chunks_in_memory(query_vector, chunks)
-=======
-    def _retrieve_relevant_chunks(self, cache_key: str, question: str) -> list[str]:
-        """在线请求只计算 query embedding，然后复用已持久化 chunk 向量。"""
-
-        persisted_vectors = load_chunk_embeddings(cache_key)
-        if not persisted_vectors:
-            return []
-
-        query_text = f"{settings.embedding_query_prefix}{question}".strip()
-        query_vector = self._encode_texts([query_text])[0]
-        query_dims = len(query_vector)
-        ranked: list[tuple[float, str]] = []
-        for chunk_text, vector, dims in persisted_vectors:
-            if dims <= 0 or not vector:
-                continue
-            if dims != len(vector):
-                LOG.warning(
-                    "Skip persisted chunk due to inconsistent dims cache dims=%s vector_len=%s chunk=%r",
-                    dims,
-                    len(vector),
-                    chunk_text[:120],
-                )
-                continue
-            if dims != query_dims:
-                LOG.warning(
-                    "Skip persisted chunk due to dims mismatch query_dims=%s chunk_dims=%s chunk=%r",
-                    query_dims,
-                    dims,
-                    chunk_text[:120],
-                )
-                continue
-            ranked.append((self._dot_product(query_vector, vector), chunk_text))
-        ranked.sort(key=lambda item: item[0], reverse=True)
-        return [chunk for _, chunk in ranked[: settings.embedding_top_k]]
->>>>>>> 9e858d2 (chore: release v3.2.6)
 
     async def warmup_all_contexts(self, jsw_client) -> None:
         """全量枚举 server/db 并顺序预热，避免首次用户使用触发全量 chunk embedding。"""
@@ -482,6 +299,8 @@ class VannaService:
             LOG.warning("Warmup failed for server=%s db=%s error=%s", server.serverCode, database.dbName, exception)
 
     async def run_nightly_warmup_if_due(self, jsw_client, current_time: datetime) -> bool:
+        """到达夜间窗口时触发一次增量预热。"""
+
         if not settings.warmup_enabled:
             return False
         if current_time.hour != settings.warmup_nightly_hour or current_time.minute != 0:
@@ -763,29 +582,11 @@ class VannaService:
         return content
 
     async def generate_sql(self, server_code: str, db_name: str, question: str, context: VannaContext) -> GenerateSqlResponse:
-        """在线请求只做 query embedding；若当前库尚未预热，则立即返回温和提示。"""
+        """根据用户问题和受权限控制的上下文生成只读 SQL。"""
 
         started_at = time.time()
-        cache_key = self._cache_key(server_code, db_name)
         self.ensure_context(server_code, db_name, context)
-<<<<<<< HEAD
         relevant_chunks = self._retrieve_relevant_chunks(server_code, db_name, context, question)
-        # response_format 要求模型尽量返回 JSON，后续仍会做兼容解析和安全校验。
-=======
-        relevant_chunks = self._retrieve_relevant_chunks(cache_key, question)
-        if not relevant_chunks:
-            LOG.info("No cached embeddings found for cache_key=%s, returning warmup hint", cache_key)
-            return GenerateSqlResponse(
-                needsClarification=True,
-                clarificationQuestion="系统正在预热该库，请稍后重试。",
-                sql=None,
-                dialect=context.dialect,
-                summary="当前库的向量缓存尚未完成，未生成 SQL",
-                matchedTables=[],
-                warnings=["该库尚未完成预热，已跳过同步全量 chunk embedding"],
-            )
-
->>>>>>> 9e858d2 (chore: release v3.2.6)
         request_payload = {
             "model": settings.chat_model,
             "temperature": 0.1,
