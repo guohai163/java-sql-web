@@ -11,6 +11,7 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Types;
 import java.util.*;
 
 import static org.guohai.javasqlweb.util.Utils.closeResource;
@@ -257,9 +258,7 @@ public class DbOperationMysqlDruid implements DbOperation {
                 dataCount++;
                 Map<String, Object> rowData = new LinkedHashMap<String, Object>();
                 for(int i=1;i<=columnCount;i++){
-                    rowData.put(md.getColumnLabel(i),md.getColumnType(i) == 93
-                            ? (rs.getObject(i)==null?"NULL":rs.getDate(i) + " " + rs.getTime(i))
-                            : rs.getObject(i));
+                    rowData.put(md.getColumnLabel(i), readColumnValue(rs, i, md.getColumnType(i)));
                 }
                 listData.add(rowData);
             }
@@ -278,7 +277,26 @@ public class DbOperationMysqlDruid implements DbOperation {
         return result;
     }
 
+    static Object readColumnValue(ResultSet rs, int columnIndex, int columnType) throws SQLException {
+        if (isTemporalColumn(columnType)) {
+            String value = rs.getString(columnIndex);
+            return value == null ? "NULL" : value;
+        }
+        return rs.getObject(columnIndex);
+    }
 
+    private static boolean isTemporalColumn(int columnType) {
+        switch (columnType) {
+            case Types.DATE:
+            case Types.TIME:
+            case Types.TIME_WITH_TIMEZONE:
+            case Types.TIMESTAMP:
+            case Types.TIMESTAMP_WITH_TIMEZONE:
+                return true;
+            default:
+                return false;
+        }
+    }
 
     /**
      * 服务器连接状态健康检查
