@@ -356,8 +356,7 @@ public class DbOperationMysqlDruid implements DbOperation {
                     if (isMysqlDateTimeColumn(columnTypeName)) {
                         object = formatMysqlDateTime(rs, i);
                     } else if (md.getColumnType(i) == Types.TIMESTAMP) {
-                        object = rs.getObject(i);
-                        object = object == null ? "NULL" : String.valueOf(rs.getTimestamp(i));
+                        object = rawMysqlTemporalValue(rs, i);
                     } else {
                         object = rs.getObject(i);
                     }
@@ -477,6 +476,11 @@ public class DbOperationMysqlDruid implements DbOperation {
             }
             return rawValue;
         }
+    }
+
+    private String rawMysqlTemporalValue(ResultSet rs, int columnIndex) throws SQLException {
+        String rawValue = rs.getString(columnIndex);
+        return rawValue == null ? "NULL" : rawValue;
     }
 
     private String formatLocalDateTime(LocalDateTime localDateTime) {

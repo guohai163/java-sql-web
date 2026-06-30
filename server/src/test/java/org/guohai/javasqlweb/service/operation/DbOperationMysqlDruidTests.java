@@ -149,6 +149,41 @@ class DbOperationMysqlDruidTests {
     }
 
     @Test
+    void queryDatabaseBySqlUsesRawMysqlTimestampText() throws Exception {
+        DataSource dataSource = mock(DataSource.class);
+        Connection connection = mock(Connection.class);
+        Statement statement = mock(Statement.class);
+        Statement sessionStatement = mock(Statement.class);
+        ResultSet sessionResultSet = mock(ResultSet.class);
+        ResultSet resultSet = mock(ResultSet.class);
+        ResultSetMetaData metaData = mock(ResultSetMetaData.class);
+        DbOperationMysqlDruid operation = new DbOperationMysqlDruid(dataSource);
+
+        when(dataSource.getConnection()).thenReturn(connection);
+        when(connection.createStatement()).thenReturn(sessionStatement);
+        when(connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY)).thenReturn(statement);
+        when(sessionStatement.executeQuery(anyString())).thenReturn(sessionResultSet);
+        when(sessionResultSet.next()).thenReturn(true);
+        when(sessionResultSet.getString("value")).thenReturn("901");
+        when(statement.executeQuery(anyString())).thenReturn(resultSet);
+        when(resultSet.getMetaData()).thenReturn(metaData);
+        when(metaData.getColumnCount()).thenReturn(1);
+        when(metaData.getColumnLabel(1)).thenReturn("create_time");
+        when(metaData.getColumnType(1)).thenReturn(Types.TIMESTAMP);
+        when(metaData.getColumnTypeName(1)).thenReturn("TIMESTAMP");
+        when(resultSet.next()).thenReturn(true, false);
+        when(resultSet.getString(1)).thenReturn("2026-06-30 12:34:56");
+
+        QueryExecutionResult executionResult = operation.queryDatabaseBySqlWithSession("analytics", "SELECT create_time FROM nppa_log", 10, null);
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> rows = (List<Map<String, Object>>) executionResult.getRows()[2];
+        assertEquals("2026-06-30 12:34:56", rows.get(0).get("create_time"));
+        verify(resultSet).getString(1);
+        verify(resultSet, never()).getTimestamp(1);
+    }
+
+    @Test
     void describeRuntimePoolReturnsHikariMetrics() {
         HikariDataSource dataSource = mock(HikariDataSource.class);
         HikariPoolMXBean poolMxBean = mock(HikariPoolMXBean.class);
