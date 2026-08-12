@@ -4,6 +4,7 @@ import sys
 import types
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -316,6 +317,46 @@ def test_generate_sql_returns_warmup_hint_when_cached_embeddings_missing():
     assert response.needsClarification is True
     assert response.sql is None
     assert response.clarificationQuestion == "系统正在预热该库，请稍后重试。"
+
+
+def test_generate_sql_runs_embedding_work_off_the_event_loop():
+    async def run():
+        service = _service()
+        worker_functions = []
+
+        def ensure_context(*args, **kwargs):
+            return None
+
+        def retrieve_relevant_chunks(*args, **kwargs):
+            return ["users: user table"]
+
+        async def create(*args, **kwargs):
+            return _response(json.dumps({"sql": "select id from users"}))
+
+        async def immediate_to_thread(function, *args, **kwargs):
+            worker_functions.append(function)
+            return function(*args, **kwargs)
+
+        service.ensure_context = ensure_context
+        service._retrieve_relevant_chunks = retrieve_relevant_chunks
+        service._save_audit = lambda *args, **kwargs: None
+        service.client = SimpleNamespace(
+            chat=SimpleNamespace(
+                completions=SimpleNamespace(
+                    create=create,
+                )
+            )
+        )
+
+        import app.service as service_module
+
+        with patch.object(service_module.asyncio, "to_thread", side_effect=immediate_to_thread):
+            response = await service.generate_sql("1", "demo", "list users", _context())
+
+        assert response.sql == "select id from users"
+        assert worker_functions == [ensure_context, retrieve_relevant_chunks]
+
+    asyncio.run(run())
 
 
 def test_run_nightly_warmup_if_due_only_triggers_at_target_hour():

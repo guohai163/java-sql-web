@@ -32,11 +32,13 @@ def test_init_uses_huggingface_name_by_default():
     original_model = settings.embedding_model
     original_revision = settings.embedding_model_revision
     original_cache_dir = settings.embedding_model_cache_dir
+    original_device = settings.embedding_device
     try:
         object.__setattr__(settings, "embedding_model_source", "huggingface")
         object.__setattr__(settings, "embedding_model", "BAAI/bge-small-zh-v1.5")
         object.__setattr__(settings, "embedding_model_revision", "")
         object.__setattr__(settings, "embedding_model_cache_dir", "")
+        object.__setattr__(settings, "embedding_device", "cpu")
 
         with patch.object(service_module, "SentenceTransformer") as sentence_transformer:
             service_module.VannaService()
@@ -47,17 +49,36 @@ def test_init_uses_huggingface_name_by_default():
         object.__setattr__(settings, "embedding_model", original_model)
         object.__setattr__(settings, "embedding_model_revision", original_revision)
         object.__setattr__(settings, "embedding_model_cache_dir", original_cache_dir)
+        object.__setattr__(settings, "embedding_device", original_device)
 
 
 def test_init_uses_modelscope_download_when_configured():
     original_source = settings.embedding_model_source
+    original_device = settings.embedding_device
     try:
         object.__setattr__(settings, "embedding_model_source", "modelscope")
+        object.__setattr__(settings, "embedding_device", "cuda:0")
         with patch.object(service_module.VannaService, "_download_model_from_modelscope", return_value="/tmp/modelscope-cache/model"), patch.object(
             service_module, "SentenceTransformer"
         ) as sentence_transformer:
             service_module.VannaService()
 
-        sentence_transformer.assert_called_once_with("/tmp/modelscope-cache/model", device="cpu")
+        sentence_transformer.assert_called_once_with("/tmp/modelscope-cache/model", device="cuda:0")
     finally:
         object.__setattr__(settings, "embedding_model_source", original_source)
+        object.__setattr__(settings, "embedding_device", original_device)
+
+
+def test_init_uses_configured_embedding_device():
+    original_source = settings.embedding_model_source
+    original_device = settings.embedding_device
+    try:
+        object.__setattr__(settings, "embedding_model_source", "huggingface")
+        object.__setattr__(settings, "embedding_device", "cuda:0")
+        with patch.object(service_module, "SentenceTransformer") as sentence_transformer:
+            service_module.VannaService()
+
+        sentence_transformer.assert_called_once_with("BAAI/bge-small-zh-v1.5", device="cuda:0")
+    finally:
+        object.__setattr__(settings, "embedding_model_source", original_source)
+        object.__setattr__(settings, "embedding_device", original_device)

@@ -28,6 +28,8 @@ class Settings:
     embedding_model_revision: str = os.getenv("VANNA_EMBEDDING_MODEL_REVISION", "")
     # 可选模型缓存目录，便于挂载持久卷或预热缓存。
     embedding_model_cache_dir: str = os.getenv("VANNA_EMBEDDING_MODEL_CACHE_DIR", "")
+    # SentenceTransformer 运行设备；独立 GPU 主机可设为 cuda:0，K8s 默认保持 CPU。
+    embedding_device: str = os.getenv("VANNA_EMBEDDING_DEVICE", "cpu")
     # bge 系列中文检索模型推荐的查询前缀。
     embedding_query_prefix: str = os.getenv("VANNA_EMBEDDING_QUERY_PREFIX", "为这个句子生成表示以用于检索相关文章：")
     # 送入大模型前保留的上下文片段数量。

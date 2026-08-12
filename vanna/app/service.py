@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import time
@@ -35,15 +36,16 @@ class VannaService:
             timeout=settings.generation_timeout_seconds,
         )
         source = settings.embedding_model_source.strip().lower() or "huggingface"
+        embedding_device = settings.embedding_device.strip() or "cpu"
         if source == "huggingface":
-            kwargs: dict[str, Any] = {"device": "cpu"}
+            kwargs: dict[str, Any] = {"device": embedding_device}
             if settings.embedding_model_cache_dir.strip():
                 kwargs["cache_folder"] = settings.embedding_model_cache_dir.strip()
             if settings.embedding_model_revision.strip():
                 kwargs["revision"] = settings.embedding_model_revision.strip()
             self.embedder = SentenceTransformer(settings.embedding_model, **kwargs)
         elif source == "modelscope":
-            self.embedder = SentenceTransformer(self._download_model_from_modelscope(), device="cpu")
+            self.embedder = SentenceTransformer(self._download_model_from_modelscope(), device=embedding_device)
         else:
             raise ValueError(
                 f"Unsupported VANNA_EMBEDDING_MODEL_SOURCE={settings.embedding_model_source!r}, "
@@ -285,7 +287,7 @@ class VannaService:
         cache_key = self._cache_key(str(server.serverCode), database.dbName)
         try:
             context = await jsw_client.get_warmup_context(server.serverCode, database.dbName)
-            self.ensure_context(str(server.serverCode), database.dbName, context)
+            await asyncio.to_thread(self.ensure_context, str(server.serverCode), database.dbName, context)
         except Exception as exception:
             upsert_job_state(
                 cache_key=cache_key,
@@ -313,7 +315,7 @@ class VannaService:
 
         try:
             context = await jsw_client.get_warmup_context(int(server_code), db_name)
-            self.ensure_context(server_code, db_name, context)
+            await asyncio.to_thread(self.ensure_context, server_code, db_name, context)
         except Exception as exception:
             cache_key = self._cache_key(server_code, db_name)
             upsert_job_state(
@@ -585,8 +587,16 @@ class VannaService:
         """根据用户问题和受权限控制的上下文生成只读 SQL。"""
 
         started_at = time.time()
-        self.ensure_context(server_code, db_name, context)
-        relevant_chunks = self._retrieve_relevant_chunks(server_code, db_name, context, question)
+        # SentenceTransformer 编码会长时间占用 CPU/GPU；必须移出 Uvicorn 的事件循环，
+        # 让 /health 与并发请求仍能被调度。
+        await asyncio.to_thread(self.ensure_context, server_code, db_name, context)
+        relevant_chunks = await asyncio.to_thread(
+            self._retrieve_relevant_chunks,
+            server_code,
+            db_name,
+            context,
+            question,
+        )
         request_payload = {
             "model": settings.chat_model,
             "temperature": 0.1,

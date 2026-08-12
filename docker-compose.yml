@@ -64,6 +64,7 @@ services:
       VANNA_EMBEDDING_MODELSCOPE_MODEL_ID: ${VANNA_EMBEDDING_MODELSCOPE_MODEL_ID:-}
       VANNA_EMBEDDING_MODEL_REVISION: ${VANNA_EMBEDDING_MODEL_REVISION:-}
       VANNA_EMBEDDING_MODEL_CACHE_DIR: ${VANNA_EMBEDDING_MODEL_CACHE_DIR:-}
+      VANNA_EMBEDDING_DEVICE: ${VANNA_EMBEDDING_DEVICE:-cpu}
       VANNA_LLM_BASE_URL: ${VANNA_LLM_BASE_URL:-https://api.openai.com/v1}
       VANNA_LLM_API_KEY: ${VANNA_LLM_API_KEY:-}
     expose:
@@ -76,6 +77,8 @@ services:
     depends_on:
       - jsw-server
       - jsw-vanna
+    environment:
+      VANNA_BASE_URL: ${VANNA_BASE_URL:-http://jsw-vanna:8003}
     ports:
       - "${FRONT_PORT:-80}:80"
 

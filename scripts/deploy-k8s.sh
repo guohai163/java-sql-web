@@ -53,6 +53,8 @@ set +a
 
 PROJECT_LEGACY_TLS_ENABLED="${PROJECT_LEGACY_TLS_ENABLED:-false}"
 JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:-}"
+# 未迁移时保持集群内默认服务名，迁移后可在 prod.env 覆盖为独立机 IP。
+VANNA_BASE_URL="${VANNA_BASE_URL:-http://jsw-vanna:8003}"
 
 if [[ -z "${DB_STORAGE_CLASS:-}" ]]; then
   unset DB_STORAGE_CLASS
@@ -121,6 +123,7 @@ export INIT_SQL_INDENT
 export LEGACY_TLS_SECURITY_INDENT
 export PROJECT_LEGACY_TLS_ENABLED
 export JAVA_TOOL_OPTIONS
+export VANNA_BASE_URL
 export DB_DIALECT
 export DB_PORT
 export DB_JDBC_URL

@@ -15,7 +15,7 @@ server {
     }
 
     location /api/vanna/ {
-        proxy_pass http://jsw-vanna:8003/api/vanna/;
+        proxy_pass ${VANNA_BASE_URL}/api/vanna/;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;

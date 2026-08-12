@@ -66,6 +66,11 @@ spec:
                 secretKeyRef:
                   name: jsw-app-secret
                   key: VANNA_EMBEDDING_MODEL_CACHE_DIR
+            - name: VANNA_EMBEDDING_DEVICE
+              valueFrom:
+                secretKeyRef:
+                  name: jsw-app-secret
+                  key: VANNA_EMBEDDING_DEVICE
             - name: VANNA_LLM_BASE_URL
               valueFrom:
                 secretKeyRef:

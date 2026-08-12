@@ -24,7 +24,7 @@ last_nightly_run_date: date | None = None
 
 
 async def _startup_warmup_task() -> None:
-    """启动后后台执行一次全量预热，不阻塞健康检查。"""
+    """启动后后台执行一次全量预热。"""
 
     await asyncio.sleep(1)
     try:

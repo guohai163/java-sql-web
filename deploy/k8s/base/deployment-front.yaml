@@ -19,6 +19,9 @@ spec:
           ports:
             - containerPort: 80
               name: http
+          env:
+            - name: VANNA_BASE_URL
+              value: "${VANNA_BASE_URL}"
           readinessProbe:
             httpGet:
               path: /
