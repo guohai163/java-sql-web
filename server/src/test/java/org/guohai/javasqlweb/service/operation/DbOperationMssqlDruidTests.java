@@ -10,11 +10,18 @@ import java.lang.reflect.Field;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
+import java.sql.Statement;
+import java.sql.Types;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class DbOperationMssqlDruidTests {
@@ -82,6 +89,59 @@ class DbOperationMssqlDruidTests {
             assertEquals("88", sessions.get(0).getSessionId());
             assertEquals("report_user", sessions.get(0).getDatabaseUserName());
             assertEquals("select count(*) from report_db.orders", sessions.get(0).getSqlText());
+        } finally {
+            operation.close();
+        }
+    }
+
+    @Test
+    void queryDatabaseBySqlUsesCatalogSwitchAndQueryControls() throws Exception {
+        DbOperationMssqlDruid operation = new DbOperationMssqlDruid(buildConnectConfig());
+        javax.sql.DataSource dataSource = mock(javax.sql.DataSource.class);
+        Connection connection = mock(Connection.class);
+        Statement sessionStatement = mock(Statement.class);
+        Statement queryStatement = mock(Statement.class);
+        ResultSet sessionResultSet = mock(ResultSet.class);
+        ResultSet resultSet = mock(ResultSet.class);
+        ResultSetMetaData metaData = mock(ResultSetMetaData.class);
+        try {
+            Field field = DbOperationMssqlDruid.class.getDeclaredField("sqlDs");
+            field.setAccessible(true);
+            field.set(operation, dataSource);
+            operation.configureQueryTimeoutSeconds(20);
+
+            when(dataSource.getConnection()).thenReturn(connection);
+            when(connection.getCatalog()).thenReturn("master", "report_db", "report_db");
+            when(connection.createStatement()).thenReturn(sessionStatement);
+            when(connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY)).thenReturn(queryStatement);
+            when(sessionStatement.executeQuery(anyString())).thenReturn(sessionResultSet);
+            when(sessionResultSet.next()).thenReturn(true);
+            when(sessionResultSet.getString("value")).thenReturn("88");
+            when(queryStatement.executeQuery(anyString())).thenReturn(resultSet);
+            when(resultSet.getMetaData()).thenReturn(metaData);
+            when(metaData.getColumnCount()).thenReturn(1);
+            when(metaData.getColumnName(1)).thenReturn("value");
+            when(resultSet.next()).thenReturn(true, true, false);
+            when(resultSet.getString(1)).thenReturn("one", "two");
+
+            org.guohai.javasqlweb.beans.QueryExecutionResult executionResult =
+                    operation.queryDatabaseBySqlWithSession("report_db", "SELECT value FROM t", 1, null);
+
+            Object[] result = executionResult.getRows();
+            assertEquals(2, result[0]);
+            assertEquals(1, result[1]);
+            assertEquals("88", executionResult.getDbSessionId());
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> rows = (List<Map<String, Object>>) result[2];
+            assertEquals("one", rows.get(0).get("value"));
+            verify(connection).setCatalog("report_db");
+            verify(connection).setCatalog("master");
+            verify(queryStatement).setQueryTimeout(20);
+            verify(queryStatement).setMaxRows(2);
+            verify(queryStatement).setFetchSize(2);
+            verify(queryStatement).executeQuery("SELECT value FROM t;");
+            verify(connection, never()).createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
+            verify(resultSet, never()).last();
         } finally {
             operation.close();
         }

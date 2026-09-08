@@ -107,7 +107,7 @@ public final class ReadOnlySqlGuard {
         return -1;
     }
 
-    static List<String> splitStatements(String sql) {
+    public static List<String> splitStatements(String sql) {
         List<String> statements = new ArrayList<>();
         if (sql == null || sql.isEmpty()) {
             return statements;

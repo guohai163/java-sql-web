@@ -15,28 +15,19 @@ spec:
         app: jsw-db
     spec:
       containers:
-        - name: mariadb
-          image: mariadb:10.11
+        - name: ${DB_CONTAINER_NAME}
+          image: ${DB_IMAGE}
           ports:
-            - containerPort: 3306
-              name: mysql
+            - containerPort: ${DB_PORT}
+              name: ${DB_SERVICE_PORT_NAME}
           env:
-            - name: MARIADB_ROOT_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: jsw-app-secret
-                  key: DB_PASSWORD
-            - name: MARIADB_DATABASE
-              valueFrom:
-                secretKeyRef:
-                  name: jsw-app-secret
-                  key: DB_NAME
+${DB_ENV_INDENT}
           readinessProbe:
             exec:
               command:
                 - sh
                 - -c
-                - mariadb-admin ping -h 127.0.0.1 -uroot -p"${MARIADB_ROOT_PASSWORD}"
+                - ${DB_PROBE_COMMAND}
             initialDelaySeconds: 15
             periodSeconds: 10
             timeoutSeconds: 5
@@ -45,7 +36,7 @@ spec:
               command:
                 - sh
                 - -c
-                - mariadb-admin ping -h 127.0.0.1 -uroot -p"${MARIADB_ROOT_PASSWORD}"
+                - ${DB_PROBE_COMMAND}
             initialDelaySeconds: 30
             periodSeconds: 15
             timeoutSeconds: 5
@@ -58,7 +49,7 @@ spec:
               memory: "1Gi"
           volumeMounts:
             - name: db-data
-              mountPath: /var/lib/mysql
+              mountPath: ${DB_VOLUME_MOUNT_PATH}
             - name: init-sql
               mountPath: /docker-entrypoint-initdb.d/init.sql
               subPath: init.sql

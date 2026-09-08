@@ -7,6 +7,6 @@ spec:
   selector:
     app: jsw-db
   ports:
-    - name: mysql
-      port: 3306
-      targetPort: 3306
+    - name: ${DB_SERVICE_PORT_NAME}
+      port: ${DB_PORT}
+      targetPort: ${DB_PORT}

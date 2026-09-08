@@ -12,6 +12,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.Statement;
@@ -40,13 +41,13 @@ class DbOperationClickHouseTests {
     void getTableListOrdersByNameAscending() throws Exception {
         DataSource dataSource = mock(DataSource.class);
         Connection connection = mock(Connection.class);
-        Statement statement = mock(Statement.class);
+        PreparedStatement statement = mock(PreparedStatement.class);
         ResultSet resultSet = mock(ResultSet.class);
         DbOperationClickHouse operation = new DbOperationClickHouse(dataSource);
 
         when(dataSource.getConnection()).thenReturn(connection);
-        when(connection.createStatement()).thenReturn(statement);
-        when(statement.executeQuery(anyString())).thenReturn(resultSet);
+        when(connection.prepareStatement(anyString())).thenReturn(statement);
+        when(statement.executeQuery()).thenReturn(resultSet);
         when(resultSet.next()).thenReturn(true, false);
         when(resultSet.getString("name")).thenReturn("A_table");
         when(resultSet.getLong("total_rows")).thenReturn(21L);
@@ -56,8 +57,8 @@ class DbOperationClickHouseTests {
         assertEquals(1, tables.size());
         assertEquals("A_table", tables.get(0).getTableName());
         assertEquals(21L, tables.get(0).getTableRows());
-        verify(statement).executeQuery(
-                "SELECT name,total_rows FROM system.tables where database='analytics' ORDER BY name ASC; ");
+        verify(statement).setString(1, "analytics");
+        verify(statement).executeQuery();
     }
 
     @Test
@@ -96,8 +97,11 @@ class DbOperationClickHouseTests {
         verify(connection).createStatement();
         verify(connection, never()).createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
         verify(queryDataSource).getConnection();
+        verify(statement).setMaxRows(3);
+        verify(statement).setFetchSize(3);
         verify(statement, never()).execute(anyString());
         verify(statement).executeQuery("select * from demo;");
+        verify(resultSet, never()).last();
         verify(resultSet).close();
         verify(statement).close();
         verify(connection).close();
@@ -135,6 +139,8 @@ class DbOperationClickHouseTests {
         assertEquals(1, rows.size());
         assertEquals(String.valueOf(timestamp), rows.get(0).get("created_at"));
         assertTrue(((Integer) result[0]) == ((Integer) result[1]));
+        verify(statement).setMaxRows(11);
+        verify(statement).setFetchSize(11);
         verify(statement, never()).execute(anyString());
     }
 
@@ -179,19 +185,21 @@ class DbOperationClickHouseTests {
         assertEquals(1, createCounter.get());
         verify(firstStatement).executeQuery("select 1;");
         verify(secondStatement).executeQuery("select 2;");
+        verify(firstStatement).setMaxRows(11);
+        verify(secondStatement).setMaxRows(11);
     }
 
     @Test
     void getColumnsListMapsAliasedClickHouseColumnsAndNullableState() throws Exception {
         DataSource dataSource = mock(DataSource.class);
         Connection connection = mock(Connection.class);
-        Statement statement = mock(Statement.class);
+        PreparedStatement statement = mock(PreparedStatement.class);
         ResultSet resultSet = mock(ResultSet.class);
         DbOperationClickHouse operation = new DbOperationClickHouse(dataSource);
 
         when(dataSource.getConnection()).thenReturn(connection);
-        when(connection.createStatement()).thenReturn(statement);
-        when(statement.executeQuery(anyString())).thenReturn(resultSet);
+        when(connection.prepareStatement(anyString())).thenReturn(statement);
+        when(statement.executeQuery()).thenReturn(resultSet);
         when(resultSet.next()).thenReturn(true, true, false);
         when(resultSet.getString("column_name")).thenReturn("user_id", "remark");
         when(resultSet.getString("column_type")).thenReturn("UInt64", "Nullable(String)");
@@ -209,9 +217,9 @@ class DbOperationClickHouseTests {
         assertEquals("Nullable(String)", columns.get(1).getColumnType());
         assertEquals("备注", columns.get(1).getColumnComment());
         assertEquals("null", columns.get(1).getColumnIsNull());
-        verify(statement).executeQuery(
-                "SELECT name AS column_name, type AS column_type, comment AS column_comment " +
-                        "FROM system.columns WHERE database='dw_game_wd' AND table='dw_scan_stall_result' LIMIT 100;");
+        verify(statement).setString(1, "dw_game_wd");
+        verify(statement).setString(2, "dw_scan_stall_result");
+        verify(statement).executeQuery();
         verify(resultSet).close();
         verify(statement).close();
         verify(connection).close();

@@ -1,0 +1,114 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jsw-vanna
+  namespace: ${NAMESPACE}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jsw-vanna
+  template:
+    metadata:
+      labels:
+        app: jsw-vanna
+    spec:
+      containers:
+        - name: jsw-vanna
+          image: ${JSW_VANNA_IMAGE}:${TAG}
+          ports:
+            - containerPort: 8003
+              name: http
+          env:
+            - name: PROJECT_VERSION
+              value: ${TAG}
+            - name: VANNA_PORT
+              value: "${VANNA_PORT}"
+            - name: JSW_SERVER_BASE_URL
+              value: "${JSW_SERVER_BASE_URL}"
+            - name: VANNA_INTERNAL_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: jsw-app-secret
+                  key: VANNA_INTERNAL_TOKEN
+            - name: VANNA_DB_URL
+              valueFrom:
+                secretKeyRef:
+                  name: jsw-app-secret
+                  key: VANNA_DB_URL
+            - name: VANNA_CHAT_MODEL
+              valueFrom:
+                secretKeyRef:
+                  name: jsw-app-secret
+                  key: VANNA_CHAT_MODEL
+            - name: VANNA_EMBEDDING_MODEL_SOURCE
+              valueFrom:
+                secretKeyRef:
+                  name: jsw-app-secret
+                  key: VANNA_EMBEDDING_MODEL_SOURCE
+            - name: VANNA_EMBEDDING_MODEL
+              valueFrom:
+                secretKeyRef:
+                  name: jsw-app-secret
+                  key: VANNA_EMBEDDING_MODEL
+            - name: VANNA_EMBEDDING_MODELSCOPE_MODEL_ID
+              valueFrom:
+                secretKeyRef:
+                  name: jsw-app-secret
+                  key: VANNA_EMBEDDING_MODELSCOPE_MODEL_ID
+            - name: VANNA_EMBEDDING_MODEL_REVISION
+              valueFrom:
+                secretKeyRef:
+                  name: jsw-app-secret
+                  key: VANNA_EMBEDDING_MODEL_REVISION
+            - name: VANNA_EMBEDDING_MODEL_CACHE_DIR
+              valueFrom:
+                secretKeyRef:
+                  name: jsw-app-secret
+                  key: VANNA_EMBEDDING_MODEL_CACHE_DIR
+            - name: VANNA_EMBEDDING_DEVICE
+              valueFrom:
+                secretKeyRef:
+                  name: jsw-app-secret
+                  key: VANNA_EMBEDDING_DEVICE
+            - name: VANNA_LLM_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: jsw-app-secret
+                  key: VANNA_LLM_BASE_URL
+            - name: VANNA_LLM_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: jsw-app-secret
+                  key: VANNA_LLM_API_KEY
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8003
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8003
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            timeoutSeconds: 10
+            failureThreshold: 6
+            successThreshold: 1
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8003
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 10
+          resources:
+            requests:
+              cpu: "1"
+              memory: "1Gi"
+            limits:
+              cpu: "2"
+              memory: "2Gi"

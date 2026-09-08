@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.*;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 
@@ -264,10 +266,19 @@ public class OidcSsfController {
      * 认证成功后重定向到前端并附带 token
      */
     @GetMapping("/api/oidc/login/callback")
-    public void loginCallback(@RequestParam("code") String code,
-                              @RequestParam("state") String state,
+    public void loginCallback(@RequestParam(value = "code", required = false) String code,
+                              @RequestParam(value = "state", required = false) String state,
+                              @RequestParam(value = "error", required = false) String error,
+                              @RequestParam(value = "error_description", required = false) String errorDescription,
                               HttpServletRequest request,
                               HttpServletResponse response) throws IOException {
+        if (error != null && !error.isBlank()) {
+            String friendlyMessage = buildOidcLoginErrorMessage(error, errorDescription);
+            String redirectUrl = "/login?oidc_error=" + URLEncoder.encode(error, StandardCharsets.UTF_8)
+                    + "&oidc_error_description=" + URLEncoder.encode(friendlyMessage, StandardCharsets.UTF_8);
+            response.sendRedirect(redirectUrl);
+            return;
+        }
         Result<UserBean> result = oidcSsfService.handleLoginCallback(code, state, request);
         if (result.getStatus() && result.getData() != null) {
             UserBean user = result.getData();
@@ -293,5 +304,15 @@ public class OidcSsfController {
                             + "<a href=\"/login\">返回登录页</a></body></html>"
             );
         }
+    }
+
+    private String buildOidcLoginErrorMessage(String error, String errorDescription) {
+        if (errorDescription != null && !errorDescription.isBlank()) {
+            return errorDescription;
+        }
+        if ("access_denied".equals(error)) {
+            return "你已取消本次 OIDC 授权登录";
+        }
+        return "OIDC 授权失败，请稍后重试";
     }
 }

@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: jsw-vanna
+  namespace: ${NAMESPACE}
+spec:
+  selector:
+    app: jsw-vanna
+  ports:
+    - name: http
+      port: 8003
+      targetPort: 8003

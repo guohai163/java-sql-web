@@ -29,17 +29,24 @@ public interface PermissionsDao {
      * 获取组数据，显示用
      * @return
      */
-    @Select("SELECT a.code,group_name,comment,COALESCE(group_concat(distinct user_name),'') as user_array \n" +
-            "FROM usergroup a\n" +
-            "left join user_permissions b on a.code=b.group_code\n" +
-            "left join user_tb c on b.user_code=c.code\n" +
-            "group by a.code;")
+    @Select.List({
+            @Select(value = "SELECT a.code,group_name,comment,COALESCE(group_concat(distinct user_name),'') as user_array \n" +
+                    "FROM usergroup a\n" +
+                    "left join user_permissions b on a.code=b.group_code\n" +
+                    "left join user_tb c on b.user_code=c.code\n" +
+                    "group by a.code;", databaseId = "mysql"),
+            @Select(value = "SELECT a.code,group_name,comment,COALESCE(string_agg(distinct user_name, ','),'') as user_array \n" +
+                    "FROM usergroup a\n" +
+                    "left join user_permissions b on a.code=b.group_code\n" +
+                    "left join user_tb c on b.user_code=c.code\n" +
+                    "group by a.code,a.group_name,a.comment;", databaseId = "postgresql")
+    })
     List<UsergroupBean> getUserGroupInUser();
     /**
      * 创建新的用户组
      * @param userGroup
      */
-    @Insert("INSERT INTO usergroup (`group_name`,`comment`) VALUES(#{groupName}, #{comment}) ")
+    @Insert("INSERT INTO usergroup (group_name,comment) VALUES(#{groupName}, #{comment}) ")
     @Options(useGeneratedKeys = true, keyProperty = "code", keyColumn = "code")
     void addUsergroup(UsergroupBean userGroup);
 
@@ -49,7 +56,7 @@ public interface PermissionsDao {
      * @param groupCode
      * @return
      */
-    @Insert("INSERT INTO `user_permissions`(`user_code`,`group_code`)VALUES(#{userCode},#{groupCode});")
+    @Insert("INSERT INTO user_permissions(user_code,group_code)VALUES(#{userCode},#{groupCode});")
     Boolean addUserPermission(Integer userCode, Integer groupCode);
 
     /**
@@ -74,7 +81,7 @@ public interface PermissionsDao {
      * @param groupCode
      * @return
      */
-    @Insert("INSERT INTO `db_permissions`(`db_code`,`group_code`)VALUES(#{dbCode}, #{groupCode});")
+    @Insert("INSERT INTO db_permissions(db_code,group_code)VALUES(#{dbCode}, #{groupCode});")
     Boolean addDbPermission(Integer dbCode, Integer groupCode);
 
 
@@ -82,10 +89,16 @@ public interface PermissionsDao {
      * 获取权限 列表，仅用于展示
      * @return
      */
-    @Select("SELECT group_code,group_name,GROUP_CONCAT(DISTINCT db_server_name) as server_list FROM db_permissions a " +
-            "join usergroup b on a.group_code=b.code " +
-            "join db_connect_config_tb c on a.db_code=c.code " +
-            " GROUP BY group_code,group_name")
+    @Select.List({
+            @Select(value = "SELECT group_code,group_name,GROUP_CONCAT(DISTINCT db_server_name) as server_list FROM db_permissions a " +
+                    "join usergroup b on a.group_code=b.code " +
+                    "join db_connect_config_tb c on a.db_code=c.code " +
+                    " GROUP BY group_code,group_name", databaseId = "mysql"),
+            @Select(value = "SELECT group_code,group_name,string_agg(DISTINCT db_server_name, ',') as server_list FROM db_permissions a " +
+                    "join usergroup b on a.group_code=b.code " +
+                    "join db_connect_config_tb c on a.db_code=c.code " +
+                    " GROUP BY group_code,group_name", databaseId = "postgresql")
+    })
     List<DbPermissionBean> getDbPermissions();
 
     /**
@@ -93,7 +106,7 @@ public interface PermissionsDao {
      * @param groupCode
      * @return
      */
-    @Delete("DELETE FROM `db_permissions` WHERE group_code=#{groupCode}")
+    @Delete("DELETE FROM db_permissions WHERE group_code=#{groupCode}")
     Boolean delDbPermissions(Integer groupCode);
 
     /**
@@ -102,7 +115,7 @@ public interface PermissionsDao {
      * @return
      */
     @Select("SELECT code,db_server_name,db_server_type,db_group FROM db_connect_config_tb WHERE code in " +
-            "(SELECT db_code FROM `db_permissions` WHERE group_code=#{groupCode})")
+            "(SELECT db_code FROM db_permissions WHERE group_code=#{groupCode})")
     List<ConnectConfigBean> getGroupPermissions(Integer groupCode);
 
     /**
@@ -121,7 +134,7 @@ public interface PermissionsDao {
      * @param comment 要更新的组备注
      * @return
      */
-    @Update("UPDATE `usergroup` SET `group_name` = #{groupName},`comment` = #{comment} WHERE `code` = #{groupCode};")
+    @Update("UPDATE usergroup SET group_name = #{groupName},comment = #{comment} WHERE code = #{groupCode};")
     Boolean setUserGroup(Integer groupCode, String groupName, String comment);
 
 }

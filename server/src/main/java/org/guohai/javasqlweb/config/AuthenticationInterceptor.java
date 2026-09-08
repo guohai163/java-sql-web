@@ -69,7 +69,8 @@ public class AuthenticationInterceptor  implements HandlerInterceptor {
                 adminClassAnnotation != null || adminMethodAnnotation != null){
             Result<UserBean> userBeanResult = null;
             if(loginClassAnnotation != null || loginMethodAnnotation != null){
-                boolean allowAccessToken = request.getRequestURI().startsWith("/database/");
+                boolean allowAccessToken = request.getRequestURI().startsWith("/database/")
+                        || request.getRequestURI().startsWith("/internal/vanna/");
                 userBeanResult = userService.checkApiAccess(
                         request.getHeader("User-Token"),
                         allowAccessToken ? request.getHeader("Authorization") : null

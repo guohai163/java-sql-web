@@ -99,8 +99,8 @@ describe('App routes', () => {
 
     render(<App />);
 
-    expect(screen.getByText('navigation shell')).toBeInTheDocument();
-    expect(screen.getByText('page content shell')).toBeInTheDocument();
+    expect(await screen.findByText('navigation shell')).toBeInTheDocument();
+    expect(await screen.findByText('page content shell')).toBeInTheDocument();
   });
 
   test('renders the security task route', async () => {

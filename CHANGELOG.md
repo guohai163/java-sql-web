@@ -2,6 +2,152 @@
 
 本文件记录当前 `master` 分支之后到当前 `develop` 工作区的主要变更，按版本和当前未发布改动整理。
 
+## v3.2.6 - 2026-06-25
+
+### Changed
+- `jsw-vanna` 的上下文缓存实现进一步收敛到完整版持久化向量方案，补齐初始化 SQL 与代码字段对齐，并继续完善向量缓存与预热逻辑。
+- 工作台 `AI 问数` 标签页新增与文字同尺寸的小图标，增强新功能入口的可识别性。
+- `.gitignore` 继续补充 Python 临时产物忽略规则，避免 `__pycache__` 和 `.pyc` 文件进入 Git 管理。
+
+## v3.2.5 - 2026-06-25
+
+### Changed
+- 为 `jsw-vanna` 增加启动后全量预热和夜间 1 点增量重建所需的内部枚举接口、任务状态表、配置模板和后台调度骨架，为后续消除用户首次命中时的全量 embedding 开销打基础。
+- `.gitignore` 新增 `tmp/` 规则，避免本地临时导出文件和调试脚本进入 Git 管理。
+- `.env.example` 和 `deploy/k8s/env/prod.env.example` 为每个变量补充逐行注释，方便部署和运维时理解用途。
+
+## v3.2.2 - 2026-06-24
+
+### Changed
+- 为 `jsw-vanna` 新增 embedding 模型来源配置，默认继续从 Hugging Face 拉取；当部署环境访问外网不稳定时，可切换到 ModelScope 下载并加载本地模型缓存。
+- 补充 `VANNA_EMBEDDING_MODEL_SOURCE`、`VANNA_EMBEDDING_MODELSCOPE_MODEL_ID`、`VANNA_EMBEDDING_MODEL_REVISION`、`VANNA_EMBEDDING_MODEL_CACHE_DIR` 等部署变量，并同步更新 Docker Compose、Kubernetes Secret/Deployment、环境变量模板和运维文档。
+- 为 `jsw-vanna` 增加 `startupProbe`，放宽模型加载阶段的启动探测窗口，避免 embedding 模型尚未准备好时被 `livenessProbe` 反复重启。
+
+### Tests
+- 新增 Vanna embedding 模型来源配置测试，覆盖默认 Hugging Face 初始化路径与 ModelScope 下载路径选择。
+
+## v3.2.1 - 2026-06-24
+
+### Added
+- 新增 Kubernetes runbook，说明如何在 `v3.0.0` 基线上通过“先扩库、后部署 `jsw-vanna`、再滚动升级前后端”的方式，尽量减少停机时间接入 Vanna。
+
+## v3.2.0 - 2026-06-24
+
+### Changed
+- 增强 `jsw-vanna` 对 OpenAI 兼容模型返回的兼容解析能力，新增对 `responses` 风格 `output` 数组、`content` / `text` 直接字段等返回形态的提取支持。
+- `jsw-vanna` 统一启用应用级 INFO 日志并输出到容器标准输出，启动时会打印当前版本号、聊天模型、embedding 模型和 LLM 网关地址，便于直接通过 `docker logs` 排查线上问题。
+- Docker Compose 和 Kubernetes 部署均为 `jsw-vanna` 注入 `PROJECT_VERSION`，让容器启动日志与镜像版本保持一致。
+
+## v3.1.10 - 2026-06-24
+
+### Changed
+- 为 `jsw-vanna` 的聊天模型调用增加请求 payload 与最终响应 content 日志，便于确认是否实际请求 OpenAI 兼容模型以及模型返回内容。
+
+## v3.1.9 - 2026-06-24
+
+### Fixed
+- 修复 `jsw-vanna` 在模型返回合法 JSON 但缺少有效 `sql` 时显示“成功但无 SQL”的问题；现在会返回需要补充信息的可控响应并附带 warning。
+
+### Tests
+- 扩展 Vanna 生成结果测试，覆盖空 JSON、`sql: null`、空白 SQL、澄清问题兜底、合法只读 SQL 和非只读 SQL 拒绝。
+
+## v3.1.8 - 2026-06-23
+
+### Fixed
+- 修复 `jsw-vanna` 在模型返回非 JSON 文本时 `json.loads` 抛出异常导致 500 的问题；现在会尝试抽取嵌入 JSON、纯只读 SQL 或返回可控澄清响应，避免接口因模型格式漂移直接崩溃。
+
+### Tests
+- 扩展 Vanna 响应解析测试，覆盖说明文本包裹 JSON、纯 SQL、SQL 代码块和完全不可解析文本。
+
+## v3.1.7 - 2026-06-23
+
+### Fixed
+- 修复 `jsw-vanna` 在 OpenAI 兼容网关返回原始 JSON 字符串或序列化 chat completion 时访问 `response.choices` 导致的 500 错误；现在会兼容 SDK 对象、原始 JSON、序列化响应和 JSON 代码块格式。
+
+### Tests
+- 新增 Vanna 聊天响应解析单元测试，覆盖 SDK 响应、原始 JSON 字符串、序列化 chat completion 与 JSON 代码块格式。
+
+## v3.1.6 - 2026-06-23
+
+### Changed
+- 为 `jsw-vanna` 的聊天模型调用增加原始响应日志，便于排查 OpenAI 兼容网关返回格式与 SDK 预期不一致时的运行时错误。
+
+## v3.1.5 - 2026-06-23
+
+### Changed
+- 重新发布 `jsw-vanna` 镜像，确保内部上下文鉴权修复与 401 错误处理逻辑正确进入 GHCR 发布产物。
+
+## v3.1.4 - 2026-06-23
+
+### Fixed
+- 修复 Vanna 问数链路中内部上下文接口未正确走登录校验的问题，恢复 `/internal/vanna/context/...` 的登录态与 Bearer token 认证能力。
+- 修复 `jsw-vanna` 把 `not logged in` 业务错误抛成 `500 Internal Server Error` 的问题；现在鉴权失败会返回更明确的 401/上游错误响应。
+
+## v3.1.3 - 2026-06-23
+
+### Changed
+- 重新发布 `jsw-vanna` 镜像，确保 `POST /api/vanna/sql/generate` 中 `serverCode` 兼容数字与字符串的修复正确进入 GHCR 发布产物。
+
+## v3.1.2 - 2026-06-23
+
+### Fixed
+- 修复 Vanna `POST /api/vanna/sql/generate` 对 `serverCode` 请求体类型过于严格的问题；接口现在同时兼容数字和字符串形式，避免前端或直接调用方传 `2` 时返回 422 校验错误。
+
+## v3.1.1 - 2026-06-23
+
+### Changed
+- Vanna 默认聊天模型从 `gpt-4.1-mini` 调整为 `gpt-5.4-mini`，同步更新 Docker Compose、Kubernetes 和环境变量模板默认值。
+- Vanna embedding 默认方案切换为本地 CPU 运行的 `BAAI/bge-small-zh-v1.5`，减少对远程 embedding API 的依赖。
+
+## v3.1.0 - 2026-06-23
+
+### Added
+- 新增独立 `jsw-vanna` 问数服务，提供基于 OpenAI 兼容接口的只读 SQL 生成能力，并将上下文缓存、向量数据与审计日志写入同一 PG 实例下的独立 `jsw_vanna_db`。
+- 新增 `jsw-server` 内部 Vanna 上下文接口，按当前用户权限返回库表备注、列备注、视图信息与脱敏后的历史查询样本。
+- 工作台新增 “AI 问数” 面板，支持非技术人员输入自然语言问题后生成 SQL，并一键复制或插入现有 SQL 编辑器。
+
+### Changed
+- 前端 Nginx 新增 `/api/vanna/` 代理，部署层新增 `jsw-vanna` 的 Docker Compose / Kubernetes 配置与环境变量模板。
+- GitHub Release 镜像流水线新增 `java-sql-web-vanna` 的 GHCR 构建与推送任务，Compose 改为直接复用发布镜像，不再本地 `build`。
+- 各数据库实现补齐表备注采集，历史 SQL 样本增加只读筛选与脱敏模板化，避免把敏感字面量直接送入问数上下文。
+
+### Tests
+- 新增 `InternalVannaControllerTests` 与 `VannaSqlExampleSanitizerTests`，覆盖内部鉴权与历史 SQL 脱敏逻辑。
+- 扩展 `PageContent.test.tsx`，覆盖 AI 问数生成结果插入 SQL 编辑器的前端主流程。
+
+## v2.11.15 - 2026-06-01
+
+### Fixed
+- OIDC 登录回调新增对授权失败参数 `error` / `error_description` 的友好处理；用户取消授权时不再因为缺少 `code/state` 直接报错，而是回跳登录页展示清晰提示。
+- 登录页新增 OIDC 授权失败 notice 展示与 URL 清理逻辑，保留重新发起 OIDC 登录或改用账号密码登录的入口。
+
+### Tests
+- 新增 `OidcSsfControllerTests`，覆盖 OIDC 登录回调失败重定向与成功回调兼容行为。
+- 新增 `Login.test.tsx`，覆盖授权拒绝提示展示及现有 OTP 绑定/验证回调路径不回归。
+
+## v2.11.14 - 2026-06-01
+
+### Fixed
+- 修复新 OIDC 用户初始 OTP 状态写错的问题：新用户不再以 `auth_status=BIND` 且 `auth_secret` 为空的矛盾状态入库，避免首次 OIDC 登录被误导到 OTP 验证流程。
+- OIDC 新用户改为以 `UNBIND` 初始状态创建，首次成功授权后再沿用现有登录状态机生成 OTP secret 并进入 `BINDING` 绑定流程。
+
+### Tests
+- 补充 `UserServiceImplTests` 回归用例，覆盖未绑定用户登录会生成 OTP secret、已绑定用户登录不会重复生成 secret 的两条关键路径。
+
+## v2.11.13 - 2026-06-01
+
+### Fixed
+- 修复 OIDC 登录在多副本部署下的 `Invalid state parameter` 问题：OIDC 授权 `state/code_verifier` 不再保存在单机内存，而是持久化到数据库，避免回调落到其它副本或实例重启后丢失状态。
+- OIDC Admin 授权回调和登录回调改为以事务方式一次性消费数据库中的 `state` 记录，避免并发回调、重复访问或刷新回调页时重复消费同一授权状态。
+
+### Added
+- 新增数据库升级脚本 `deploy/upgrade/2026-06-01-oidc-login-state.sql`，创建 `oidc_login_state_tb` 用于存储短期 OIDC PKCE state。
+
+## v2.11.10 - 2026-05-11
+
+### Changed
+- 发布版本 `v2.11.10`，同步服务端 Maven 版本号到 `2.11.10`。
+
 ## v2.11.8 - 2026-05-08
 
 ### Changed

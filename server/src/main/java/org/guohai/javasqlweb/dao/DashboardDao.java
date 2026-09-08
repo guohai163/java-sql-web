@@ -93,17 +93,29 @@ public interface DashboardDao {
                                                       @Param("endTime") Date endTime,
                                                       @Param("limit") Integer limit);
 
-    @Select("SELECT l.query_time, l.query_name, c.db_server_name AS server_name, l.query_database, " +
-            "COALESCE(GROUP_CONCAT(DISTINCT CONCAT(COALESCE(t.database_name, l.query_database), '.', t.table_name) " +
-            "ORDER BY t.table_name SEPARATOR ', '), '-') AS target_tables, " +
-            "l.result_row_count, l.query_consuming, l.query_sqlscript " +
-            "FROM db_query_log l " +
-            "LEFT JOIN db_connect_config_tb c ON c.code = l.server_code " +
-            "LEFT JOIN db_query_log_target_tb t ON t.query_log_code = l.code " +
-            "WHERE l.query_time >= #{startTime} AND l.query_time < #{endTime} " +
-            "GROUP BY l.code, l.query_time, l.query_name, c.db_server_name, l.query_database, l.result_row_count, l.query_consuming, l.query_sqlscript " +
-            "ORDER BY l.query_time DESC " +
-            "LIMIT #{limit}")
+    @Select.List({
+            @Select(value = "SELECT l.query_time, l.query_name, c.db_server_name AS server_name, l.query_database, " +
+                    "COALESCE(GROUP_CONCAT(DISTINCT CONCAT(COALESCE(t.database_name, l.query_database), '.', t.table_name) " +
+                    "ORDER BY t.table_name SEPARATOR ', '), '-') AS target_tables, " +
+                    "l.result_row_count, l.query_consuming, l.query_sqlscript " +
+                    "FROM db_query_log l " +
+                    "LEFT JOIN db_connect_config_tb c ON c.code = l.server_code " +
+                    "LEFT JOIN db_query_log_target_tb t ON t.query_log_code = l.code " +
+                    "WHERE l.query_time >= #{startTime} AND l.query_time < #{endTime} " +
+                    "GROUP BY l.code, l.query_time, l.query_name, c.db_server_name, l.query_database, l.result_row_count, l.query_consuming, l.query_sqlscript " +
+                    "ORDER BY l.query_time DESC " +
+                    "LIMIT #{limit}", databaseId = "mysql"),
+            @Select(value = "SELECT l.query_time, l.query_name, c.db_server_name AS server_name, l.query_database, " +
+                    "COALESCE(STRING_AGG(DISTINCT COALESCE(t.database_name, l.query_database) || '.' || t.table_name, ', '), '-') AS target_tables, " +
+                    "l.result_row_count, l.query_consuming, l.query_sqlscript " +
+                    "FROM db_query_log l " +
+                    "LEFT JOIN db_connect_config_tb c ON c.code = l.server_code " +
+                    "LEFT JOIN db_query_log_target_tb t ON t.query_log_code = l.code " +
+                    "WHERE l.query_time >= #{startTime} AND l.query_time < #{endTime} " +
+                    "GROUP BY l.code, l.query_time, l.query_name, c.db_server_name, l.query_database, l.result_row_count, l.query_consuming, l.query_sqlscript " +
+                    "ORDER BY l.query_time DESC " +
+                    "LIMIT #{limit}", databaseId = "postgresql")
+    })
     List<DashboardRecentQueryItem> getRecentQueries(@Param("startTime") Date startTime,
                                                     @Param("endTime") Date endTime,
                                                     @Param("limit") Integer limit);

@@ -445,6 +445,38 @@ describe('PageContent', () => {
     });
   });
 
+  test('generates ai sql and inserts it into the editor', async () => {
+    mockApi.post.mockResolvedValueOnce({
+      status: 200,
+      jsonData: {
+        needsClarification: false,
+        sql: 'SELECT id, name FROM demo LIMIT 20',
+        dialect: 'mysql',
+        summary: '已生成 SQL',
+        matchedTables: ['demo'],
+        warnings: [],
+      },
+    });
+
+    render(<PageContent />);
+    await publishDatabaseSelection();
+
+    await userEvent.click(screen.getByRole('tab', { name: 'AI 问数' }));
+    const questionBox = screen.getByPlaceholderText('例如：帮我查最近 7 天订单量前 10 的城市');
+    await userEvent.type(questionBox, '查 demo 表前 20 条');
+    await userEvent.click(screen.getByRole('button', { name: '生成 SQL' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('已生成 SQL')).toBeInTheDocument();
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: '插入编辑器' }));
+    await userEvent.click(screen.getByRole('tab', { name: '查询结果' }));
+
+    const editor = within(getActiveWorkbenchPanel()).getByLabelText('sql-editor');
+    expect(editor).toHaveValue('SELECT id, name FROM demo LIMIT 20');
+  });
+
   test('inserts selected table name at cursor without swallowing the next character', async () => {
     render(<PageContent />);
     await publishDatabaseSelection();

@@ -6,11 +6,15 @@ import com.warrenstrange.googleauth.GoogleAuthenticator;
 import com.warrenstrange.googleauth.GoogleAuthenticatorKey;
 import org.guohai.javasqlweb.beans.*;
 import org.guohai.javasqlweb.dao.OidcConfigDao;
+import org.guohai.javasqlweb.dao.OidcLoginStateDao;
 import org.guohai.javasqlweb.dao.UserManageDao;
 import org.guohai.javasqlweb.util.PasswordUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import jakarta.servlet.http.HttpServletRequest;
 
 import java.io.IOException;
@@ -25,7 +29,6 @@ import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
@@ -39,9 +42,12 @@ public class OidcSsfServiceImpl implements OidcSsfService {
     private static final Logger LOG = LoggerFactory.getLogger(OidcSsfServiceImpl.class);
 
     private final OidcConfigDao oidcConfigDao;
+    private final OidcLoginStateDao oidcLoginStateDao;
     private final UserManageDao userManageDao;
+    private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
+    private final String appDatabaseDialect;
 
     /** OIDC discovery 缓存 */
     private volatile Map<String, Object> oidcDiscovery;
@@ -53,18 +59,29 @@ public class OidcSsfServiceImpl implements OidcSsfService {
     /** 存储的用户信息 */
     private volatile OidcUserInfo storedUserInfo;
 
-    /** PKCE state → code_verifier 映射 */
-    private final ConcurrentHashMap<String, String> pkceStore = new ConcurrentHashMap<>();
-
     /** 事件日志 (最多保留 500 条) */
     private final CopyOnWriteArrayList<SsfEvent> eventLog = new CopyOnWriteArrayList<>();
     private static final int MAX_EVENT_LOG = 500;
+    /** OIDC state 有效期：10 分钟 */
+    private static final long OIDC_STATE_EXPIRE_MS = 10 * 60 * 1000L;
+    private static final String OIDC_SUB_COLUMN = "oidc_sub";
+    private static final String STATE_USAGE_ADMIN = "admin";
+    private static final String STATE_USAGE_LOGIN = "login";
+    /** user_tb 是否已经具备 oidc_sub 列，避免每次登录都访问 information_schema */
+    private volatile Boolean oidcSubColumnPresent;
 
     public OidcSsfServiceImpl(OidcConfigDao oidcConfigDao,
-                              UserManageDao userManageDao, ObjectMapper objectMapper) {
+                              OidcLoginStateDao oidcLoginStateDao,
+                              UserManageDao userManageDao,
+                              JdbcTemplate jdbcTemplate,
+                              ObjectMapper objectMapper,
+                              @Value("${app.db.dialect:mysql}") String appDatabaseDialect) {
         this.oidcConfigDao = oidcConfigDao;
+        this.oidcLoginStateDao = oidcLoginStateDao;
         this.userManageDao = userManageDao;
+        this.jdbcTemplate = jdbcTemplate;
         this.objectMapper = objectMapper;
+        this.appDatabaseDialect = normalizeAppDatabaseDialect(appDatabaseDialect);
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(10))
                 .build();
@@ -203,8 +220,7 @@ public class OidcSsfServiceImpl implements OidcSsfService {
         String codeVerifier = generateRandomString(64);
         String codeChallenge = computeS256Challenge(codeVerifier);
         String nonce = computeS256Challenge(codeVerifier);
-
-        pkceStore.put(state, codeVerifier);
+        persistOidcState(STATE_USAGE_ADMIN, state, codeVerifier);
 
         OidcConfigBean effectiveConfig = getDbConfig();
         if (!isConfiguredAndEnabled(effectiveConfig)) {
@@ -228,8 +244,9 @@ public class OidcSsfServiceImpl implements OidcSsfService {
     }
 
     @Override
+    @Transactional
     public Result<OidcTokenInfo> exchangeCodeForTokens(String code, String state, HttpServletRequest request) {
-        String codeVerifier = pkceStore.remove(state);
+        String codeVerifier = consumeOidcState(STATE_USAGE_ADMIN, state);
         if (codeVerifier == null) {
             return new Result<>(false, "Invalid state parameter", null);
         }
@@ -336,7 +353,6 @@ public class OidcSsfServiceImpl implements OidcSsfService {
     public Result<String> disconnect() {
         storedTokens = null;
         storedUserInfo = null;
-        pkceStore.clear();
         return new Result<>(true, "Disconnected", null);
     }
 
@@ -641,8 +657,7 @@ public class OidcSsfServiceImpl implements OidcSsfService {
         String codeVerifier = generateRandomString(64);
         String codeChallenge = computeS256Challenge(codeVerifier);
         String nonce = computeS256Challenge(codeVerifier);
-
-        pkceStore.put(state, codeVerifier);
+        persistOidcState(STATE_USAGE_LOGIN, state, codeVerifier);
 
         OidcConfigBean effectiveConfig = getDbConfig();
         if (!isConfiguredAndEnabled(effectiveConfig)) {
@@ -666,8 +681,9 @@ public class OidcSsfServiceImpl implements OidcSsfService {
     }
 
     @Override
+    @Transactional
     public Result<UserBean> handleLoginCallback(String code, String state, HttpServletRequest request) {
-        String codeVerifier = pkceStore.remove(state);
+        String codeVerifier = consumeOidcState(STATE_USAGE_LOGIN, state);
         if (codeVerifier == null) {
             return new Result<>(false, "Invalid state parameter", null);
         }
@@ -764,22 +780,74 @@ public class OidcSsfServiceImpl implements OidcSsfService {
     }
 
     /**
+     * 将 OIDC state 持久化到数据库，支持多副本共享和重启恢复。
+     * 这里会顺手清理历史过期数据，避免短期一次性记录无限增长。
+     * @param usageType state 用途
+     * @param state OIDC state
+     * @param codeVerifier PKCE code_verifier
+     */
+    private void persistOidcState(String usageType, String state, String codeVerifier) {
+        Date now = new Date();
+        oidcLoginStateDao.deleteExpired(now);
+
+        OidcLoginStateBean stateRecord = new OidcLoginStateBean();
+        stateRecord.setUsageType(usageType);
+        stateRecord.setStateKey(state);
+        stateRecord.setCodeVerifier(codeVerifier);
+        stateRecord.setCreatedTime(now);
+        stateRecord.setExpireTime(new Date(now.getTime() + OIDC_STATE_EXPIRE_MS));
+        if (!Boolean.TRUE.equals(oidcLoginStateDao.saveState(stateRecord))) {
+            throw new IllegalStateException("Failed to persist OIDC state");
+        }
+    }
+
+    /**
+     * 以一次性方式消费 OIDC state。
+     * 通过事务内先锁定再删除，确保多副本并发回调时只有一个请求可以成功消费。
+     * @param usageType state 用途
+     * @param state OIDC state
+     * @return 对应的 code_verifier；不存在或已过期时返回 null
+     */
+    private String consumeOidcState(String usageType, String state) {
+        Date now = new Date();
+        OidcLoginStateBean stateRecord = oidcLoginStateDao.getActiveStateForUpdate(usageType, state, now);
+        if (stateRecord == null) {
+            oidcLoginStateDao.deleteExpiredByUsageAndState(usageType, state, now);
+            return null;
+        }
+        Integer deleted = oidcLoginStateDao.deleteByCode(stateRecord.getCode());
+        if (deleted == null || deleted < 1) {
+            return null;
+        }
+        return stateRecord.getCodeVerifier();
+    }
+
+    /**
      * 按 sub → email → 创建 的优先级查找/创建用户
      */
     private UserBean findOrCreateOidcUser(String sub, String email, String preferredUsername, String displayName) {
-        // 1. 按 oidc_sub 查找
-        UserBean user = userManageDao.getUserByOidcSub(sub);
-        if (user != null) {
-            LOG.info("OIDC login: found existing user by sub={}: {}", sub, user.getUserName());
-            return user;
+        boolean hasOidcSubColumn = hasOidcSubColumn();
+
+        // 1. 新结构优先按 oidc_sub 查找；旧结构则跳过这一层，避免直接打出 SQLSyntaxErrorException。
+        UserBean user = null;
+        if (hasOidcSubColumn) {
+            user = userManageDao.getUserByOidcSub(sub);
+            if (user != null) {
+                LOG.info("OIDC login: found existing user by sub={}: {}", sub, user.getUserName());
+                return user;
+            }
         }
 
-        // 2. 按 email 匹配并绑定
+        // 2. 按 email 匹配；如果库结构已经升级，则顺带把 sub 绑定回去。
         if (email != null && !email.isBlank()) {
             user = userManageDao.getUserByEmail(email);
             if (user != null) {
-                userManageDao.updateOidcSub(user.getCode(), sub);
-                LOG.info("OIDC login: linked sub={} to existing user {} by email", sub, user.getUserName());
+                if (hasOidcSubColumn) {
+                    userManageDao.updateOidcSub(user.getCode(), sub);
+                    LOG.info("OIDC login: linked sub={} to existing user {} by email", sub, user.getUserName());
+                } else {
+                    LOG.warn("OIDC login: user_tb is missing oidc_sub, fallback to email match for user {}", user.getUserName());
+                }
                 return user;
             }
         }
@@ -792,14 +860,73 @@ public class OidcSsfServiceImpl implements OidcSsfService {
         String randomPassword = PasswordUtils.encode(UUID.randomUUID().toString());
 
         try {
-            userManageDao.addNewOidcUser(userName, email, randomPassword, sub);
-            user = userManageDao.getUserByOidcSub(sub);
+            if (hasOidcSubColumn) {
+                userManageDao.addNewOidcUser(userName, email, randomPassword, sub);
+                user = userManageDao.getUserByOidcSub(sub);
+            } else {
+                // 旧库结构先按普通用户创建，后续补列并执行迁移后即可绑定 sub。
+                userManageDao.addNewUser(userName, email, randomPassword, "ACTIVE");
+                user = userManageDao.getUserByEmail(email);
+                if (user == null) {
+                    user = userManageDao.getUserByName(userName);
+                }
+                LOG.warn("OIDC login: created fallback user {} without oidc_sub binding because column is missing", userName);
+            }
             LOG.info("OIDC login: created new user {} for sub={}", userName, sub);
             return user;
         } catch (Exception e) {
             LOG.error("Failed to create OIDC user: {}", userName, e);
             return null;
         }
+    }
+
+    /**
+     * 检查 user_tb 是否已经完成 oidc_sub 升级。
+     * 结果会被缓存，只有首次访问或启动后才会查询 information_schema。
+     * @return true 表示列存在
+     */
+    private boolean hasOidcSubColumn() {
+        Boolean cached = oidcSubColumnPresent;
+        if (cached != null) {
+            return cached;
+        }
+        synchronized (this) {
+            if (oidcSubColumnPresent != null) {
+                return oidcSubColumnPresent;
+            }
+            try {
+                Integer count = jdbcTemplate.queryForObject(oidcSubColumnInspectionSql(), Integer.class, OIDC_SUB_COLUMN);
+                oidcSubColumnPresent = count != null && count > 0;
+            } catch (Exception e) {
+                LOG.warn("Failed to inspect user_tb.oidc_sub, fallback to legacy-compatible OIDC login flow", e);
+                oidcSubColumnPresent = false;
+            }
+            if (!oidcSubColumnPresent) {
+                LOG.warn("user_tb is missing oidc_sub. OIDC login will run in legacy compatibility mode until DB migration is applied.");
+            }
+            return oidcSubColumnPresent;
+        }
+    }
+
+    private String oidcSubColumnInspectionSql() {
+        if ("postgresql".equals(appDatabaseDialect)) {
+            return "SELECT COUNT(*) FROM information_schema.columns " +
+                    "WHERE table_catalog = current_database() " +
+                    "AND table_schema = current_schema() " +
+                    "AND table_name = 'user_tb' AND column_name = ?";
+        }
+        return "SELECT COUNT(*) FROM information_schema.columns " +
+                "WHERE table_schema = DATABASE() AND table_name = 'user_tb' AND column_name = ?";
+    }
+
+    private String normalizeAppDatabaseDialect(String dialect) {
+        if (dialect == null) {
+            return "mysql";
+        }
+        String normalized = dialect.trim().toLowerCase(Locale.ROOT);
+        return ("postgres".equals(normalized) || "pgsql".equals(normalized) || "postgresql".equals(normalized))
+                ? "postgresql"
+                : "mysql";
     }
 
     /**

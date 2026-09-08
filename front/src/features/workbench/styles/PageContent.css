@@ -243,6 +243,21 @@
     padding: 14px;
 }
 
+.workbench-tab-with-icon {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.38em;
+    line-height: 1;
+}
+
+.workbench-tab-icon {
+    width: 1em;
+    height: 1em;
+    object-fit: contain;
+    vertical-align: middle;
+    flex: 0 0 auto;
+}
+
 .workbench-dashboard-panel {
     display: flex;
     flex-direction: column;
@@ -260,6 +275,58 @@
     color: #64748b;
     font-size: 0.82rem;
     font-weight: 600;
+}
+
+.vanna-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.vanna-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+}
+
+.vanna-loading,
+.vanna-empty {
+    padding: 20px 0;
+}
+
+.vanna-alert {
+    margin-top: 4px;
+}
+
+.vanna-result {
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 14px;
+    background: rgba(248, 252, 253, 0.9);
+    padding: 14px;
+}
+
+.vanna-sql-card {
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 12px;
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 14px;
+}
+
+.vanna-sql-card pre {
+    margin: 0 0 12px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: Menlo, Monaco, Consolas, 'Courier New', monospace;
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.vanna-subtitle {
+    margin-bottom: 8px;
+    color: #334155;
+    font-size: 0.82rem;
+    font-weight: 700;
 }
 
 .workbench-dashboard-feedback.error {
@@ -384,6 +451,18 @@
 
 .workbench-result-wrap .x-spreadsheet-sheet {
     box-shadow: none !important;
+}
+
+.workbench-editor-loading {
+    min-height: 300px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 14px;
+    background: #fbfdff;
+    color: #64748b;
+    font-size: 0.9rem;
 }
 
 .query_load {

@@ -1,0 +1,42 @@
+services:
+  jsw-vanna:
+    build:
+      context: ../../vanna
+      dockerfile: Dockerfile.gpu
+    image: jsw-vanna-gpu:${TAG:-v3.3.0}
+    container_name: jsw-vanna
+    restart: unless-stopped
+    ports:
+      - "${VANNA_BIND_IP:-0.0.0.0}:${VANNA_PORT:-8003}:8003"
+    environment:
+      PROJECT_VERSION: ${TAG:-v3.3.0}
+      VANNA_PORT: 8003
+      JSW_SERVER_BASE_URL: ${JSW_SERVER_BASE_URL:?set JSW_SERVER_BASE_URL}
+      VANNA_INTERNAL_TOKEN: ${VANNA_INTERNAL_TOKEN:?set VANNA_INTERNAL_TOKEN}
+      VANNA_DB_URL: ${VANNA_DB_URL:?set VANNA_DB_URL}
+      VANNA_CHAT_MODEL: ${VANNA_CHAT_MODEL:?set VANNA_CHAT_MODEL}
+      VANNA_EMBEDDING_MODEL_SOURCE: ${VANNA_EMBEDDING_MODEL_SOURCE:-huggingface}
+      VANNA_EMBEDDING_MODEL: ${VANNA_EMBEDDING_MODEL:-BAAI/bge-small-zh-v1.5}
+      VANNA_EMBEDDING_MODELSCOPE_MODEL_ID: ${VANNA_EMBEDDING_MODELSCOPE_MODEL_ID:-}
+      VANNA_EMBEDDING_MODEL_REVISION: ${VANNA_EMBEDDING_MODEL_REVISION:-}
+      VANNA_EMBEDDING_MODEL_CACHE_DIR: /models
+      VANNA_EMBEDDING_DEVICE: ${VANNA_EMBEDDING_DEVICE:-cuda:0}
+      VANNA_WARMUP_ENABLED: ${VANNA_WARMUP_ENABLED:-true}
+      VANNA_WARMUP_ON_STARTUP: ${VANNA_WARMUP_ON_STARTUP:-true}
+      VANNA_WARMUP_MAX_CONCURRENCY: ${VANNA_WARMUP_MAX_CONCURRENCY:-1}
+      VANNA_WARMUP_NIGHTLY_HOUR: ${VANNA_WARMUP_NIGHTLY_HOUR:-1}
+      VANNA_WARMUP_RETRY_MINUTES: ${VANNA_WARMUP_RETRY_MINUTES:-30}
+      VANNA_LLM_BASE_URL: ${VANNA_LLM_BASE_URL:?set VANNA_LLM_BASE_URL}
+      VANNA_LLM_API_KEY: ${VANNA_LLM_API_KEY:?set VANNA_LLM_API_KEY}
+    volumes:
+      - vanna-models:/models
+    gpus: all
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8003/health', timeout=3)"]
+      interval: 20s
+      timeout: 5s
+      retries: 6
+      start_period: 120s
+
+volumes:
+  vanna-models:

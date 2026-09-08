@@ -94,11 +94,12 @@ public class DbOperationMysql implements DbOperation {
         List<TablesNameBean> listTnb = new ArrayList<>();
         Statement st = sqlConn.createStatement();
         ResultSet rs = st.executeQuery(String.format(
-                "SELECT table_name ,table_rows\n" +
+                "SELECT table_name ,table_rows, COALESCE(table_comment, '') AS table_comment\n" +
                         "FROM `information_schema`.`tables` WHERE TABLE_SCHEMA = '%s' ORDER BY table_rows DESC;", dbName));
         while (rs.next()){
             listTnb.add(new TablesNameBean(rs.getObject("table_name").toString(),
-                    rs.getLong("table_rows")));
+                    rs.getLong("table_rows"),
+                    rs.getString("table_comment")));
         }
         // 关闭rs和statement
         if (rs != null) {
@@ -136,6 +137,8 @@ public class DbOperationMysql implements DbOperation {
     }
 
     /**
+     * 获取指定表的列元数据；目标表不存在时返回空列表。
+     *
      * @param dbName
      * @param tableName
      * @return
@@ -143,22 +146,31 @@ public class DbOperationMysql implements DbOperation {
     @Override
     public List<ColumnsNameBean> getColumnsList(String dbName, String tableName) throws SQLException {
         List<ColumnsNameBean> listCnb = new ArrayList<>();
-        Statement st = sqlConn.createStatement();
-        ResultSet rs = st.executeQuery(String.format(
-                "SHOW FULL COLUMNS FROM %s.%s", dbName, tableName));
-        while (rs.next()){
-            listCnb.add(new ColumnsNameBean(rs.getObject("Field").toString(),
-                    rs.getObject("Type").toString(),
-                    rs.getObject("Type").toString(),
-                    "",
-                    ""));
-        }
-        // 关闭rs和statement
-        if (rs != null) {
-            rs.close();
-        }
-        if (st != null) {
-            st.close();
+        PreparedStatement st = null;
+        ResultSet rs = null;
+        try {
+            st = sqlConn.prepareStatement(
+                    "SELECT column_name, column_type, column_comment, is_nullable " +
+                            "FROM information_schema.columns " +
+                            "WHERE table_schema = ? AND table_name = ? ORDER BY ordinal_position");
+            st.setString(1, dbName);
+            st.setString(2, tableName);
+            rs = st.executeQuery();
+            while (rs.next()){
+                listCnb.add(new ColumnsNameBean(rs.getString("column_name"),
+                        rs.getString("column_type"),
+                        "",
+                        rs.getString("column_comment"),
+                        "NO".equals(rs.getString("is_nullable"))?"not null":"null"));
+            }
+        } finally {
+            // information_schema 查不到表时为空结果；异常仅保留给真实连接或 SQL 执行问题。
+            if (rs != null) {
+                rs.close();
+            }
+            if (st != null) {
+                st.close();
+            }
         }
         return listCnb;
     }

@@ -33,8 +33,9 @@
 .
 ├── front/                 # React 前端 + Nginx 镜像
 ├── server/                # Spring Boot 服务端 + Maven 构建
+├── vanna/                 # 独立的 Vanna/FastAPI 问数服务
 ├── deploy/                # 部署相关文件，例如数据库初始化 SQL
-├── docker-compose.yml     # 运行数据库、服务端、前端三个容器
+├── docker-compose.yml     # 运行数据库、服务端、Vanna、前端四个容器
 └── .github/workflows/     # Git tag 触发的镜像发布流程
 ```
 
@@ -53,6 +54,7 @@ git push origin v0.9.0
 
 - `ghcr.io/guohai163/java-sql-web-front:<tag>`
 - `ghcr.io/guohai163/java-sql-web-server:<tag>`
+- `ghcr.io/guohai163/java-sql-web-vanna:<tag>`
 
 ### 2. 使用 docker compose 部署
 
@@ -65,12 +67,21 @@ cp .env.example .env
 至少需要确认：
 
 - `TAG`：要部署的镜像版本，例如 `v0.9.0`
-- `DB_PASSWORD`：MariaDB root 密码
+- `DB_USERNAME` / `DB_PASSWORD`：PostgreSQL 应用用户与密码
+- `DB_DIALECT`：默认 `postgresql`，兼容旧元库时可设为 `mysql`
 - `PUBLIC_DOMAIN` / `PUBLIC_HOST`：对外访问域名与完整 URL
+- `VANNA_INTERNAL_TOKEN`：`jsw-server` 与 `jsw-vanna` 之间的内部共享密钥
+- `VANNA_DB_URL`：Vanna 独立数据库连接串
+- `VANNA_CHAT_MODEL` / `VANNA_LLM_API_KEY`：问数聊天模型配置（仍走 OpenAI 兼容接口）
+- `VANNA_EMBEDDING_MODEL_SOURCE`：embedding 模型来源，默认 `huggingface`，也可设为 `modelscope`
+- `VANNA_EMBEDDING_MODEL`：embedding 模型 ID，默认 `BAAI/bge-small-zh-v1.5`
 
 建议配置示例：
 
 ```shell
+DB_USERNAME=jsw
+DB_PASSWORD=change-me
+DB_DIALECT=postgresql
 PUBLIC_DOMAIN=jsw.example.com
 PUBLIC_HOST=https://jsw.example.com
 ```
@@ -85,7 +96,54 @@ docker compose up -d
 
 - `jsw-front`：唯一对外入口，提供静态页面并将后端请求代理到 `jsw-server`
 - `jsw-server`：Spring Boot API 服务
-- `jsw-db`：MariaDB 数据库，首次启动会执行 `deploy/init.sql`
+- `jsw-vanna`：AI 问数服务，只生成只读 SQL，不执行 SQL
+- `jsw-db`：PostgreSQL 18 数据库，首次启动会执行 `deploy/init.postgresql.sql`
+
+默认配置下：
+
+- 聊天模型仍通过 OpenAI 兼容接口调用
+- embedding 模型改为本地 CPU 运行，不再依赖 `text-embedding-3-small`
+
+如果部署环境访问 `huggingface.co` 不稳定，可切到 ModelScope：
+
+```shell
+VANNA_EMBEDDING_MODEL_SOURCE=modelscope
+VANNA_EMBEDDING_MODEL=BAAI/bge-small-zh-v1.5
+VANNA_EMBEDDING_MODELSCOPE_MODEL_ID=<modelscope-repo-id>
+```
+
+说明：
+
+- `VANNA_EMBEDDING_MODELSCOPE_MODEL_ID` 仅在 `VANNA_EMBEDDING_MODEL_SOURCE=modelscope` 时生效
+- 如果两边仓库名一致，可以不单独配置 `VANNA_EMBEDDING_MODELSCOPE_MODEL_ID`
+- `VANNA_EMBEDDING_MODEL_CACHE_DIR` 可选，适合挂载持久卷复用模型缓存，减少重复下载
+
+如果当前 PG 实例已经在运行，并且不是“首次空数据卷启动”，还需要额外执行一次：
+
+```shell
+psql "$DB_URL" -f deploy/init.vanna.postgresql.sql
+```
+
+这一步会在同一 PG 实例中创建：
+
+- 独立数据库 `jsw_vanna_db`
+- 独立角色 `jsw_vanna`
+- `vector` 扩展
+- Vanna 的上下文缓存 / 向量 / 审计表
+
+补充说明：
+
+- 全新 `docker compose` 首次启动时，`deploy/init.postgresql.sql` 会创建 `jsw_vanna_db`
+- `jsw-vanna` 服务自身启动时会自动补齐 `vector` 扩展与其业务表
+- 已迁移完成的线上 PG 不会重新走首次初始化，因此需要手工执行 `deploy/init.vanna.postgresql.sql`
+
+应用自身元数据库通过 `APP_DB_DIALECT` / `DB_DIALECT` 选择 SQL 方言。默认新部署使用 PostgreSQL；若需要先发布兼容版本并继续连接旧 MariaDB/MySQL 元库，可显式设置：
+
+```shell
+DB_DIALECT=mysql
+APP_DB_DIALECT=mysql
+DB_URL="jdbc:mysql://jsw-db:3306/javasqlweb_db?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Hongkong"
+```
 
 如需兼容极少数仅支持 TLS 1.0 且强制加密的老 MSSQL，可在部署层为 `jsw-server` 增加：
 
@@ -119,7 +177,10 @@ cp deploy/k8s/env/prod.env.example deploy/k8s/env/prod.env
 至少需要确认：
 
 - `TAG`
+- `DB_USERNAME`
 - `DB_PASSWORD`
+- `DB_DIALECT`
+- `DB_PORT`
 - `PUBLIC_DOMAIN`
 - `PUBLIC_HOST`
 - `INGRESS_HOST`
@@ -128,6 +189,9 @@ cp deploy/k8s/env/prod.env.example deploy/k8s/env/prod.env
 建议配置示例：
 
 ```shell
+DB_USERNAME=jsw
+DB_DIALECT=postgresql
+DB_PORT=5432
 PUBLIC_DOMAIN=jsw.example.com
 PUBLIC_HOST=https://jsw.example.com
 INGRESS_HOST=jsw.example.com
@@ -141,8 +205,9 @@ bash scripts/deploy-k8s.sh
 
 该方案默认部署：
 
-- `jsw-db`：单实例 MariaDB（StatefulSet + PVC）
+- `jsw-db`：单实例 PostgreSQL 18（StatefulSet + PVC）
 - `jsw-server`：Spring Boot API（Deployment + ClusterIP Service）
+- `jsw-vanna`：AI 问数服务（Deployment + ClusterIP Service）
 - `jsw-front`：前端 Nginx（Deployment + ClusterIP Service）
 - `Ingress`：将外部流量转到 `jsw-front`
 
@@ -166,6 +231,35 @@ deploy/java-security/legacy-tls.security
 ```text
 /opt/jsw/legacy-tls.security
 ```
+
+### 2.2 从 MariaDB/MySQL 元库停机迁移到 PostgreSQL
+
+Docker Compose 模式下的完整迁移步骤、常见问题和回滚方案见：
+
+- [doc/docker-compose-mysql-to-postgresql-migration.md](./doc/docker-compose-mysql-to-postgresql-migration.md)
+
+Kubernetes 模式下从已有 MySQL 元库迁移到新的 PostgreSQL 元库，见：
+
+- [doc/k8s-mysql-to-postgresql-migration.md](./doc/k8s-mysql-to-postgresql-migration.md)
+
+推荐先发布同时兼容 MySQL/MariaDB 和 PostgreSQL 的服务端版本，但线上环境变量仍保持旧元库：
+
+```shell
+DB_DIALECT=mysql
+APP_DB_DIALECT=mysql
+DB_URL="jdbc:mysql://旧元库地址:3306/javasqlweb_db?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Hongkong"
+```
+
+确认旧库行为无回归后，安排停机窗口执行迁移：
+
+1. 停止 `jsw-front` 和 `jsw-server`，避免迁移期间继续写入登录态、权限、查询日志、OIDC/WebAuthn state。
+2. 备份旧库，例如 `mysqldump --single-transaction --routines --triggers javasqlweb_db > javasqlweb_db.sql`。
+3. 启动空 PostgreSQL 18 数据卷，确认 `deploy/init.postgresql.sql` 已完成建表。
+4. 使用 `pgloader` 或受控导出/导入迁移 `user_tb`、`usergroup`、`user_permissions`、`db_permissions`、`db_connect_config_tb`、`db_query_log`、`db_query_log_target_tb`、`db_server_database_snapshot_tb`、`guid_sql_tb`、`oidc_config_tb`、`oidc_login_state_tb`、`passkey_auths_tb`、`webauthn_request_tb`、`user_security_task_tb`。
+5. 校验核心表行数、唯一约束、最大自增值/identity 序列、管理员登录、已有连接配置、权限组、最近查询日志、Dashboard、OIDC/WebAuthn 回调。
+6. 切换环境变量到 `DB_DIALECT=postgresql`、`APP_DB_DIALECT=postgresql`、`DB_PORT=5432`、`DB_URL=jdbc:postgresql://jsw-db:5432/javasqlweb_db` 后启动服务。
+
+回滚时停止新服务，恢复旧 MariaDB/MySQL 的 `DB_DIALECT=mysql` 和旧 `DB_URL`，并保留迁移前备份与旧数据卷直到 PostgreSQL 验收完成。
 
 ### 3. 本地构建镜像
 
