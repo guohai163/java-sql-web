@@ -62,6 +62,12 @@ spec:
                 secretKeyRef:
                   name: jsw-app-secret
                   key: PROJECT_LIMIT
+            - name: MCP_QUERY_LIMIT
+              value: "${MCP_QUERY_LIMIT}"
+            - name: MCP_QUERY_RATE_PER_MINUTE
+              value: "${MCP_QUERY_RATE_PER_MINUTE}"
+            - name: MCP_MAX_REQUEST_SIZE
+              value: "${MCP_MAX_REQUEST_SIZE}"
             - name: PROJECT_SIGNKEY
               valueFrom:
                 secretKeyRef:

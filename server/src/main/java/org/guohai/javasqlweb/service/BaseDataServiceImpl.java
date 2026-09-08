@@ -289,6 +289,16 @@ public class BaseDataServiceImpl implements BaseDataService{
      */
     @Override
     public Result<Object> quereyDataBySql(Integer serverCode, String dbName, String sql, UserBean user, String userIp) {
+        return queryDataBySql(serverCode, dbName, sql, user, userIp, limit);
+    }
+
+    @Override
+    public Result<Object> queryDataBySql(Integer serverCode,
+                                         String dbName,
+                                         String sql,
+                                         UserBean user,
+                                         String userIp,
+                                         Integer resultLimit) {
         Result<Object> permissionCheck = validateServerPermission(serverCode, user);
         if (permissionCheck != null) {
             return permissionCheck;
@@ -326,7 +336,7 @@ public class BaseDataServiceImpl implements BaseDataService{
                 QueryExecutionResult executionResult = operation.queryDatabaseBySqlWithSession(
                         effectiveDbName,
                         executableSql,
-                        limit,
+                        resultLimit == null || resultLimit < 1 ? limit : resultLimit,
                         sessionId -> {
                             queryLog.setDbSessionId(sessionId);
                             saveQueryLogCompat(queryLog);

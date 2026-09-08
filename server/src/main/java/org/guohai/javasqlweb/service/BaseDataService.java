@@ -120,6 +120,16 @@ public interface BaseDataService {
     Result<Object> quereyDataBySql(Integer serverCode, String dbName, String sql, UserBean user, String userIp);
 
     /**
+     * 执行指定返回条数上限的查询语句。
+     */
+    Result<Object> queryDataBySql(Integer serverCode,
+                                  String dbName,
+                                  String sql,
+                                  UserBean user,
+                                  String userIp,
+                                  Integer resultLimit);
+
+    /**
      * 获取工作台 dashboard
      * @param serverCode 服务器编号
      * @param dbName 数据库名

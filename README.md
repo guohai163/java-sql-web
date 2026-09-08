@@ -75,6 +75,8 @@ cp .env.example .env
 - `VANNA_CHAT_MODEL` / `VANNA_LLM_API_KEY`：问数聊天模型配置（仍走 OpenAI 兼容接口）
 - `VANNA_EMBEDDING_MODEL_SOURCE`：embedding 模型来源，默认 `huggingface`，也可设为 `modelscope`
 - `VANNA_EMBEDDING_MODEL`：embedding 模型 ID，默认 `BAAI/bge-small-zh-v1.5`
+- `MCP_QUERY_LIMIT`：远程 MCP 单次查询最大返回行数，默认 `1000`
+- `MCP_QUERY_RATE_PER_MINUTE`：每个 JSW 用户每分钟最大 MCP 查询次数，默认 `20`
 
 建议配置示例：
 
@@ -98,6 +100,35 @@ docker compose up -d
 - `jsw-server`：Spring Boot API 服务
 - `jsw-vanna`：AI 问数服务，只生成只读 SQL，不执行 SQL
 - `jsw-db`：PostgreSQL 18 数据库，首次启动会执行 `deploy/init.postgresql.sql`
+
+### 2.1 使用远程 MCP
+
+JSW 默认在同一公网域名提供无状态 Streamable HTTP MCP：
+
+```text
+https://jsw.example.com/mcp
+```
+
+MCP 使用前端“访问令牌”页面生成的 `jsw_` Token。Token 有效期为 90 天，沿用当前用户的数据库服务器权限；所有查询仍经过只读 SQL 校验、超时控制和审计。MCP 单次最多返回 `MCP_QUERY_LIMIT` 行，默认 1000 行。
+
+生产环境必须使用 HTTPS，并确保 `PUBLIC_DOMAIN` 与对外域名一致。MCP 不支持写 SQL、存储过程调用、后台管理或 Token 管理。
+
+Codex 可将 Token 放入环境变量：
+
+```shell
+export JSW_ACCESS_TOKEN='jsw_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+```
+
+然后在用户级 `~/.codex/config.toml` 中配置：
+
+```toml
+[mcp_servers.jsw]
+url = "https://jsw.example.com/mcp"
+bearer_token_env_var = "JSW_ACCESS_TOKEN"
+tool_timeout_sec = 40
+```
+
+重启 Codex 后应能发现以下工具：`jsw_list_servers`、`jsw_list_databases`、`jsw_list_tables`、`jsw_describe_table`、`jsw_query`。Codex 的 HTTP MCP 配置字段以[官方配置参考](https://developers.openai.com/codex/config-file/config-reference)为准。
 
 默认配置下：
 
@@ -160,7 +191,7 @@ JAVA_TOOL_OPTIONS="-Djdk.tls.client.protocols=TLSv1,TLSv1.1,TLSv1.2 -Djava.secur
 ./deploy/java-security/legacy-tls.security -> /opt/jsw/legacy-tls.security
 ```
 
-### 2.1 使用 Kubernetes 部署
+### 2.2 使用 Kubernetes 部署
 
 仓库提供了一套基于原生 YAML 的 K8s 部署清单：
 

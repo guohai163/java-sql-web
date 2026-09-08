@@ -39,6 +39,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
@@ -155,6 +156,29 @@ class BaseDataServiceImplTests {
         }
 
         verify(operation, times(4)).getDbList();
+    }
+
+    @Test
+    void customQueryLimitIsPassedToDatabaseWithoutChangingWebLimit() throws Exception {
+        UserBean user = buildUser();
+        DbOperation operation = mock(DbOperation.class);
+        ConnectConfigBean server = buildConnectConfig(61, "mysql", "core");
+        when(baseConfigDao.hasServerPermission(user.getCode(), 61)).thenReturn(true);
+        when(baseConfigDao.getConnectConfig(61)).thenReturn(server);
+        when(operation.queryDatabaseBySqlWithSession(anyString(), anyString(), anyInt(), any()))
+                .thenAnswer(invocation -> {
+                    QueryExecutionResult executionResult = new QueryExecutionResult();
+                    executionResult.setRows(new Object[]{0, 0, List.of()});
+                    return executionResult;
+                });
+        accessStaticMap("operationMap").put(61, operation);
+
+        assertTrue(baseDataService.queryDataBySql(61, "demo", "SELECT 1", user, "127.0.0.1", 1000).getStatus());
+        verify(operation).queryDatabaseBySqlWithSession(eq("demo"), eq("SELECT 1"), eq(1000), any());
+
+        clearInvocations(operation);
+        assertTrue(baseDataService.quereyDataBySql(61, "demo", "SELECT 1", user, "127.0.0.1").getStatus());
+        verify(operation).queryDatabaseBySqlWithSession(eq("demo"), eq("SELECT 1"), eq(100), any());
     }
 
     @Test

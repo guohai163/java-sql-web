@@ -25,6 +25,9 @@ project:
   auto-user-link-enabled: ${PROJECT_AUTO_USER_LINK_ENABLED:false}
   legacy-tls-enabled: ${PROJECT_LEGACY_TLS_ENABLED:false}
   target-query-timeout-seconds: ${PROJECT_TARGET_QUERY_TIMEOUT_SECONDS:30}
+  mcp-query-limit: ${MCP_QUERY_LIMIT:1000}
+  mcp-query-rate-per-minute: ${MCP_QUERY_RATE_PER_MINUTE:20}
+  mcp-max-request-size: ${MCP_MAX_REQUEST_SIZE:65536}
   vanna-internal-token: ${VANNA_INTERNAL_TOKEN:}
 management:
   endpoints:
